@@ -5,8 +5,16 @@ import { motion } from "framer-motion";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
 
 const CAMP_QUOTES = [
-  { quote: "Quote 1", emoji: "⭐" },
-  { quote: "Quote 2", emoji: "🚀" },
+  { quote: "John 3:16", emoji: "⭐" },
+  { quote: "Philippians 4:13", emoji: "💪" },
+  { quote: "Jeremiah 29:11", emoji: "🌟" },
+  { quote: "Psalm 23:1", emoji: "🐑" },
+  { quote: "Romans 8:28", emoji: "❤️" },
+  { quote: "Proverbs 3:5-6", emoji: "📖" },
+  { quote: "Matthew 19:26", emoji: "🙏" },
+  { quote: "Isaiah 40:31", emoji: "🦅" },
+  { quote: "Joshua 1:9", emoji: "🛡️" },
+  { quote: "Psalm 46:10", emoji: "✨" },
 ];
 
 export function SurpriseFX() {

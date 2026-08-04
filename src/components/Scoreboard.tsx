@@ -104,7 +104,7 @@ export function Scoreboard() {
           </motion.div>
 
           <p className="display-font text-sm font-semibold uppercase tracking-[0.28em] text-saddle/80 sm:text-base">
-            Quote 1
+            To Jesus I Belong
           </p>
           <h1 className="display-font mt-2 text-4xl font-bold text-ink drop-shadow-sm sm:text-5xl md:text-6xl">
             Camp Scoreboard
