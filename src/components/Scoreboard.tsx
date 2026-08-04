@@ -104,7 +104,7 @@ export function Scoreboard() {
           </motion.div>
 
           <p className="display-font text-sm font-semibold uppercase tracking-[0.28em] text-saddle/80 sm:text-base">
-            To infinity & beyond
+            Quote 1
           </p>
           <h1 className="display-font mt-2 text-4xl font-bold text-ink drop-shadow-sm sm:text-5xl md:text-6xl">
             Camp Scoreboard
@@ -156,7 +156,7 @@ export function Scoreboard() {
                   {data.standings.map((team) => {
                     const dark = needsDarkText(team.color);
                     const topThree = team.rank <= 3;
-                    const isSheriff = team.rank === 1;
+                    const isFirst = team.rank === 1;
                     const badge =
                       team.rank === 1
                         ? "👑"
@@ -181,14 +181,14 @@ export function Scoreboard() {
                           opacity: { duration: 0.2 },
                         }}
                         className={`relative overflow-hidden rounded-2xl border-2 shadow-md ${
-                          isSheriff
+                          isFirst
                             ? "sheriff-glow border-[#E8B923] bg-gradient-to-r from-[#fff8ee] via-[#ffe9a8]/70 to-[#fff8ee]"
                             : topThree
                               ? "border-woody/35 bg-cloud/80"
                               : "border-saddle/15 bg-cloud/80"
                         }`}
                       >
-                        {isSheriff ? (
+                        {isFirst ? (
                           <motion.div
                             className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
                             animate={{ x: ["-120%", "120%"] }}
@@ -241,9 +241,9 @@ export function Scoreboard() {
                             </p>
                             <p className="text-xs font-bold uppercase tracking-wider text-saddle/60 sm:text-sm">
                               Rank #{team.rank}
-                              {isSheriff ? " · Sheriff of the Camp" : ""}
-                              {team.rank === 2 ? " · Deputy" : ""}
-                              {team.rank === 3 ? " · Space Ranger" : ""}
+                              {isFirst ? " · 1st place" : ""}
+                              {team.rank === 2 ? " · 2nd place" : ""}
+                              {team.rank === 3 ? " · 3rd place" : ""}
                             </p>
                           </div>
 

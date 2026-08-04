@@ -5,12 +5,8 @@ import { motion } from "framer-motion";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
 
 const CAMP_QUOTES = [
-  { quote: "Reach for the sky", emoji: "🤠" },
-  { quote: "To infinity and beyond", emoji: "🚀" },
-  { quote: "You've got a friend in me", emoji: "⭐" },
-  { quote: "The claw chooses", emoji: "👽" },
-  { quote: "There's a snake in my boot", emoji: "🐍" },
-  { quote: "Space ranger on duty", emoji: "🛸" },
+  { quote: "Quote 1", emoji: "⭐" },
+  { quote: "Quote 2", emoji: "🚀" },
 ];
 
 export function SurpriseFX() {

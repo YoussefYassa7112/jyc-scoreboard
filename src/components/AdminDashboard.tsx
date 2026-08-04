@@ -340,7 +340,7 @@ export function AdminDashboard() {
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder="e.g. Woody Rangers"
+                    placeholder="e.g. Team Rocket"
                     required
                     className="mt-1.5 w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-3 py-3 text-base font-semibold"
                   />
