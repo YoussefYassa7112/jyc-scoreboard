@@ -2,6 +2,11 @@
 
 Toy Story–inspired live camp scoreboard. Kids scan a QR code to view animated standings. Staff log in to create teams and add or deduct points.
 
+**Live app:** [https://camp-scoreboard.vercel.app](https://camp-scoreboard.vercel.app)  
+**Repo:** [YoussefYassa7112/jyc-scoreboard](https://github.com/YoussefYassa7112/jyc-scoreboard)
+
+Pushes to `main` automatically deploy to Vercel production.
+
 **Free stack:** Next.js · Neon Postgres · Vercel
 
 ## Features
