@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pointEvents, teams } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
@@ -69,20 +69,9 @@ export async function DELETE(_request: Request, { params }: Params) {
     }
 
     const db = getDb();
-    const [countRow] = await db
-      .select({ count: sql<number>`count(*)`.mapWith(Number) })
-      .from(pointEvents)
-      .where(eq(pointEvents.teamId, id));
 
-    if ((countRow?.count ?? 0) > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "Cannot delete a team that has point history. Rename it instead.",
-        },
-        { status: 409 },
-      );
-    }
+    // Remove point history first so any team can be deleted anytime
+    await db.delete(pointEvents).where(eq(pointEvents.teamId, id));
 
     const deleted = await db
       .delete(teams)

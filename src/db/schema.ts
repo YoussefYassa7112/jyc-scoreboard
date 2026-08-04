@@ -14,7 +14,7 @@ export const pointEvents = pgTable("point_events", {
   id: serial("id").primaryKey(),
   teamId: integer("team_id")
     .notNull()
-    .references(() => teams.id),
+    .references(() => teams.id, { onDelete: "cascade" }),
   delta: integer("delta").notNull(),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true })

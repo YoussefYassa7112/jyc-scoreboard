@@ -146,7 +146,11 @@ export function AdminDashboard() {
   }
 
   async function deleteTeam(id: number, name: string) {
-    if (!window.confirm(`Delete team "${name}"? Only works if it has no point history.`)) {
+    if (
+      !window.confirm(
+        `Delete team "${name}"? This also removes its point history.`,
+      )
+    ) {
       return;
     }
     setError(null);

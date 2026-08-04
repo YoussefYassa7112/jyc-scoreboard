@@ -96,4 +96,4 @@ drizzle/               # SQL migration
 
 - Schedule module is deferred (scoreboard only for v1).
 - Theme is Toy Story–inspired; no official Disney assets are included.
-- Deleting a team is blocked if it already has point history — rename instead.
+- Deleting a team also removes that team's point history.
