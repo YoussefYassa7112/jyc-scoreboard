@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --sky-top: #7ec8e3;
+  --sky-mid: #b8e0f0;
+  --horizon: #f4d35e;
+  --grass: #3d8b5a;
+  --woody: #c45c26;
+  --saddle: #5c4033;
+  --buzz-blue: #1e6bb8;
+  --cloud: #fff8ee;
+  --ink: #2a1f14;
+  --panel: rgba(255, 248, 238, 0.92);
+  --panel-border: rgba(92, 64, 51, 0.18);
+  --shadow: 0 12px 40px rgba(42, 31, 20, 0.18);
+}
+
+@theme inline {
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --color-sky-top: var(--sky-top);
+  --color-sky-mid: var(--sky-mid);
+  --color-horizon: var(--horizon);
+  --color-grass: var(--grass);
+  --color-woody: var(--woody);
+  --color-saddle: var(--saddle);
+  --color-buzz: var(--buzz-blue);
+  --color-cloud: var(--cloud);
+  --color-ink: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 12%, rgba(255, 255, 255, 0.4) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 55% 8%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px),
+    linear-gradient(
+      180deg,
+      var(--sky-top) 0%,
+      var(--sky-mid) 42%,
+      var(--horizon) 68%,
+      var(--grass) 100%
+    );
+  background-attachment: fixed;
+}
+
+.display-font {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.panel {
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+}
+
+.cloud-shape {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  filter: blur(0.5px);
+  pointer-events: none;
+}
+
+@keyframes float-cloud {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+
+.float-a {
+  animation: float-cloud 8s ease-in-out infinite alternate;
+}
+
+.float-b {
+  animation: float-cloud 11s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes pulse-live {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+
+.live-dot {
+  animation: pulse-live 1.6s ease-in-out infinite;
+}
