@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { TEAM_COLORS } from "@/lib/standings";
 import { SkyDecor } from "./SkyDecor";
+import { SpiderChart } from "./SpiderChart";
+import { useTheme } from "@/lib/theme";
 
 type TeamRow = {
   id: number;
@@ -27,6 +29,7 @@ type HistoryRow = {
 
 export function AdminDashboard() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -207,12 +210,12 @@ export function AdminDashboard() {
 
   return (
     <main className="relative min-h-dvh px-4 py-6 sm:px-6 md:px-8 md:py-8">
-      <SkyDecor />
+      {theme !== "dark" ? <SkyDecor /> : null}
 
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-5">
         <header className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
           <div>
-            <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-saddle/70">
+            <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
               Camp control
             </p>
             <h1 className="display-font text-2xl font-bold text-ink sm:text-3xl">
@@ -222,14 +225,14 @@ export function AdminDashboard() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/"
-              className="rounded-xl border-2 border-saddle/20 bg-white/70 px-4 py-2 text-sm font-extrabold text-ink"
+              className="btn-soft rounded-xl border-2 px-4 py-2 text-sm font-extrabold"
             >
               View scoreboard
             </Link>
             <button
               type="button"
               onClick={logout}
-              className="rounded-xl bg-saddle px-4 py-2 text-sm font-extrabold text-cloud"
+              className="btn-cta rounded-xl bg-saddle px-4 py-2 text-sm font-extrabold"
             >
               Log out
             </button>
@@ -237,40 +240,42 @@ export function AdminDashboard() {
         </header>
 
         {error ? (
-          <p className="rounded-2xl border-2 border-woody/40 bg-cloud/90 px-4 py-3 text-sm font-bold text-woody">
+          <p className="surface-card rounded-2xl border-2 border-woody/50 px-4 py-3 text-sm font-bold text-woody">
             {error}
           </p>
         ) : null}
         {message ? (
-          <p className="rounded-2xl border-2 border-grass/40 bg-cloud/90 px-4 py-3 text-sm font-bold text-grass">
+          <p className="surface-card rounded-2xl border-2 border-emerald-400/50 px-4 py-3 text-sm font-bold text-emerald-400">
             {message}
           </p>
         ) : null}
 
         {loading ? (
-          <p className="panel rounded-3xl px-5 py-10 text-center font-bold text-saddle/70">
+          <p className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft">
             Loading…
           </p>
         ) : (
           <>
+            <SpiderChart teams={sortedTeams} />
+
             <section className="grid gap-5 lg:grid-cols-2">
               <form
                 onSubmit={submitPoints}
                 className="panel rounded-3xl p-5"
               >
                 <h2 className="display-font text-xl font-bold">Add or deduct points</h2>
-                <p className="mt-1 text-sm font-semibold text-saddle/75">
+                <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Changes show on the public board within a few seconds.
                 </p>
 
-                <label className="mt-4 block text-sm font-bold text-saddle">
+                <label className="mt-4 block text-sm font-bold text-muted">
                   Team
                   <select
                     value={pointTeamId}
                     onChange={(e) =>
                       setPointTeamId(e.target.value ? Number(e.target.value) : "")
                     }
-                    className="mt-1.5 w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-3 py-3 text-base font-semibold"
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
                     required
                   >
                     <option value="" disabled>
@@ -284,13 +289,13 @@ export function AdminDashboard() {
                   </select>
                 </label>
 
-                <label className="mt-3 block text-sm font-bold text-saddle">
+                <label className="mt-3 block text-sm font-bold text-muted">
                   Points (use negative to deduct)
                   <input
                     type="number"
                     value={pointDelta}
                     onChange={(e) => setPointDelta(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-3 py-3 text-base font-semibold"
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
                     required
                   />
                 </label>
@@ -301,28 +306,28 @@ export function AdminDashboard() {
                       key={n}
                       type="button"
                       onClick={() => setPointDelta(String(n))}
-                      className="rounded-lg border border-saddle/20 bg-white/70 px-3 py-1.5 text-sm font-extrabold"
+                      className="btn-soft rounded-lg border px-3 py-1.5 text-sm font-extrabold"
                     >
                       {n > 0 ? `+${n}` : n}
                     </button>
                   ))}
                 </div>
 
-                <label className="mt-3 block text-sm font-bold text-saddle">
+                <label className="mt-3 block text-sm font-bold text-muted">
                   Note (optional)
                   <input
                     type="text"
                     value={pointNote}
                     onChange={(e) => setPointNote(e.target.value)}
                     placeholder="e.g. Capture the flag"
-                    className="mt-1.5 w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-3 py-3 text-base font-semibold"
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
                   />
                 </label>
 
                 <button
                   type="submit"
                   disabled={teams.length === 0}
-                  className="mt-4 w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold text-cloud disabled:opacity-50"
+                  className="btn-cta mt-4 w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
                   Submit points
                 </button>
@@ -330,11 +335,11 @@ export function AdminDashboard() {
 
               <form onSubmit={createTeam} className="panel rounded-3xl p-5">
                 <h2 className="display-font text-xl font-bold">Create team</h2>
-                <p className="mt-1 text-sm font-semibold text-saddle/75">
+                <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Add as many teams as you need — names are fully dynamic.
                 </p>
 
-                <label className="mt-4 block text-sm font-bold text-saddle">
+                <label className="mt-4 block text-sm font-bold text-muted">
                   Team name
                   <input
                     type="text"
@@ -342,18 +347,18 @@ export function AdminDashboard() {
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="e.g. Team Rocket"
                     required
-                    className="mt-1.5 w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-3 py-3 text-base font-semibold"
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
                   />
                 </label>
 
-                <label className="mt-3 block text-sm font-bold text-saddle">
+                <label className="mt-3 block text-sm font-bold text-muted">
                   Color
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     <input
                       type="color"
                       value={newColor}
                       onChange={(e) => setNewColor(e.target.value)}
-                      className="h-11 w-14 cursor-pointer rounded border border-saddle/20 bg-white"
+                      className="field h-11 w-14 cursor-pointer rounded border-2"
                     />
                     <div className="flex flex-wrap gap-1.5">
                       {TEAM_COLORS.map((c) => (
@@ -362,7 +367,7 @@ export function AdminDashboard() {
                           type="button"
                           aria-label={`Pick ${c}`}
                           onClick={() => setNewColor(c)}
-                          className="h-8 w-8 rounded-full border-2 border-white shadow"
+                          className="h-8 w-8 rounded-full border-2 border-white/80 shadow"
                           style={{ backgroundColor: c }}
                         />
                       ))}
@@ -372,7 +377,7 @@ export function AdminDashboard() {
 
                 <button
                   type="submit"
-                  className="mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold text-cloud"
+                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold"
                 >
                   Add team
                 </button>
@@ -382,7 +387,7 @@ export function AdminDashboard() {
             <section className="panel rounded-3xl p-5">
               <h2 className="display-font text-xl font-bold">Teams</h2>
               {sortedTeams.length === 0 ? (
-                <p className="mt-3 font-semibold text-saddle/70">
+                <p className="mt-3 font-semibold text-muted-soft">
                   No teams yet. Create your first team above.
                 </p>
               ) : (
@@ -390,39 +395,39 @@ export function AdminDashboard() {
                   {sortedTeams.map((team, index) => (
                     <li
                       key={team.id}
-                      className="rounded-2xl border-2 border-saddle/15 bg-white/60 p-3 sm:p-4"
+                      className="surface-card rounded-2xl border-2 p-3 sm:p-4"
                     >
                       {editingId === team.id ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                          <label className="flex-1 text-sm font-bold text-saddle">
+                          <label className="flex-1 text-sm font-bold text-muted">
                             Name
                             <input
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
-                              className="mt-1 w-full rounded-xl border-2 border-saddle/20 bg-white px-3 py-2 font-semibold"
+                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
                             />
                           </label>
-                          <label className="text-sm font-bold text-saddle">
+                          <label className="text-sm font-bold text-muted">
                             Color
                             <input
                               type="color"
                               value={editColor}
                               onChange={(e) => setEditColor(e.target.value)}
-                              className="mt-1 block h-10 w-14 rounded border border-saddle/20"
+                              className="field mt-1 block h-10 w-14 rounded border-2"
                             />
                           </label>
                           <div className="flex gap-2">
                             <button
                               type="button"
                               onClick={() => saveEdit(team.id)}
-                              className="rounded-xl bg-grass px-3 py-2 text-sm font-extrabold text-cloud"
+                              className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold"
                             >
                               Save
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingId(null)}
-                              className="rounded-xl border border-saddle/20 px-3 py-2 text-sm font-extrabold"
+                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
                             >
                               Cancel
                             </button>
@@ -431,16 +436,16 @@ export function AdminDashboard() {
                       ) : (
                         <div className="flex flex-wrap items-center gap-3">
                           <span
-                            className="display-font flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-cloud"
+                            className="display-font flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white"
                             style={{ backgroundColor: team.color }}
                           >
                             {index + 1}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="display-font truncate text-lg font-bold">
+                            <p className="display-font truncate text-lg font-bold text-card-ink">
                               {team.name}
                             </p>
-                            <p className="text-sm font-bold text-saddle/70">
+                            <p className="text-sm font-bold text-muted-soft">
                               {team.score} pts · {team.eventCount} events
                             </p>
                           </div>
@@ -451,21 +456,21 @@ export function AdminDashboard() {
                                 setPointTeamId(team.id);
                                 setPointDelta("10");
                               }}
-                              className="rounded-xl bg-buzz px-3 py-2 text-sm font-extrabold text-cloud"
+                              className="btn-cta rounded-xl bg-buzz px-3 py-2 text-sm font-extrabold"
                             >
                               + points
                             </button>
                             <button
                               type="button"
                               onClick={() => startEdit(team)}
-                              className="rounded-xl border border-saddle/20 bg-white/80 px-3 py-2 text-sm font-extrabold"
+                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
                             >
                               Rename
                             </button>
                             <button
                               type="button"
                               onClick={() => deleteTeam(team.id, team.name)}
-                              className="rounded-xl border border-woody/30 px-3 py-2 text-sm font-extrabold text-woody"
+                              className="rounded-xl border border-woody/40 px-3 py-2 text-sm font-extrabold text-woody"
                             >
                               Delete
                             </button>
@@ -482,7 +487,7 @@ export function AdminDashboard() {
               <div className="panel rounded-3xl p-5">
                 <h2 className="display-font text-xl font-bold">Point history</h2>
                 {history.length === 0 ? (
-                  <p className="mt-3 font-semibold text-saddle/70">
+                  <p className="mt-3 font-semibold text-muted-soft">
                     No point events yet.
                   </p>
                 ) : (
@@ -490,24 +495,24 @@ export function AdminDashboard() {
                     {history.map((row) => (
                       <li
                         key={row.id}
-                        className="flex items-start justify-between gap-3 rounded-xl border border-saddle/10 bg-white/55 px-3 py-2.5"
+                        className="surface-card flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-extrabold">
+                          <p className="truncate font-extrabold text-card-ink">
                             <span
                               className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
                               style={{ backgroundColor: row.teamColor }}
                             />
                             {row.teamName}
                           </p>
-                          <p className="text-xs font-semibold text-saddle/65">
+                          <p className="text-xs font-semibold text-muted-soft">
                             {new Date(row.createdAt).toLocaleString()}
                             {row.note ? ` · ${row.note}` : ""}
                           </p>
                         </div>
                         <span
                           className={`display-font shrink-0 text-lg font-bold ${
-                            row.delta > 0 ? "text-grass" : "text-woody"
+                            row.delta > 0 ? "text-emerald-400" : "text-woody"
                           }`}
                         >
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
@@ -520,7 +525,7 @@ export function AdminDashboard() {
 
               <div className="panel rounded-3xl p-5 text-center">
                 <h2 className="display-font text-xl font-bold">Camper QR code</h2>
-                <p className="mt-1 text-sm font-semibold text-saddle/75">
+                <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Print this so kids can open the live scoreboard.
                 </p>
                 {qrDataUrl ? (
@@ -528,19 +533,19 @@ export function AdminDashboard() {
                   <img
                     src={qrDataUrl}
                     alt="QR code to camp scoreboard"
-                    className="mx-auto mt-4 w-52 rounded-2xl border-2 border-saddle/15 bg-cloud p-2"
+                    className="mx-auto mt-4 w-52 rounded-2xl border-2 border-field-border bg-white p-2"
                   />
                 ) : (
-                  <p className="mt-8 font-semibold text-saddle/60">Generating QR…</p>
+                  <p className="mt-8 font-semibold text-muted-soft">Generating QR…</p>
                 )}
-                <p className="mt-3 break-all text-xs font-bold text-saddle/70">
+                <p className="mt-3 break-all text-xs font-bold text-muted-soft">
                   {publicUrl}
                 </p>
                 <button
                   type="button"
                   onClick={downloadQr}
                   disabled={!qrDataUrl}
-                  className="mt-4 w-full rounded-xl bg-woody px-4 py-3 text-sm font-extrabold text-cloud disabled:opacity-50"
+                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-sm font-extrabold disabled:opacity-50"
                 >
                   Download QR PNG
                 </button>

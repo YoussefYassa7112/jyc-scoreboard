@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 const display = Fredoka({
@@ -16,8 +17,21 @@ const body = Nunito({
 
 export const metadata: Metadata = {
   title: "Camp Scoreboard",
-  description: "Live Toy Story–inspired camp team standings",
+  description: "Live camp team standings and schedule",
 };
+
+const themeBootScript = `
+(function () {
+  try {
+    var stored = localStorage.getItem('camp-theme');
+    var hour = new Date().getHours();
+    var night = hour >= 20 || hour < 6;
+    var theme = stored === 'light' || stored === 'dark' ? stored : (night ? 'dark' : 'light');
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    document.documentElement.dataset.theme = theme;
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -25,9 +39,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body className={`${display.variable} ${body.variable} antialiased`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

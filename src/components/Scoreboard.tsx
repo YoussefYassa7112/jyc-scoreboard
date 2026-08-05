@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import type { StandingRow } from "@/lib/standings";
+import { useTheme } from "@/lib/theme";
 import { CampSchedule } from "./CampSchedule";
+import { OrbitArena } from "./OrbitArena";
 import { SkyDecor } from "./SkyDecor";
 import { ReachForTheSkyMarquee, SurpriseFX } from "./SurpriseFX";
 
@@ -34,9 +36,11 @@ function needsDarkText(hex: string) {
 }
 
 export function Scoreboard() {
+  const { theme } = useTheme();
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isDark = theme === "dark";
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +73,8 @@ export function Scoreboard() {
 
   return (
     <main className="relative min-h-dvh overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">
-      <SkyDecor />
-      <SurpriseFX />
+      {!isDark ? <SkyDecor /> : null}
+      {!isDark ? <SurpriseFX /> : null}
 
       <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-5 md:max-w-5xl md:gap-7">
         <header className="text-center">
@@ -83,7 +87,7 @@ export function Scoreboard() {
               animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             >
-              🤠
+              {isDark ? "🌙" : "🤠"}
             </motion.span>
             <motion.span
               animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
@@ -104,8 +108,8 @@ export function Scoreboard() {
             </motion.span>
           </motion.div>
 
-          <p className="display-font text-sm font-semibold uppercase tracking-[0.28em] text-saddle/80 sm:text-base">
-            To Jesus I Belong
+          <p className="display-font text-sm font-semibold uppercase tracking-[0.28em] text-muted sm:text-base">
+            Welcome to the JYC
           </p>
           <h1 className="display-font mt-2 text-4xl font-bold text-ink drop-shadow-sm sm:text-5xl md:text-6xl">
             Camp Scoreboard
@@ -113,11 +117,11 @@ export function Scoreboard() {
 
           <ReachForTheSkyMarquee />
 
-          <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-saddle sm:text-base">
+          <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
             <span className="live-dot inline-block h-2.5 w-2.5 rounded-full bg-woody" />
             <span>Live standings</span>
             {data?.asOf ? (
-              <span className="font-semibold text-saddle/70">
+              <span className="font-semibold text-muted-soft">
                 · as of {formatAsOf(data.asOf)}
               </span>
             ) : null}
@@ -133,7 +137,7 @@ export function Scoreboard() {
           </div>
 
           {loading && !data ? (
-            <p className="py-16 text-center text-lg font-bold text-saddle/70">
+            <p className="py-16 text-center text-lg font-bold text-muted">
               Opening the toy box…
             </p>
           ) : null}
@@ -145,7 +149,7 @@ export function Scoreboard() {
           ) : null}
 
           {data && data.standings.length === 0 ? (
-            <p className="py-16 text-center text-lg font-bold text-saddle/80">
+            <p className="py-16 text-center text-lg font-bold text-muted">
               No teams yet — ask a counselor to set up the scoreboard!
             </p>
           ) : null}
@@ -183,15 +187,15 @@ export function Scoreboard() {
                         }}
                         className={`relative overflow-hidden rounded-2xl border-2 shadow-md ${
                           isFirst
-                            ? "sheriff-glow border-[#E8B923] bg-gradient-to-r from-[#fff8ee] via-[#ffe9a8]/70 to-[#fff8ee]"
+                            ? "sheriff-glow border-saddle/20 bg-first-card"
                             : topThree
-                              ? "border-woody/35 bg-cloud/80"
-                              : "border-saddle/15 bg-cloud/80"
+                              ? "border-woody/40 bg-card"
+                              : "border-saddle/20 bg-card"
                         }`}
                       >
                         {isFirst ? (
                           <motion.div
-                            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent"
+                            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
                             animate={{ x: ["-120%", "120%"] }}
                             transition={{
                               duration: 2.8,
@@ -211,7 +215,7 @@ export function Scoreboard() {
                             className="display-font relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold sm:h-14 sm:w-14 sm:text-2xl"
                             style={{
                               backgroundColor: team.color,
-                              color: dark ? "var(--ink)" : "var(--cloud)",
+                              color: dark ? "#2a1f14" : "#fff8ee",
                               boxShadow: topThree
                                 ? "0 0 0 3px rgba(232, 185, 35, 0.55)"
                                 : undefined,
@@ -237,10 +241,10 @@ export function Scoreboard() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <p className="display-font truncate text-xl font-bold text-ink sm:text-2xl md:text-3xl">
+                            <p className="display-font truncate text-xl font-bold text-card-ink sm:text-2xl md:text-3xl">
                               {team.name}
                             </p>
-                            <p className="text-xs font-bold uppercase tracking-wider text-saddle/60 sm:text-sm">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
                               Rank #{team.rank}
                               {isFirst ? " · 1st place" : ""}
                               {team.rank === 2 ? " · 2nd place" : ""}
@@ -250,14 +254,14 @@ export function Scoreboard() {
 
                           <motion.div
                             key={`${team.id}-${team.score}`}
-                            initial={{ scale: 1.2, rotate: -4, color: "#C45C26" }}
-                            animate={{ scale: 1, rotate: 0, color: "var(--ink)" }}
+                            initial={{ scale: 1.2, rotate: -4 }}
+                            animate={{ scale: 1, rotate: 0 }}
                             transition={{
                               type: "spring",
                               stiffness: 420,
                               damping: 16,
                             }}
-                            className="display-font shrink-0 text-3xl font-bold tabular-nums sm:text-4xl md:text-5xl"
+                            className="display-font shrink-0 text-3xl font-bold tabular-nums text-card-ink sm:text-4xl md:text-5xl"
                           >
                             {team.score}
                           </motion.div>
@@ -271,14 +275,16 @@ export function Scoreboard() {
           ) : null}
         </section>
 
+        <OrbitArena standings={data?.standings ?? []} />
+
         <CampSchedule />
 
         <motion.p
-          className="text-center text-xs font-semibold text-saddle/70 sm:text-sm"
+          className="text-center text-xs font-semibold text-muted-soft sm:text-sm"
           animate={{ opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 3.5, repeat: Infinity }}
         >
-          🤠 Scan the camp QR anytime to check who&apos;s leading the adventure 🚀
+          Scan the camp QR anytime to check who&apos;s leading the adventure
         </motion.p>
       </div>
     </main>

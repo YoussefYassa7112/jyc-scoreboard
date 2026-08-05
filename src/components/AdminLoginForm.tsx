@@ -60,7 +60,7 @@ export function AdminLoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            className="w-full rounded-xl border-2 border-saddle/20 bg-white/80 px-4 py-3 text-base font-semibold outline-none ring-woody/40 focus:ring-4"
+            className="field w-full rounded-xl border-2 px-4 py-3 text-base font-semibold outline-none ring-woody/40 focus:ring-4"
           />
         </label>
 
@@ -71,7 +71,7 @@ export function AdminLoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-5 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold text-cloud transition hover:brightness-110 disabled:opacity-60"
+          className="btn-cta mt-5 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
         >
           {loading ? "Signing in…" : "Enter admin"}
         </button>
