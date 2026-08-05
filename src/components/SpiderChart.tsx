@@ -117,9 +117,11 @@ export function SpiderChart({ teams }: Props) {
   }, []);
 
   useEffect(() => {
-    const wrap = wrapRef.current;
+    const wrapEl = wrapRef.current;
     const svgEl = svgRef.current;
-    if (!wrap || !svgEl) return;
+    if (!wrapEl || !svgEl) return;
+    // Capture after null-check so nested handlers keep a definite type
+    const wrap: HTMLDivElement = wrapEl;
 
     const width = Math.min(wrap.clientWidth || 480, 520);
     const height = Math.max(300, Math.min(380, width));
