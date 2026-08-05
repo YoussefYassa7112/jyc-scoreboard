@@ -1,0 +1,513 @@
+export type ScheduleGroup = "all" | "red" | "green";
+export type ScheduleSection = "morning" | "midday" | "evening" | "full";
+
+export type ScheduleBlock = {
+  id: string;
+  title: string;
+  time?: string;
+  location?: string;
+  note?: string;
+  group: ScheduleGroup;
+  section: ScheduleSection;
+  details?: string[];
+};
+
+export type CampDay = {
+  id: string;
+  label: string;
+  dateLabel: string;
+  /** split = red/green tracks; together = one shared day */
+  mode: "split" | "together";
+  blocks: ScheduleBlock[];
+};
+
+export const campDays: CampDay[] = [
+  {
+    id: "day-1",
+    label: "Day 1",
+    dateLabel: "Saturday, Sept 5",
+    mode: "split",
+    blocks: [
+      {
+        id: "d1-arrival",
+        title: "Arrival",
+        location: "B1 — All Churches · B4 — St-George",
+        note: "Buses with Seguin & Viola",
+        group: "all",
+        section: "morning",
+      },
+      {
+        id: "d1-registration",
+        title: "Registration & Check-in",
+        location: "B1–4 (In Bus)",
+        group: "all",
+        section: "morning",
+      },
+      {
+        id: "d1-opening",
+        title: "Opening Ceremony + Verse + Hymns",
+        location: "B1 — Caf",
+        group: "all",
+        section: "morning",
+      },
+      {
+        id: "d1-icebreaker",
+        title: "JYC Ice-breaker Activity",
+        location: "Outside",
+        group: "all",
+        section: "morning",
+      },
+
+      {
+        id: "d1-red-topic1-lunch",
+        title: "Topic 1 / Lunch (split by cabin)",
+        location: "B1-B Salle Le Nordet · B4-B Common Area · B1 — Caf",
+        note: "Topic 1: What the world is telling you to be",
+        group: "red",
+        section: "midday",
+        details: [
+          "Cabins 1–2: Topic 1, then Lunch",
+          "Cabins 3–4: Lunch, then Topic 1",
+        ],
+      },
+      {
+        id: "d1-red-rotations",
+        title: "Rotating Activities (2 rounds)",
+        location:
+          "B1 — Caf · B1-B Salle Le Nordet · B1-B Salle Le Bivouac · B4 Common Area",
+        group: "red",
+        section: "midday",
+        details: [
+          "Round 1 — Cabin 1: Obstacle Course · Cabin 2: Pulling Tire (TTT) · Cabin 3: BabyFoot · Cabin 4: Kickball",
+          "Round 2 — Cabin 1: Pulling Tire (TTT) · Cabin 2: Obstacle Course · Cabin 3: Kickball · Cabin 4: BabyFoot",
+        ],
+      },
+      {
+        id: "d1-red-topic2-snack",
+        title: "Topic 2 / Snack (split by cabin)",
+        location: "B4-B Common Area · B1-B Salle Le Nordet · On the go",
+        note: "Topic 2: What God created us to be",
+        group: "red",
+        section: "midday",
+        details: [
+          "Cabins 1–2: Topic 2, then Snack",
+          "Cabins 3–4: Snack, then Topic 2",
+        ],
+      },
+      {
+        id: "d1-red-arbre",
+        title: "Arbre en Arbre",
+        location: "Arbre en Arbre course",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d1-red-bible",
+        title: "Bible Study #1",
+        location: "B1 — Caf / Open",
+        note: "Bring Bible, pen & notebook",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d1-red-supper",
+        title: "Supper",
+        location: "B1 — Caf",
+        group: "red",
+        section: "midday",
+      },
+
+      {
+        id: "d1-green-lunch-topic1",
+        title: "Lunch / Topic 1 (split by cabin)",
+        location: "B1 — Caf · B1-B Salle Le Nordet · B4 Common Area",
+        note: "Topic 1: What the world is telling you to be",
+        group: "green",
+        section: "midday",
+        details: [
+          "Cabins 5–6: Lunch, then Topic 1",
+          "Cabins 7–8: Topic 1, then Lunch",
+        ],
+      },
+      {
+        id: "d1-green-arbre",
+        title: "Arbre en Arbre",
+        location: "Arbre en Arbre course",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d1-green-snack-topic2",
+        title: "Snack / Topic 2 (split by cabin)",
+        location: "On the go · B4 Common Area · B1-B Salle Le Nordet",
+        note: "Topic 2: What God created us to be",
+        group: "green",
+        section: "midday",
+        details: [
+          "Cabins 5–6: Snack, then Topic 2",
+          "Cabins 7–8: Topic 2, then Snack",
+        ],
+      },
+      {
+        id: "d1-green-rotations",
+        title: "Rotating Activities (2 rounds)",
+        location:
+          "On the go · B4 Common Area · B1-B Salle Le Nordet · B1-B Salle Le Bivouac",
+        group: "green",
+        section: "midday",
+        details: [
+          "Round 1 — Cabin 5: BabyFoot · Cabin 6: Kickball · Cabin 7: Obstacle Course · Cabin 8: Pulling Tire (TTT)",
+          "Round 2 — Cabin 5: Kickball · Cabin 6: BabyFoot · Cabin 7: Pulling Tire (TTT) · Cabin 8: Obstacle Course",
+        ],
+      },
+      {
+        id: "d1-green-supper",
+        title: "Supper",
+        location: "B1 — Caf",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d1-green-bible",
+        title: "Bible Study #1",
+        location: "B1 — Caf / Open",
+        note: "Bring Bible, pen & notebook",
+        group: "green",
+        section: "midday",
+      },
+
+      {
+        id: "d1-compline",
+        title: "Gathering | Compline Prayer",
+        location: "Camp Site",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d1-campfire",
+        title: "Camp Fire",
+        location: "B1 — Caf",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d1-chill",
+        title: "Chill Time in Rooms / Snacks",
+        location: "Rooms",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d1-lights",
+        title: "Lights Out!",
+        location: "Rooms",
+        group: "all",
+        section: "evening",
+      },
+    ],
+  },
+  {
+    id: "day-2",
+    label: "Day 2",
+    dateLabel: "Sunday, Sept 6",
+    mode: "split",
+    blocks: [
+      {
+        id: "d2-wake",
+        title: "Wake-Up",
+        time: "8:00 AM",
+        group: "all",
+        section: "morning",
+      },
+      {
+        id: "d2-prayer",
+        title: "Prayer",
+        time: "8:30 – 10:00 AM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "morning",
+      },
+      {
+        id: "d2-breakfast",
+        title: "Breakfast",
+        time: "10:00 – 10:30 AM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "morning",
+      },
+
+      // Red midday
+      {
+        id: "d2-red-rot1",
+        title: "Rotating Activities — Round 1",
+        time: "11:00 – 11:45 AM",
+        group: "red",
+        section: "midday",
+        details: [
+          "Cabin 1: BabyFoot · Cabin 2: Kickball · Cabin 3: Obstacle Course · Cabin 4: Pulling Tire (TTT)",
+        ],
+      },
+      {
+        id: "d2-red-rot2",
+        title: "Rotating Activities — Round 2",
+        time: "11:45 AM – 12:30 PM",
+        group: "red",
+        section: "midday",
+        details: [
+          "Cabin 1: Kickball · Cabin 2: BabyFoot · Cabin 3: Pulling Tire (TTT) · Cabin 4: Obstacle Course",
+        ],
+      },
+      {
+        id: "d2-red-topic3",
+        title: "Topic 3: Your calling (Purpose)",
+        time: "12:30 – 1:30 PM",
+        location: "B1 — Caf",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d2-red-lunch",
+        title: "Lunch",
+        time: "1:30 – 2:30 PM",
+        location: "B1 — Caf",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d2-red-baignade",
+        title: "Camp Activity (Baignade)",
+        time: "2:30 – 4:00 PM",
+        note: "Swimming / camp activity block",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d2-red-topic4-snack",
+        title: "Topic 4 / Snack (split by cabin)",
+        time: "4:00 – 5:15 PM",
+        note: "Topic 4: Obstacles from finding your purpose",
+        group: "red",
+        section: "midday",
+        details: [
+          "4:00 – 4:45 — Cabins 1–2: Topic 4 · Cabins 3–4: Snack",
+          "4:45 – 5:15 — Cabins 1–2: Snack · Cabins 3–4: Topic 4",
+        ],
+      },
+      {
+        id: "d2-red-bible",
+        title: "Bible Study #2",
+        time: "5:30 – 6:30 PM",
+        location: "B1 — Caf",
+        note: "Bring Bible, pen & notebook",
+        group: "red",
+        section: "midday",
+      },
+      {
+        id: "d2-red-supper",
+        title: "Supper",
+        time: "6:30 – 7:30 PM",
+        location: "B1 — Caf",
+        group: "red",
+        section: "midday",
+      },
+
+      // Green midday (opposite rhythm)
+      {
+        id: "d2-green-baignade",
+        title: "Camp Activity (Baignade)",
+        time: "11:00 AM – 12:30 PM",
+        note: "Swimming / camp activity block",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d2-green-lunch",
+        title: "Lunch",
+        time: "12:30 – 1:30 PM",
+        location: "B1 — Caf",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d2-green-topic3",
+        title: "Topic 3: Your calling (Purpose)",
+        time: "1:30 – 2:30 PM",
+        location: "B1 — Caf",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d2-green-rot1",
+        title: "Rotating Activities — Round 1",
+        time: "2:30 – 3:15 PM",
+        group: "green",
+        section: "midday",
+        details: [
+          "Cabin 5: Obstacle Course · Cabin 6: Pulling Tire (TTT) · Cabin 7: BabyFoot · Cabin 8: Kickball",
+        ],
+      },
+      {
+        id: "d2-green-rot2",
+        title: "Rotating Activities — Round 2",
+        time: "3:15 – 4:00 PM",
+        group: "green",
+        section: "midday",
+        details: [
+          "Cabin 5: Pulling Tire (TTT) · Cabin 6: Obstacle Course · Cabin 7: Kickball · Cabin 8: BabyFoot",
+        ],
+      },
+      {
+        id: "d2-green-topic4-snack",
+        title: "Topic 4 / Snack (split by cabin)",
+        time: "4:00 – 5:15 PM",
+        note: "Topic 4: Obstacles from finding your purpose",
+        group: "green",
+        section: "midday",
+        details: [
+          "4:00 – 4:45 — Cabins 5–6: Snack · Cabins 7–8: Topic 4",
+          "4:45 – 5:15 — Cabins 5–6: Topic 4 · Cabins 7–8: Snack",
+        ],
+      },
+      {
+        id: "d2-green-supper",
+        title: "Supper",
+        time: "5:15 – 6:30 PM",
+        location: "B1 — Caf",
+        group: "green",
+        section: "midday",
+      },
+      {
+        id: "d2-green-bible",
+        title: "Bible Study #2",
+        time: "6:30 – 7:30 PM",
+        location: "B1 — Caf",
+        note: "Bring Bible, pen & notebook",
+        group: "green",
+        section: "midday",
+      },
+
+      {
+        id: "d2-special-game",
+        title: "Special Game (Glow)",
+        time: "7:30 – 8:30 PM",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d2-vespers",
+        title: "Agpeya (Vespers)",
+        time: "8:30 – 9:30 PM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d2-chill",
+        title: "Chill Time in Rooms + Give out T-Shirts",
+        time: "9:30 – 11:00 PM",
+        location: "Rooms",
+        group: "all",
+        section: "evening",
+      },
+      {
+        id: "d2-lights",
+        title: "Lights Out!",
+        time: "11:00 PM",
+        location: "Rooms",
+        group: "all",
+        section: "evening",
+      },
+    ],
+  },
+  {
+    id: "day-3",
+    label: "Day 3",
+    dateLabel: "Monday, Sept 7",
+    mode: "together",
+    blocks: [
+      {
+        id: "d3-wake",
+        title: "Wake-Up + Packing",
+        time: "7:00 AM",
+        location: "Rooms",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-liturgy",
+        title: "Holy Liturgy + Group Picture",
+        time: "8:00 – 10:00 AM",
+        location: "Chapel",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-topic5",
+        title: "Topic 5: Abouna Special",
+        time: "10:00 – 11:00 AM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-breakfast",
+        title: "Breakfast for All",
+        time: "11:00 AM – 12:00 PM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-finale",
+        title: "Big Game — THE FINALE (Stations)",
+        time: "12:00 – 2:00 PM",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-closing",
+        title: "Closing Session (Video)",
+        time: "2:00 – 3:00 PM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-lunch",
+        title: "Lunch",
+        time: "3:00 – 3:30 PM",
+        location: "B1 — Caf",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-leaving",
+        title: "Leaving & Loading the Bus",
+        time: "3:30 – 4:00 PM",
+        group: "all",
+        section: "full",
+      },
+      {
+        id: "d3-goodbye",
+        title: "Goodbye!",
+        time: "4:00 PM",
+        group: "all",
+        section: "full",
+      },
+    ],
+  },
+];
+
+export const redCabins = [
+  "Mina N. + Christina F.",
+  "Valerie G. + Youssef",
+  "Karine A. + Mickel S.",
+  "Robert M. + Imy S.",
+];
+
+export const greenCabins = [
+  "Carol H. + …",
+  "Mark T. + Yoanna S.",
+  "Jean N. + Carole Y.",
+  "Maria E. + Gab N.",
+];

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import type { StandingRow } from "@/lib/standings";
+import { CampSchedule } from "./CampSchedule";
 import { SkyDecor } from "./SkyDecor";
 import { ReachForTheSkyMarquee, SurpriseFX } from "./SurpriseFX";
 
@@ -67,11 +68,11 @@ export function Scoreboard() {
   }, []);
 
   return (
-    <main className="relative min-h-dvh overflow-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">
+    <main className="relative min-h-dvh overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">
       <SkyDecor />
       <SurpriseFX />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-5 md:max-w-4xl md:gap-7">
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-5 md:max-w-5xl md:gap-7">
         <header className="text-center">
           <motion.div
             className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
@@ -269,6 +270,8 @@ export function Scoreboard() {
             </LayoutGroup>
           ) : null}
         </section>
+
+        <CampSchedule />
 
         <motion.p
           className="text-center text-xs font-semibold text-saddle/70 sm:text-sm"
