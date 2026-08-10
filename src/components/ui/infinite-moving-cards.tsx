@@ -60,7 +60,7 @@ export function InfiniteMovingCards({
     <div
       ref={containerRef}
       className={cn(
-        "scroller relative z-10 mx-auto max-w-xl overflow-hidden rounded-full border border-saddle/20 bg-card/90 py-2 shadow-[0_8px_30px_rgba(42,31,20,0.10)] backdrop-blur-md",
+        "scroller relative z-10 mx-auto max-w-3xl overflow-hidden rounded-full border border-saddle/20 bg-card/90 py-2 shadow-[0_8px_30px_rgba(42,31,20,0.10)] backdrop-blur-md",
         "[mask-image:linear-gradient(to_right,transparent,white_12%,white_88%,transparent)]",
         className,
       )}

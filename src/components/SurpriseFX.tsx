@@ -4,17 +4,15 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
 
+const ISAIAH_43_1 =
+  "But now, thus says the Lord, who created you, O Jacob, And He who formed you, O Israel: “Fear not, for I have redeemed you; I have called you by your name; You are Mine.”";
+
+/** Verse first, then reference — repeated so the marquee loops smoothly */
 const CAMP_QUOTES = [
-  { quote: "John 3:16", emoji: "⭐" },
-  { quote: "Philippians 4:13", emoji: "💪" },
-  { quote: "Jeremiah 29:11", emoji: "🌟" },
-  { quote: "Psalm 23:1", emoji: "🐑" },
-  { quote: "Romans 8:28", emoji: "❤️" },
-  { quote: "Proverbs 3:5-6", emoji: "📖" },
-  { quote: "Matthew 19:26", emoji: "🙏" },
-  { quote: "Isaiah 40:31", emoji: "🦅" },
-  { quote: "Joshua 1:9", emoji: "🛡️" },
-  { quote: "Psalm 46:10", emoji: "✨" },
+  { quote: ISAIAH_43_1, emoji: "✨" },
+  { quote: "Isaiah 43:1", emoji: "📖" },
+  { quote: ISAIAH_43_1, emoji: "✨" },
+  { quote: "Isaiah 43:1", emoji: "📖" },
 ];
 
 export function SurpriseFX() {
@@ -74,7 +72,7 @@ export function ReachForTheSkyMarquee() {
       <InfiniteMovingCards
         items={CAMP_QUOTES}
         direction="left"
-        speed="normal"
+        speed="slow"
         pauseOnHover
       />
     </div>

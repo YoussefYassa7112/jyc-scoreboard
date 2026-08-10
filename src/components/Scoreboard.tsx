@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import type { StandingRow } from "@/lib/standings";
 import { useTheme } from "@/lib/theme";
+import { BuildingMap } from "./BuildingMap";
 import { CampSchedule } from "./CampSchedule";
 import { OrbitArena } from "./OrbitArena";
 import { SkyDecor } from "./SkyDecor";
 import { ReachForTheSkyMarquee, SurpriseFX } from "./SurpriseFX";
+
+type BoardTab = "standings" | "map" | "schedule";
+
+const TABS: { id: BoardTab; label: string }[] = [
+  { id: "standings", label: "Standings" },
+  { id: "map", label: "Map" },
+  { id: "schedule", label: "Schedule" },
+];
 
 type StandingsResponse = {
   standings: StandingRow[];
@@ -40,6 +49,7 @@ export function Scoreboard() {
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<BoardTab>("standings");
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -128,6 +138,31 @@ export function Scoreboard() {
           </div>
         </header>
 
+        <nav
+          className="panel flex gap-1 rounded-2xl p-1.5 sm:gap-1.5"
+          aria-label="Scoreboard sections"
+        >
+          {TABS.map((item) => {
+            const active = tab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`display-font relative flex-1 rounded-xl px-2 py-2.5 text-sm font-extrabold transition sm:px-3 sm:text-base ${
+                  active
+                    ? "bg-woody text-on-strong shadow-sm"
+                    : "text-ink hover:bg-chip/80"
+                }`}
+                aria-current={active ? "page" : undefined}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {tab === "standings" ? (
         <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
           <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
             ✨
@@ -274,10 +309,15 @@ export function Scoreboard() {
             </LayoutGroup>
           ) : null}
         </section>
+        ) : null}
 
-        <OrbitArena standings={data?.standings ?? []} />
+        {tab === "standings" ? (
+          <OrbitArena standings={data?.standings ?? []} />
+        ) : null}
 
-        <CampSchedule />
+        {tab === "map" ? <BuildingMap /> : null}
+
+        {tab === "schedule" ? <CampSchedule /> : null}
 
         <motion.p
           className="text-center text-xs font-semibold text-muted-soft sm:text-sm"

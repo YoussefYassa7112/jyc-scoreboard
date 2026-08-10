@@ -256,8 +256,6 @@ export function AdminDashboard() {
           </p>
         ) : (
           <>
-            <SpiderChart teams={sortedTeams} />
-
             <section className="grid gap-5 lg:grid-cols-2">
               <form
                 onSubmit={submitPoints}
@@ -384,6 +382,8 @@ export function AdminDashboard() {
               </form>
             </section>
 
+            <SpiderChart teams={sortedTeams} />
+
             <section className="panel rounded-3xl p-5">
               <h2 className="display-font text-xl font-bold">Teams</h2>
               {sortedTeams.length === 0 ? (
@@ -450,16 +450,6 @@ export function AdminDashboard() {
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPointTeamId(team.id);
-                                setPointDelta("10");
-                              }}
-                              className="btn-cta rounded-xl bg-buzz px-3 py-2 text-sm font-extrabold"
-                            >
-                              + points
-                            </button>
                             <button
                               type="button"
                               onClick={() => startEdit(team)}
