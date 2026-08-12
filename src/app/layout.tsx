@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { Providers } from "@/components/Providers";
+import { DevServiceWorkerReset } from "@/components/DevServiceWorkerReset";
 import "./globals.css";
 
 const display = Fredoka({
@@ -72,6 +73,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className={`${display.variable} ${body.variable} antialiased`}>
+        {process.env.NODE_ENV === "development" ? (
+          <DevServiceWorkerReset />
+        ) : null}
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useOnline } from "@/lib/use-online";
 import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
+import { BusyLabel } from "./Spinner";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -88,7 +89,9 @@ export function AdminLoginForm() {
           disabled={loading || !online}
           className="btn-cta mt-5 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
         >
-          {loading ? "Signing in…" : "Enter admin"}
+          <BusyLabel busy={loading} busyLabel="Signing in…">
+            Enter admin
+          </BusyLabel>
         </button>
 
         <Link

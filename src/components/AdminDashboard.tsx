@@ -1,14 +1,33 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import {
+  createFieldNote,
+  readAdminTeamsCache,
+  readFieldNotes,
+  writeAdminTeamsCache,
+  writeFieldNotes,
+  type FieldNote,
+} from "@/lib/field-notes";
 import { TEAM_COLORS } from "@/lib/standings";
 import { useOnline } from "@/lib/use-online";
+import { FieldNotes } from "./FieldNotes";
+import { AdminToasts, type AdminToast } from "./AdminToasts";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
 import { SpiderChart } from "./SpiderChart";
+import { BusyLabel, Spinner } from "./Spinner";
 import { useTheme } from "@/lib/theme";
 
 type CampGroup = "red" | "green";
@@ -38,9 +57,12 @@ export function AdminDashboard() {
   const online = useOnline();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<AdminToast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TEAM_COLORS[0]);
@@ -57,6 +79,61 @@ export function AdminDashboard() {
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
+  const [fieldNotes, setFieldNotes] = useState<FieldNote[]>([]);
+  const [pending, setPending] = useState<Record<string, true>>({});
+
+  // Ref mirror so a second click in the same tick is rejected before state lands.
+  const inFlight = useRef(new Set<string>());
+
+  const isBusy = useCallback((key: string) => key in pending, [pending]);
+
+  const run = useCallback(
+    async (key: string, action: () => Promise<void>) => {
+      if (inFlight.current.has(key)) return;
+      inFlight.current.add(key);
+      setPending((current) => ({ ...current, [key]: true }));
+      try {
+        await action();
+      } finally {
+        inFlight.current.delete(key);
+        setPending((current) => {
+          const next = { ...current };
+          delete next[key];
+          return next;
+        });
+      }
+    },
+    [],
+  );
+
+  const persistNotes = useCallback((next: FieldNote[]) => {
+    setFieldNotes(next);
+    writeFieldNotes(next);
+  }, []);
+
+  const pushToast = useCallback(
+    (kind: AdminToast["kind"], title: string, detail?: string) => {
+      const id =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `toast-${Date.now()}`;
+      setToasts((current) => [...current.slice(-2), { id, kind, title, detail }]);
+      window.setTimeout(() => {
+        setToasts((current) => current.filter((t) => t.id !== id));
+      }, 4200);
+    },
+    [],
+  );
+
+  const flash = useCallback(
+    (title: string, detail?: string) => pushToast("success", title, detail),
+    [pushToast],
+  );
+
+  const fail = useCallback(
+    (title: string, detail?: string) => pushToast("error", title, detail),
+    [pushToast],
+  );
 
   const refresh = useCallback(async () => {
     const [teamsRes, historyRes] = await Promise.all([
@@ -69,6 +146,7 @@ export function AdminDashboard() {
     const teamsJson = (await teamsRes.json()) as { teams: TeamRow[] };
     const historyJson = (await historyRes.json()) as { history: HistoryRow[] };
     setTeams(teamsJson.teams);
+    writeAdminTeamsCache(teamsJson.teams);
     setHistory(historyJson.history);
     setPointTeamId((current) =>
       current === "" && teamsJson.teams[0] ? teamsJson.teams[0].id : current,
@@ -76,22 +154,41 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    const cachedTeams = readAdminTeamsCache();
+    if (cachedTeams.length) {
+      setTeams(cachedTeams);
+      setPointTeamId((current) =>
+        current === "" && cachedTeams[0] ? cachedTeams[0].id : current,
+      );
+    }
+    setFieldNotes(readFieldNotes());
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         await refresh();
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Load failed");
-          setLoading(false);
+          const cached = readAdminTeamsCache();
+          if (cached.length) {
+            setTeams(cached);
+            setLoading(false);
+          } else {
+            fail(err instanceof Error ? err.message : "Load failed");
+            setLoading(false);
+          }
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [refresh]);
+  }, [refresh, fail]);
 
   useEffect(() => {
     const url = window.location.origin + "/";
@@ -108,134 +205,266 @@ export function AdminDashboard() {
     [teams],
   );
 
-  function flash(msg: string) {
-    setMessage(msg);
-    setError(null);
-    window.setTimeout(() => setMessage(null), 2500);
-  }
+  const postingNoteId =
+    fieldNotes.find((note) => isBusy(`note-${note.id}`))?.id ?? null;
+  const postingAll = isBusy("post-all");
 
   function requireOnline() {
     if (online) return true;
-    setError("You're offline — connect to WiFi to manage teams and points.");
+    fail("You're offline", "Connect to WiFi to change teams or post points.");
     return false;
   }
 
-  async function logout() {
+  function logout() {
     if (!requireOnline()) return;
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/admin/login");
-    router.refresh();
+    void run("logout", async () => {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.replace("/admin/login");
+      router.refresh();
+    });
   }
 
-  async function createTeam(e: FormEvent) {
+  function createTeam(e: FormEvent) {
     e.preventDefault();
     if (!requireOnline()) return;
-    setError(null);
-    const res = await fetch("/api/teams", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: newName,
-        color: newColor,
-        campGroup: newCampGroup,
-      }),
+    void run("create-team", async () => {
+      const res = await fetch("/api/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName,
+          color: newColor,
+          campGroup: newCampGroup,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not create team");
+        return;
+      }
+      const createdName = newName.trim();
+      const createdGroup = newCampGroup;
+      setNewName("");
+      setNewColor(
+        TEAM_COLORS[teams.length % TEAM_COLORS.length] || TEAM_COLORS[0],
+      );
+      setNewCampGroup("red");
+      await refresh();
+      flash(
+        `${createdName} is on the board`,
+        `Added to the ${createdGroup} group.`,
+      );
     });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) {
-      setError(data.error || "Could not create team");
-      return;
-    }
-    setNewName("");
-    setNewColor(TEAM_COLORS[teams.length % TEAM_COLORS.length] || TEAM_COLORS[0]);
-    setNewCampGroup("red");
-    await refresh();
-    flash("Team created");
   }
 
-  async function saveEdit(id: number) {
+  function saveEdit(id: number) {
     if (!requireOnline()) return;
-    setError(null);
-    const res = await fetch(`/api/teams/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editName,
-        color: editColor,
-        campGroup: editCampGroup,
-      }),
+    void run(`team-${id}`, async () => {
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          color: editColor,
+          campGroup: editCampGroup,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not update team");
+        return;
+      }
+      setEditingId(null);
+      await refresh();
+      flash("Team saved", `${editName} is up to date.`);
     });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) {
-      setError(data.error || "Could not update team");
-      return;
-    }
-    setEditingId(null);
-    await refresh();
-    flash("Team updated");
   }
 
-  async function setTeamGroup(id: number, campGroup: CampGroup) {
+  function setTeamGroup(id: number, campGroup: CampGroup) {
     if (!requireOnline()) return;
-    setError(null);
-    const res = await fetch(`/api/teams/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ campGroup }),
+    void run(`team-${id}`, async () => {
+      const team = teams.find((t) => t.id === id);
+      const res = await fetch(`/api/teams/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campGroup }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not update group");
+        return;
+      }
+      await refresh();
+      flash(
+        `${team?.name ?? "Team"} moved to ${campGroup} group`,
+        "Schedule track updated for this team.",
+      );
     });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) {
-      setError(data.error || "Could not update group");
-      return;
-    }
-    await refresh();
   }
 
-  async function deleteTeam(id: number, name: string) {
+  function requestDeleteTeam(id: number, name: string) {
     if (!requireOnline()) return;
-    if (
-      !window.confirm(
-        `Delete team "${name}"? This also removes its point history.`,
-      )
-    ) {
-      return;
-    }
-    setError(null);
-    const res = await fetch(`/api/teams/${id}`, { method: "DELETE" });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    if (!res.ok) {
-      setError(data.error || "Could not delete team");
-      return;
-    }
-    await refresh();
-    flash("Team deleted");
+    setPendingDelete({ id, name });
   }
 
-  async function submitPoints(e: FormEvent) {
-    e.preventDefault();
-    if (!requireOnline()) return;
-    setError(null);
+  function confirmDeleteTeam() {
+    if (!pendingDelete) return;
+    const { id, name } = pendingDelete;
+    void run(`delete-${id}`, async () => {
+      const res = await fetch(`/api/teams/${id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setPendingDelete(null);
+        fail(data.error || "Could not delete team");
+        return;
+      }
+      await refresh();
+      setPendingDelete(null);
+      flash(`${name} deleted`, "Their point history was removed too.");
+    });
+  }
+
+  function parsedAward() {
     const delta = Number(pointDelta);
     if (!pointTeamId || !Number.isInteger(delta) || delta === 0) {
-      setError("Pick a team and enter a non-zero whole number");
-      return;
+      fail("Need a team and points", "Enter a non-zero whole number.");
+      return null;
     }
+    const team = teams.find((t) => t.id === pointTeamId);
+    if (!team) {
+      fail("Pick a team first");
+      return null;
+    }
+    return { delta, team };
+  }
+
+  function saveToFieldNotes() {
+    const parsed = parsedAward();
+    if (!parsed) return;
+    const next = [
+      createFieldNote({
+        teamId: parsed.team.id,
+        teamName: parsed.team.name,
+        teamColor: parsed.team.color,
+        delta: parsed.delta,
+        note: pointNote.trim(),
+      }),
+      ...fieldNotes,
+    ];
+    persistNotes(next);
+    setPointNote("");
+    flash(
+      "Saved to field notes",
+      `${parsed.delta > 0 ? "+" : ""}${parsed.delta} for ${parsed.team.name} — post when you have WiFi.`,
+    );
+  }
+
+  async function postPoints(input: {
+    teamId: number;
+    delta: number;
+    note: string;
+  }) {
     const res = await fetch("/api/points", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        teamId: pointTeamId,
-        delta,
-        note: pointNote,
+        teamId: input.teamId,
+        delta: input.delta,
+        note: input.note,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
-      setError(data.error || "Could not update points");
+      throw new Error(data.error || "Could not update points");
+    }
+  }
+
+  function submitPoints(e: FormEvent) {
+    e.preventDefault();
+    if (!online) {
+      saveToFieldNotes();
       return;
     }
-    setPointNote("");
-    await refresh();
-    flash(delta > 0 ? `Added ${delta} points` : `Deducted ${Math.abs(delta)} points`);
+    const parsed = parsedAward();
+    if (!parsed) return;
+    void run("submit-points", async () => {
+      try {
+        await postPoints({
+          teamId: parsed.team.id,
+          delta: parsed.delta,
+          note: pointNote,
+        });
+        setPointNote("");
+        await refresh();
+        flash(
+          parsed.delta > 0
+            ? `+${parsed.delta} for ${parsed.team.name}`
+            : `${parsed.delta} for ${parsed.team.name}`,
+          parsed.delta > 0
+            ? "Points are live on the scoreboard."
+            : "Deduction is live on the scoreboard.",
+        );
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "Could not update points");
+      }
+    });
+  }
+
+  function postFieldNote(note: FieldNote) {
+    if (!requireOnline()) return;
+    void run(`note-${note.id}`, async () => {
+      try {
+        await postPoints({
+          teamId: note.teamId,
+          delta: note.delta,
+          note: note.note,
+        });
+        persistNotes(fieldNotes.filter((n) => n.id !== note.id));
+        await refresh();
+        flash(
+          note.delta > 0
+            ? `Posted +${note.delta} to ${note.teamName}`
+            : `Posted ${note.delta} to ${note.teamName}`,
+          "Live on the public board.",
+        );
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "Could not post field note");
+      }
+    });
+  }
+
+  function postAllFieldNotes() {
+    if (!requireOnline()) return;
+    if (fieldNotes.length === 0) return;
+    void run("post-all", async () => {
+      const remaining: FieldNote[] = [];
+      let posted = 0;
+      for (const note of [...fieldNotes].reverse()) {
+        try {
+          await postPoints({
+            teamId: note.teamId,
+            delta: note.delta,
+            note: note.note,
+          });
+          posted += 1;
+        } catch {
+          remaining.unshift(note);
+        }
+      }
+      persistNotes(remaining);
+      await refresh();
+      if (remaining.length) {
+        fail(
+          `Posted ${posted}, ${remaining.length} left`,
+          "Retry the remaining notes when WiFi is stable.",
+        );
+      } else {
+        flash(
+          `Posted ${posted} field note${posted === 1 ? "" : "s"}`,
+          "All clipboard awards are live.",
+        );
+      }
+    });
   }
 
   function startEdit(team: TeamRow) {
@@ -277,28 +506,20 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={logout}
-              className="btn-cta rounded-xl bg-saddle px-4 py-2 text-sm font-extrabold"
+              disabled={isBusy("logout")}
+              className="btn-cta rounded-xl bg-saddle px-4 py-2 text-sm font-extrabold disabled:opacity-60"
             >
-              Log out
+              <BusyLabel busy={isBusy("logout")} busyLabel="Logging out…">
+                Log out
+              </BusyLabel>
             </button>
           </div>
         </header>
 
         <OfflineBanner
           online={online}
-          detail="Admin changes need WiFi. Connect to manage teams and points."
+          detail="Live scores and team edits need WiFi. You can still jot awards on Field notes, then post them when you're back online."
         />
-
-        {error ? (
-          <p className="surface-card rounded-2xl border-2 border-woody/50 px-4 py-3 text-sm font-bold text-woody">
-            {error}
-          </p>
-        ) : null}
-        {message ? (
-          <p className="surface-card rounded-2xl border-2 border-emerald-400/50 px-4 py-3 text-sm font-bold text-emerald-400">
-            {message}
-          </p>
-        ) : null}
 
         {loading ? (
           <p className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft">
@@ -307,13 +528,16 @@ export function AdminDashboard() {
         ) : (
           <>
             <section className="grid gap-5 lg:grid-cols-2">
+              <div className="flex flex-col gap-5">
               <form
                 onSubmit={submitPoints}
                 className="panel rounded-3xl p-5"
               >
                 <h2 className="display-font text-xl font-bold">Add or deduct points</h2>
                 <p className="mt-1 text-sm font-semibold text-muted-soft">
-                  Changes show on the public board within a few seconds.
+                  {online
+                    ? "Changes show on the public board within a few seconds."
+                    : "No WiFi — save to Field notes on this device, then post when you're back."}
                 </p>
 
                 <label className="mt-4 block text-sm font-bold text-muted">
@@ -372,13 +596,38 @@ export function AdminDashboard() {
                   />
                 </label>
 
-                <button
-                  type="submit"
-                  disabled={!online || teams.length === 0}
-                  className="btn-cta mt-4 w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                >
-                  Submit points
-                </button>
+                {online ? (
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="submit"
+                      disabled={teams.length === 0 || isBusy("submit-points")}
+                      className="btn-cta w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                    >
+                      <BusyLabel
+                        busy={isBusy("submit-points")}
+                        busyLabel="Submitting…"
+                      >
+                        Submit points
+                      </BusyLabel>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveToFieldNotes}
+                      disabled={teams.length === 0 || isBusy("submit-points")}
+                      className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                    >
+                      Save for later
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={teams.length === 0}
+                    className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  >
+                    Save to field notes
+                  </button>
+                )}
               </form>
 
               <form onSubmit={createTeam} className="panel rounded-3xl p-5">
@@ -440,12 +689,31 @@ export function AdminDashboard() {
 
                 <button
                   type="submit"
-                  disabled={!online}
+                  disabled={!online || isBusy("create-team")}
                   className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
-                  Add team
+                  <BusyLabel
+                    busy={isBusy("create-team")}
+                    busyLabel="Adding team…"
+                  >
+                    Add team
+                  </BusyLabel>
                 </button>
               </form>
+              </div>
+
+              <FieldNotes
+                notes={fieldNotes}
+                online={online}
+                postingId={postingNoteId}
+                postingAll={postingAll}
+                onPost={postFieldNote}
+                onDiscard={(id) => {
+                  persistNotes(fieldNotes.filter((n) => n.id !== id));
+                  flash("Note discarded", "It was only on this device.");
+                }}
+                onPostAll={postAllFieldNotes}
+              />
             </section>
 
             <SpiderChart teams={sortedTeams} />
@@ -458,7 +726,10 @@ export function AdminDashboard() {
                 </p>
               ) : (
                 <ul className="mt-4 flex flex-col gap-3">
-                  {sortedTeams.map((team, index) => (
+                  {sortedTeams.map((team, index) => {
+                    const teamBusy =
+                      isBusy(`team-${team.id}`) || isBusy(`delete-${team.id}`);
+                    return (
                     <li
                       key={team.id}
                       className="surface-card rounded-2xl border-2 p-3 sm:p-4"
@@ -499,59 +770,69 @@ export function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => saveEdit(team.id)}
-                              className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold"
+                              disabled={isBusy(`team-${team.id}`)}
+                              className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
-                              Save
+                              <BusyLabel
+                                busy={isBusy(`team-${team.id}`)}
+                                busyLabel="Saving…"
+                              >
+                                Save
+                              </BusyLabel>
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingId(null)}
-                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+                              disabled={isBusy(`team-${team.id}`)}
+                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               Cancel
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span
-                            className="display-font flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white"
-                            style={{ backgroundColor: team.color }}
-                          >
-                            {index + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="display-font truncate text-lg font-bold text-card-ink">
-                                {team.name}
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-start gap-3">
+                            <span
+                              className="display-font flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
+                              style={{ backgroundColor: team.color }}
+                            >
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="display-font break-words text-lg font-bold text-card-ink">
+                                  {team.name}
+                                </p>
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
+                                    team.campGroup === "green"
+                                      ? "bg-[#2F8F4E]"
+                                      : team.campGroup === "red"
+                                        ? "bg-[#C45C26]"
+                                        : "bg-slate-500"
+                                  }`}
+                                >
+                                  {team.campGroup ?? "unassigned"}
+                                </span>
+                              </div>
+                              <p className="text-sm font-bold text-muted-soft">
+                                {team.score} pts · {team.eventCount} events
                               </p>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
-                                  team.campGroup === "green"
-                                    ? "bg-[#2F8F4E]"
-                                    : team.campGroup === "red"
-                                      ? "bg-[#C45C26]"
-                                      : "bg-slate-500"
-                                }`}
-                              >
-                                {team.campGroup ?? "unassigned"}
-                              </span>
                             </div>
-                            <p className="text-sm font-bold text-muted-soft">
-                              {team.score} pts · {team.eventCount} events
-                            </p>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                             <select
                               aria-label={`Camp group for ${team.name}`}
                               value={team.campGroup ?? ""}
+                              disabled={teamBusy}
                               onChange={(e) => {
                                 const value = e.target.value as CampGroup;
                                 if (value === "red" || value === "green") {
-                                  void setTeamGroup(team.id, value);
+                                  setTeamGroup(team.id, value);
                                 }
                               }}
-                              className="field rounded-xl border-2 px-2 py-2 text-sm font-extrabold"
+                              className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
                             >
                               {!team.campGroup ? (
                                 <option value="" disabled>
@@ -564,22 +845,31 @@ export function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => startEdit(team)}
-                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+                              disabled={teamBusy}
+                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
-                              onClick={() => deleteTeam(team.id, team.name)}
-                              className="rounded-xl border border-woody/40 px-3 py-2 text-sm font-extrabold text-woody"
+                              onClick={() => requestDeleteTeam(team.id, team.name)}
+                              disabled={teamBusy}
+                              className="rounded-xl border border-woody/40 px-3 py-2 text-sm font-extrabold text-woody disabled:opacity-60"
                             >
                               Delete
                             </button>
+                            {teamBusy ? (
+                              <span className="col-span-2 inline-flex items-center gap-2 text-sm font-bold text-muted-soft sm:col-span-1">
+                                <Spinner />
+                                Saving…
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </section>
@@ -655,6 +945,22 @@ export function AdminDashboard() {
           </>
         )}
       </div>
+
+      <AdminToasts
+        toasts={toasts}
+        onDismiss={(id) =>
+          setToasts((current) => current.filter((t) => t.id !== id))
+        }
+      />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.name ?? "this team"}?`}
+        detail="This also removes that team's point history. This cannot be undone."
+        confirmLabel="Yes, delete"
+        busy={pendingDelete ? isBusy(`delete-${pendingDelete.id}`) : false}
+        onConfirm={confirmDeleteTeam}
+        onCancel={() => setPendingDelete(null)}
+      />
     </main>
   );
 }

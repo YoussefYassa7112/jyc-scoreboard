@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tie Tailwind's dark: variant to the in-app toggle instead of the OS setting */
+@custom-variant dark (&:where(html.dark, html.dark *));
+
 /* Light mode palette */
 :root {
   --sky-top: #7ec8e3;
