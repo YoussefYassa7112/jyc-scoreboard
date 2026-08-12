@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { TEAM_COLORS } from "@/lib/standings";
+import { useOnline } from "@/lib/use-online";
+import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
 import { SpiderChart } from "./SpiderChart";
 import { useTheme } from "@/lib/theme";
@@ -33,6 +35,7 @@ type HistoryRow = {
 export function AdminDashboard() {
   const router = useRouter();
   const { theme } = useTheme();
+  const online = useOnline();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +114,14 @@ export function AdminDashboard() {
     window.setTimeout(() => setMessage(null), 2500);
   }
 
+  function requireOnline() {
+    if (online) return true;
+    setError("You're offline — connect to WiFi to manage teams and points.");
+    return false;
+  }
+
   async function logout() {
+    if (!requireOnline()) return;
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/admin/login");
     router.refresh();
@@ -119,6 +129,7 @@ export function AdminDashboard() {
 
   async function createTeam(e: FormEvent) {
     e.preventDefault();
+    if (!requireOnline()) return;
     setError(null);
     const res = await fetch("/api/teams", {
       method: "POST",
@@ -142,6 +153,7 @@ export function AdminDashboard() {
   }
 
   async function saveEdit(id: number) {
+    if (!requireOnline()) return;
     setError(null);
     const res = await fetch(`/api/teams/${id}`, {
       method: "PATCH",
@@ -163,6 +175,7 @@ export function AdminDashboard() {
   }
 
   async function setTeamGroup(id: number, campGroup: CampGroup) {
+    if (!requireOnline()) return;
     setError(null);
     const res = await fetch(`/api/teams/${id}`, {
       method: "PATCH",
@@ -178,6 +191,7 @@ export function AdminDashboard() {
   }
 
   async function deleteTeam(id: number, name: string) {
+    if (!requireOnline()) return;
     if (
       !window.confirm(
         `Delete team "${name}"? This also removes its point history.`,
@@ -198,6 +212,7 @@ export function AdminDashboard() {
 
   async function submitPoints(e: FormEvent) {
     e.preventDefault();
+    if (!requireOnline()) return;
     setError(null);
     const delta = Number(pointDelta);
     if (!pointTeamId || !Number.isInteger(delta) || delta === 0) {
@@ -268,6 +283,11 @@ export function AdminDashboard() {
             </button>
           </div>
         </header>
+
+        <OfflineBanner
+          online={online}
+          detail="Admin changes need WiFi. Connect to manage teams and points."
+        />
 
         {error ? (
           <p className="surface-card rounded-2xl border-2 border-woody/50 px-4 py-3 text-sm font-bold text-woody">
@@ -354,7 +374,7 @@ export function AdminDashboard() {
 
                 <button
                   type="submit"
-                  disabled={teams.length === 0}
+                  disabled={!online || teams.length === 0}
                   className="btn-cta mt-4 w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
                   Submit points
@@ -420,7 +440,8 @@ export function AdminDashboard() {
 
                 <button
                   type="submit"
-                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold"
+                  disabled={!online}
+                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
                   Add team
                 </button>

@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import {
+  readStandingsCache,
+  writeStandingsCache,
+} from "@/lib/offline";
 import type { StandingRow } from "@/lib/standings";
 import { useTheme } from "@/lib/theme";
+import { useOnline } from "@/lib/use-online";
 import { BuildingMap } from "./BuildingMap";
 import { CampSchedule } from "./CampSchedule";
+import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
 import { SkyDecor } from "./SkyDecor";
 import { ReachForTheSkyMarquee, SurpriseFX } from "./SurpriseFX";
@@ -46,9 +52,11 @@ function needsDarkText(hex: string) {
 
 export function Scoreboard() {
   const { theme } = useTheme();
+  const online = useOnline();
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [staleCache, setStaleCache] = useState(false);
   const [tab, setTab] = useState<BoardTab>("standings");
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
@@ -62,34 +70,75 @@ export function Scoreboard() {
   } | null>(null);
   const isDark = theme === "dark";
 
+  // Hydrate last standings so Schedule personalization works immediately offline.
+  useEffect(() => {
+    const cached = readStandingsCache();
+    if (!cached) return;
+    setData({ standings: cached.standings, asOf: cached.asOf });
+    setStaleCache(true);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      if (!navigator.onLine) {
+        const cached = readStandingsCache();
+        if (!cancelled) {
+          if (cached) {
+            setData({ standings: cached.standings, asOf: cached.asOf });
+            setStaleCache(true);
+            setError(null);
+          } else if (!data) {
+            setError("Go online once to load standings. Map & Schedule still work.");
+          }
+          setLoading(false);
+        }
+        return;
+      }
+
       try {
         const res = await fetch("/api/standings", { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load");
         const json = (await res.json()) as StandingsResponse;
         if (!cancelled) {
           setData(json);
+          writeStandingsCache(json);
+          setStaleCache(false);
           setError(null);
           setLoading(false);
         }
       } catch {
         if (!cancelled) {
-          setError("Could not load standings. Check your connection.");
+          const cached = readStandingsCache();
+          if (cached) {
+            setData({ standings: cached.standings, asOf: cached.asOf });
+            setStaleCache(true);
+            setError(null);
+          } else {
+            setError("Could not load standings. Check your connection.");
+          }
           setLoading(false);
         }
       }
     }
 
     load();
+    if (!online) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const id = setInterval(load, 3000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+    // `data` intentionally omitted — only gate polling on connectivity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
 
   return (
     <main className="relative min-h-dvh overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">
@@ -138,8 +187,18 @@ export function Scoreboard() {
           <ReachForTheSkyMarquee />
 
           <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
-            <span className="live-dot inline-block h-2.5 w-2.5 rounded-full bg-woody" />
-            <span>Live standings</span>
+            <span
+              className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
+                online && !staleCache ? "bg-woody" : "bg-muted-soft"
+              }`}
+            />
+            <span>
+              {online && !staleCache
+                ? "Live standings"
+                : online
+                  ? "Standings"
+                  : "Cached standings"}
+            </span>
             {data?.asOf ? (
               <span className="font-semibold text-muted-soft">
                 · as of {formatAsOf(data.asOf)}
@@ -147,6 +206,15 @@ export function Scoreboard() {
             ) : null}
           </div>
         </header>
+
+        <OfflineBanner
+          online={online}
+          detail={
+            tab === "standings"
+              ? "Showing the last scores saved on this phone. Go online for live updates. Map & Schedule still work."
+              : "Map and Schedule still work. Live scores need WiFi."
+          }
+        />
 
         <nav
           className="panel flex gap-1 rounded-2xl p-1.5 sm:gap-1.5"

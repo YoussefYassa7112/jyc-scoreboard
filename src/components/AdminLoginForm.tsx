@@ -3,16 +3,23 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useOnline } from "@/lib/use-online";
+import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
 
 export function AdminLoginForm() {
   const router = useRouter();
+  const online = useOnline();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!online) {
+      setError("You're offline — connect to WiFi to sign in.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -50,6 +57,13 @@ export function AdminLoginForm() {
           Enter the camp password to manage teams and points.
         </p>
 
+        <div className="mt-4">
+          <OfflineBanner
+            online={online}
+            detail="Admin login needs WiFi. Campers can still use Map & Schedule offline after caching the app."
+          />
+        </div>
+
         <label className="mt-6 block">
           <span className="mb-1.5 block text-sm font-bold text-saddle">
             Password
@@ -60,7 +74,8 @@ export function AdminLoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
-            className="field w-full rounded-xl border-2 px-4 py-3 text-base font-semibold outline-none ring-woody/40 focus:ring-4"
+            disabled={!online}
+            className="field w-full rounded-xl border-2 px-4 py-3 text-base font-semibold outline-none ring-woody/40 focus:ring-4 disabled:opacity-60"
           />
         </label>
 
@@ -70,7 +85,7 @@ export function AdminLoginForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !online}
           className="btn-cta mt-5 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
         >
           {loading ? "Signing in…" : "Enter admin"}

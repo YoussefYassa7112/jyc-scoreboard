@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import "./globals.css";
@@ -15,9 +15,37 @@ const body = Nunito({
   weight: ["400", "600", "700", "800"],
 });
 
+const APP_NAME = "Camp Scoreboard";
+const APP_DESCRIPTION =
+  "Live camp standings, map, and schedule — works offline after first visit.";
+
 export const metadata: Metadata = {
-  title: "Camp Scoreboard",
-  description: "Live camp team standings and schedule",
+  applicationName: APP_NAME,
+  title: {
+    default: APP_NAME,
+    template: `%s · ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: APP_NAME,
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#C45C26",
 };
 
 const themeBootScript = `

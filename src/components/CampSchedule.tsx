@@ -9,6 +9,11 @@ import {
   redCabins,
   type ScheduleBlock,
 } from "@/data/schedule";
+import {
+  readMyTeamSnapshot,
+  writeMyTeamSnapshot,
+  type MyTeamSnapshot,
+} from "@/lib/offline";
 import type { StandingRow } from "@/lib/standings";
 import {
   eventDateTimes,
@@ -17,8 +22,6 @@ import {
   formatCountdown,
   isoDateKey,
 } from "@/lib/schedule-time";
-
-const TEAM_STORAGE_KEY = "camp-my-team";
 
 type TrackFilter = "overview" | "red" | "green";
 
@@ -202,6 +205,7 @@ export function CampSchedule({
   );
   const [track, setTrack] = useState<TrackFilter>("overview");
   const [myTeamId, setMyTeamId] = useState<number | "">("");
+  const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -215,20 +219,47 @@ export function CampSchedule({
   consumedRef.current = onScheduleFocusConsumed;
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(TEAM_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as { teamId?: number };
-      if (typeof parsed.teamId === "number") setMyTeamId(parsed.teamId);
-    } catch {
-      /* ignore */
-    }
+    const snap = readMyTeamSnapshot();
+    if (!snap) return;
+    setMyTeamId(snap.teamId);
+    setTeamSnapshot(snap);
   }, []);
 
-  const myTeam = useMemo(
-    () => teams.find((t) => t.id === myTeamId) ?? null,
-    [teams, myTeamId],
-  );
+  // Keep localStorage snapshot in sync when live standings include the team.
+  useEffect(() => {
+    if (myTeamId === "") return;
+    const live = teams.find((t) => t.id === myTeamId);
+    if (!live) return;
+    const next: MyTeamSnapshot = {
+      teamId: live.id,
+      campGroup: live.campGroup,
+      teamName: live.name,
+    };
+    setTeamSnapshot(next);
+    writeMyTeamSnapshot(next);
+  }, [teams, myTeamId]);
+
+  const myTeam = useMemo(() => {
+    const live = teams.find((t) => t.id === myTeamId);
+    if (live) return live;
+    // Offline / empty roster: synthesize from last saved snapshot
+    if (
+      teamSnapshot &&
+      myTeamId !== "" &&
+      teamSnapshot.teamId === myTeamId &&
+      (teamSnapshot.campGroup === "red" || teamSnapshot.campGroup === "green")
+    ) {
+      return {
+        id: teamSnapshot.teamId,
+        name: teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`,
+        color: "#888888",
+        score: 0,
+        rank: 0,
+        campGroup: teamSnapshot.campGroup,
+      } satisfies StandingRow;
+    }
+    return null;
+  }, [teams, myTeamId, teamSnapshot]);
 
   // Apply saved team's track once when teams load — never override map navigation
   useEffect(() => {
@@ -289,17 +320,23 @@ export function CampSchedule({
     setMyTeamId(id);
     setHighlightId(null);
     if (id === "") {
-      window.localStorage.removeItem(TEAM_STORAGE_KEY);
+      writeMyTeamSnapshot(null);
+      setTeamSnapshot(null);
       setTrack("overview");
       teamTrackReady.current = true;
       return;
     }
-    window.localStorage.setItem(
-      TEAM_STORAGE_KEY,
-      JSON.stringify({ teamId: id }),
-    );
     const team = teams.find((t) => t.id === id);
-    if (team?.campGroup) setTrack(team.campGroup);
+    const next: MyTeamSnapshot = {
+      teamId: id,
+      campGroup: team?.campGroup ?? teamSnapshot?.campGroup ?? null,
+      teamName: team?.name ?? teamSnapshot?.teamName,
+    };
+    setTeamSnapshot(next);
+    writeMyTeamSnapshot(next);
+    if (next.campGroup === "red" || next.campGroup === "green") {
+      setTrack(next.campGroup);
+    }
     teamTrackReady.current = true;
   }
 
@@ -432,6 +469,16 @@ export function CampSchedule({
                 {t.campGroup ? ` (${t.campGroup})` : " (no group yet)"}
               </option>
             ))}
+            {teamSnapshot &&
+            myTeamId !== "" &&
+            !teams.some((t) => t.id === teamSnapshot.teamId) ? (
+              <option value={teamSnapshot.teamId}>
+                {teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`}
+                {teamSnapshot.campGroup
+                  ? ` (${teamSnapshot.campGroup}, saved offline)`
+                  : " (saved offline)"}
+              </option>
+            ) : null}
           </select>
         </label>
 
