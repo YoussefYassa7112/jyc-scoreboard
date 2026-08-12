@@ -55,7 +55,7 @@ export function parseTimeRange(time: string | undefined): ParsedTimeRange | null
 
   // Inherit AM/PM from the end token when start omits it ("10:00 - 12:00 PM" rare; usually both plain or both with meridiem)
   let startRaw = parts[0];
-  let endRaw = parts[1];
+  const endRaw = parts[1];
   const endMeridiem = endRaw.match(/\b(AM|PM)\b/i)?.[1];
   const startHasMeridiem = /\b(AM|PM)\b/i.test(startRaw);
   if (endMeridiem && !startHasMeridiem) {
