@@ -39,23 +39,45 @@ type Props = {
   }) => void;
 };
 
+function chromeClasses(chrome: "all" | "red" | "green") {
+  if (chrome === "green") {
+    return {
+      cardBorder: "border-[#2F8F4E]/55 border-l-[#2F8F4E]",
+      time: "text-[#2F8F4E]",
+      ring: "ring-[#2F8F4E]",
+    };
+  }
+  if (chrome === "red") {
+    return {
+      cardBorder: "border-[#C45C26]/55 border-l-[#C45C26]",
+      time: "text-[#C45C26]",
+      ring: "ring-[#C45C26]",
+    };
+  }
+  return {
+    cardBorder: "border-saddle/20 border-l-[#1E6BB8]",
+    time: "text-[#1E6BB8]",
+    ring: "ring-woody",
+  };
+}
+
 function BlockCard({
   block,
   accent,
+  chrome,
   highlighted,
   onViewMap,
 }: {
   block: ScheduleBlock;
   accent: "all" | "red" | "green";
+  /** Active track color — tints times/outlines for green vs red */
+  chrome: "all" | "red" | "green";
   highlighted?: boolean;
   onViewMap?: () => void;
 }) {
-  const border =
-    accent === "red"
-      ? "border-l-[#C45C26]"
-      : accent === "green"
-        ? "border-l-[#2F8F4E]"
-        : "border-l-[#1E6BB8]";
+  // Prefer the selected track color so shared "everyone" blocks match Red/Green.
+  const colorKey = chrome !== "all" ? chrome : accent;
+  const colors = chromeClasses(colorKey);
 
   return (
     <motion.article
@@ -63,12 +85,14 @@ function BlockCard({
       id={`schedule-block-${block.id}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`surface-card rounded-2xl border border-saddle/20 border-l-4 bg-card p-3.5 text-card-ink shadow-sm sm:p-4 ${border} ${
-        highlighted ? "ring-2 ring-woody ring-offset-2 ring-offset-transparent" : ""
+      className={`rounded-2xl border border-l-4 bg-card p-3.5 text-card-ink shadow-sm sm:p-4 ${colors.cardBorder} ${
+        highlighted ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-transparent` : ""
       }`}
     >
       {block.time ? (
-        <p className="text-xs font-extrabold uppercase tracking-wide text-woody sm:text-sm">
+        <p
+          className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${colors.time}`}
+        >
           {block.time}
         </p>
       ) : null}
@@ -112,6 +136,7 @@ function BlockCard({
 function Section({
   title,
   tint,
+  chrome,
   blocks,
   cabins,
   highlightBlockId,
@@ -119,6 +144,7 @@ function Section({
 }: {
   title: string;
   tint: "all" | "red" | "green";
+  chrome: "all" | "red" | "green";
   blocks: ScheduleBlock[];
   cabins?: string[];
   highlightBlockId?: string | null;
@@ -151,6 +177,7 @@ function Section({
             key={block.id}
             block={block}
             accent={tint}
+            chrome={chrome}
             highlighted={highlightBlockId === block.id}
             onViewMap={onViewMapFor ? () => onViewMapFor(block) : undefined}
           />
@@ -325,6 +352,8 @@ export function CampSchedule({
   }, [nextInfo, nowTick]);
 
   const isSplit = day.mode === "split";
+  const chrome: "all" | "red" | "green" =
+    track === "red" || track === "green" ? track : "all";
   const morning = day.blocks.filter(
     (b) => b.section === "morning" && b.group === "all",
   );
@@ -334,6 +363,12 @@ export function CampSchedule({
   const fullDay = day.blocks.filter((b) => b.section === "full");
   const redBlocks = day.blocks.filter((b) => b.group === "red");
   const greenBlocks = day.blocks.filter((b) => b.group === "green");
+  const dayActiveClass =
+    chrome === "green"
+      ? "bg-[#2F8F4E] text-on-strong shadow-sm"
+      : chrome === "red"
+        ? "bg-[#C45C26] text-on-strong shadow-sm"
+        : "bg-woody text-on-strong shadow-sm";
 
   function handleViewMap(block: ScheduleBlock) {
     setMapNotice(null);
@@ -523,7 +558,7 @@ export function CampSchedule({
               }}
               className={`rounded-xl px-3.5 py-2 text-sm font-extrabold transition ${
                 active
-                  ? "bg-woody text-on-strong shadow-sm"
+                  ? dayActiveClass
                   : "border border-saddle/20 bg-card text-card-ink"
               }`}
             >
@@ -586,6 +621,7 @@ export function CampSchedule({
             <Section
               title="Full day — Everyone together"
               tint="all"
+              chrome={chrome}
               blocks={fullDay}
               highlightBlockId={highlightId}
               onViewMapFor={handleViewMap}
@@ -595,6 +631,7 @@ export function CampSchedule({
               <Section
                 title="Morning — Everyone together"
                 tint="all"
+                chrome={chrome}
                 blocks={morning}
                 highlightBlockId={highlightId}
                 onViewMapFor={handleViewMap}
@@ -605,6 +642,7 @@ export function CampSchedule({
                   <Section
                     title="Red group"
                     tint="red"
+                    chrome="red"
                     blocks={redBlocks}
                     cabins={redCabins}
                     highlightBlockId={highlightId}
@@ -613,6 +651,7 @@ export function CampSchedule({
                   <Section
                     title="Green group"
                     tint="green"
+                    chrome="green"
                     blocks={greenBlocks}
                     cabins={greenCabins}
                     highlightBlockId={highlightId}
@@ -625,6 +664,7 @@ export function CampSchedule({
                 <Section
                   title="Red group"
                   tint="red"
+                  chrome={chrome}
                   blocks={redBlocks}
                   cabins={redCabins}
                   highlightBlockId={highlightId}
@@ -636,6 +676,7 @@ export function CampSchedule({
                 <Section
                   title="Green group"
                   tint="green"
+                  chrome={chrome}
                   blocks={greenBlocks}
                   cabins={greenCabins}
                   highlightBlockId={highlightId}
@@ -646,6 +687,7 @@ export function CampSchedule({
               <Section
                 title="Evening — Everyone together"
                 tint="all"
+                chrome={chrome}
                 blocks={evening}
                 highlightBlockId={highlightId}
                 onViewMapFor={handleViewMap}

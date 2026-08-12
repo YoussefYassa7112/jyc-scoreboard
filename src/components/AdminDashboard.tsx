@@ -545,7 +545,7 @@ export function AdminDashboard() {
                               onClick={() => startEdit(team)}
                               className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
                             >
-                              Rename
+                              Edit
                             </button>
                             <button
                               type="button"
