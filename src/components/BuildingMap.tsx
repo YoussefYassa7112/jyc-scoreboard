@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import {
@@ -12,6 +12,17 @@ import {
   type MapRoom,
   type RoomKind,
 } from "@/data/floors";
+import { blocksAtRoom } from "@/lib/schedule-time";
+
+type BuildingMapProps = {
+  focusFloorId?: string | null;
+  focusRoomId?: string | null;
+  onOpenScheduleEvent?: (
+    dayId: string,
+    blockId: string,
+    group: "all" | "red" | "green",
+  ) => void;
+};
 
 const kindFillLight: Record<RoomKind, string> = {
   activity: "#ffe8c8",
@@ -261,7 +272,11 @@ function Decorations({
   );
 }
 
-export function BuildingMap() {
+export function BuildingMap({
+  focusFloorId,
+  focusRoomId,
+  onOpenScheduleEvent,
+}: BuildingMapProps) {
   const { theme } = useTheme();
   const dark = theme === "dark";
   const wrapRef = useRef<HTMLElement>(null);
@@ -269,10 +284,19 @@ export function BuildingMap() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
 
+  useEffect(() => {
+    if (focusFloorId) setFloorId(focusFloorId);
+    if (focusRoomId) setSelectedId(focusRoomId);
+  }, [focusFloorId, focusRoomId]);
+
   const floor = useMemo(() => getFloor(floorId), [floorId]);
   const selected = useMemo(
     () => floor.rooms.find((r) => r.id === selectedId) ?? null,
     [floor.rooms, selectedId],
+  );
+  const roomEvents = useMemo(
+    () => (selected ? blocksAtRoom(selected.id) : []),
+    [selected],
   );
 
   const wall = dark ? "rgba(226,232,240,0.85)" : "#2a1f14";
@@ -577,6 +601,54 @@ export function BuildingMap() {
               >
                 Clear
               </button>
+            </div>
+
+            <div className="mt-4 border-t border-saddle/15 pt-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
+                Scheduled here
+              </p>
+              {roomEvents.length === 0 ? (
+                <p className="mt-1 text-sm font-semibold text-muted">
+                  No schedule events are tagged to this room yet.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-2">
+                  {roomEvents.map(({ day, block }) => (
+                    <li key={`${day.id}-${block.id}`}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenScheduleEvent?.(day.id, block.id, block.group)
+                        }
+                        className="w-full rounded-xl bg-chip/80 px-3 py-2 text-left transition hover:bg-chip"
+                      >
+                        <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-muted-soft">
+                          <span>{day.label}</span>
+                          {block.time ? <span>· {block.time}</span> : null}
+                          {block.group === "red" || block.group === "green" ? (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
+                                block.group === "green"
+                                  ? "bg-[#2F8F4E]"
+                                  : "bg-[#C45C26]"
+                              }`}
+                            >
+                              <span
+                                className="h-1.5 w-1.5 rounded-full bg-white/90"
+                                aria-hidden
+                              />
+                              {block.group}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="display-font text-sm font-bold text-card-ink">
+                          {block.title}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </motion.div>
         ) : (

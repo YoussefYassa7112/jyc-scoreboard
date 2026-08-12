@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { pointEvents, teams } from "@/db/schema";
+import { pointEvents, teams, type CampGroup } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
+
+function parseCampGroup(value: unknown): CampGroup | undefined {
+  if (value === "red" || value === "green") return value;
+  return undefined;
+}
 
 export async function PATCH(request: Request, { params }: Params) {
   if (!(await isAdminAuthenticated())) {
@@ -21,14 +26,29 @@ export async function PATCH(request: Request, { params }: Params) {
     const body = (await request.json()) as {
       name?: string;
       color?: string;
+      campGroup?: string;
     };
 
-    const updates: { name?: string; color?: string } = {};
+    const updates: {
+      name?: string;
+      color?: string;
+      campGroup?: CampGroup;
+    } = {};
     if (typeof body.name === "string" && body.name.trim()) {
       updates.name = body.name.trim();
     }
     if (typeof body.color === "string" && body.color.trim()) {
       updates.color = body.color.trim();
+    }
+    if (body.campGroup !== undefined) {
+      const group = parseCampGroup(body.campGroup);
+      if (!group) {
+        return NextResponse.json(
+          { error: "Camp group must be red or green" },
+          { status: 400 },
+        );
+      }
+      updates.campGroup = group;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -70,7 +90,6 @@ export async function DELETE(_request: Request, { params }: Params) {
 
     const db = getDb();
 
-    // Remove point history first so any team can be deleted anytime
     await db.delete(pointEvents).where(eq(pointEvents.teamId, id));
 
     const deleted = await db

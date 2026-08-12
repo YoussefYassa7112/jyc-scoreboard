@@ -8,6 +8,7 @@ export type StandingRow = {
   color: string;
   score: number;
   rank: number;
+  campGroup: "red" | "green" | null;
 };
 
 export async function getStandings(): Promise<{
@@ -21,11 +22,18 @@ export async function getStandings(): Promise<{
       id: teams.id,
       name: teams.name,
       color: teams.color,
+      campGroup: teams.campGroup,
       score: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`.mapWith(Number),
     })
     .from(teams)
     .leftJoin(pointEvents, eq(pointEvents.teamId, teams.id))
-    .groupBy(teams.id, teams.name, teams.color, teams.createdAt)
+    .groupBy(
+      teams.id,
+      teams.name,
+      teams.color,
+      teams.campGroup,
+      teams.createdAt,
+    )
     .orderBy(
       desc(sql`coalesce(sum(${pointEvents.delta}), 0)`),
       asc(teams.name),
@@ -38,6 +46,7 @@ export async function getStandings(): Promise<{
     color: row.color,
     score: row.score,
     rank: index + 1,
+    campGroup: row.campGroup ?? null,
   }));
 
   return {

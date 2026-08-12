@@ -1,9 +1,14 @@
 import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 
+/** Camp schedule track: red or green group */
+export type CampGroup = "red" | "green";
+
 export const teams = pgTable("teams", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   color: text("color").notNull().default("#F4C430"),
+  /** Which schedule track this team follows */
+  campGroup: text("camp_group").$type<CampGroup>(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

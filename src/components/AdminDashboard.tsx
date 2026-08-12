@@ -9,12 +9,15 @@ import { SkyDecor } from "./SkyDecor";
 import { SpiderChart } from "./SpiderChart";
 import { useTheme } from "@/lib/theme";
 
+type CampGroup = "red" | "green";
+
 type TeamRow = {
   id: number;
   name: string;
   color: string;
   score: number;
   eventCount: number;
+  campGroup: CampGroup | null;
 };
 
 type HistoryRow = {
@@ -38,6 +41,7 @@ export function AdminDashboard() {
 
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TEAM_COLORS[0]);
+  const [newCampGroup, setNewCampGroup] = useState<CampGroup>("red");
 
   const [pointTeamId, setPointTeamId] = useState<number | "">("");
   const [pointDelta, setPointDelta] = useState("10");
@@ -46,6 +50,7 @@ export function AdminDashboard() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
+  const [editCampGroup, setEditCampGroup] = useState<CampGroup>("red");
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
@@ -118,7 +123,11 @@ export function AdminDashboard() {
     const res = await fetch("/api/teams", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, color: newColor }),
+      body: JSON.stringify({
+        name: newName,
+        color: newColor,
+        campGroup: newCampGroup,
+      }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
@@ -127,6 +136,7 @@ export function AdminDashboard() {
     }
     setNewName("");
     setNewColor(TEAM_COLORS[teams.length % TEAM_COLORS.length] || TEAM_COLORS[0]);
+    setNewCampGroup("red");
     await refresh();
     flash("Team created");
   }
@@ -136,7 +146,11 @@ export function AdminDashboard() {
     const res = await fetch(`/api/teams/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editName, color: editColor }),
+      body: JSON.stringify({
+        name: editName,
+        color: editColor,
+        campGroup: editCampGroup,
+      }),
     });
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) {
@@ -146,6 +160,21 @@ export function AdminDashboard() {
     setEditingId(null);
     await refresh();
     flash("Team updated");
+  }
+
+  async function setTeamGroup(id: number, campGroup: CampGroup) {
+    setError(null);
+    const res = await fetch(`/api/teams/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campGroup }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(data.error || "Could not update group");
+      return;
+    }
+    await refresh();
   }
 
   async function deleteTeam(id: number, name: string) {
@@ -198,6 +227,7 @@ export function AdminDashboard() {
     setEditingId(team.id);
     setEditName(team.name);
     setEditColor(team.color);
+    setEditCampGroup(team.campGroup ?? "red");
   }
 
   function downloadQr() {
@@ -350,6 +380,21 @@ export function AdminDashboard() {
                 </label>
 
                 <label className="mt-3 block text-sm font-bold text-muted">
+                  Camp group
+                  <select
+                    value={newCampGroup}
+                    onChange={(e) =>
+                      setNewCampGroup(e.target.value as CampGroup)
+                    }
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                    required
+                  >
+                    <option value="red">Red group</option>
+                    <option value="green">Green group</option>
+                  </select>
+                </label>
+
+                <label className="mt-3 block text-sm font-bold text-muted">
                   Color
                   <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     <input
@@ -408,6 +453,19 @@ export function AdminDashboard() {
                             />
                           </label>
                           <label className="text-sm font-bold text-muted">
+                            Group
+                            <select
+                              value={editCampGroup}
+                              onChange={(e) =>
+                                setEditCampGroup(e.target.value as CampGroup)
+                              }
+                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
+                            >
+                              <option value="red">Red</option>
+                              <option value="green">Green</option>
+                            </select>
+                          </label>
+                          <label className="text-sm font-bold text-muted">
                             Color
                             <input
                               type="color"
@@ -442,14 +500,46 @@ export function AdminDashboard() {
                             {index + 1}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="display-font truncate text-lg font-bold text-card-ink">
-                              {team.name}
-                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="display-font truncate text-lg font-bold text-card-ink">
+                                {team.name}
+                              </p>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
+                                  team.campGroup === "green"
+                                    ? "bg-[#2F8F4E]"
+                                    : team.campGroup === "red"
+                                      ? "bg-[#C45C26]"
+                                      : "bg-slate-500"
+                                }`}
+                              >
+                                {team.campGroup ?? "unassigned"}
+                              </span>
+                            </div>
                             <p className="text-sm font-bold text-muted-soft">
                               {team.score} pts · {team.eventCount} events
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
+                            <select
+                              aria-label={`Camp group for ${team.name}`}
+                              value={team.campGroup ?? ""}
+                              onChange={(e) => {
+                                const value = e.target.value as CampGroup;
+                                if (value === "red" || value === "green") {
+                                  void setTeamGroup(team.id, value);
+                                }
+                              }}
+                              className="field rounded-xl border-2 px-2 py-2 text-sm font-extrabold"
+                            >
+                              {!team.campGroup ? (
+                                <option value="" disabled>
+                                  Set group
+                                </option>
+                              ) : null}
+                              <option value="red">Red</option>
+                              <option value="green">Green</option>
+                            </select>
                             <button
                               type="button"
                               onClick={() => startEdit(team)}

@@ -50,6 +50,16 @@ export function Scoreboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<BoardTab>("standings");
+  const [mapFocus, setMapFocus] = useState<{
+    floorId: string;
+    roomId: string;
+  } | null>(null);
+  const [scheduleFocus, setScheduleFocus] = useState<{
+    dayId: string;
+    blockId: string;
+    group: "all" | "red" | "green";
+    scrollNonce: number;
+  } | null>(null);
   const isDark = theme === "dark";
 
   useEffect(() => {
@@ -148,7 +158,12 @@ export function Scoreboard() {
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setTab(item.id)}
+                onClick={() => {
+                  // Manual tab changes should never reuse a leftover map→schedule
+                  // scroll/highlight intent.
+                  setScheduleFocus(null);
+                  setTab(item.id);
+                }}
                 className={`display-font relative flex-1 rounded-xl px-2 py-2.5 text-sm font-extrabold transition sm:px-3 sm:text-base ${
                   active
                     ? "bg-woody text-on-strong shadow-sm"
@@ -315,9 +330,41 @@ export function Scoreboard() {
           <OrbitArena standings={data?.standings ?? []} />
         ) : null}
 
-        {tab === "map" ? <BuildingMap /> : null}
+        {tab === "map" ? (
+          <BuildingMap
+            focusFloorId={mapFocus?.floorId}
+            focusRoomId={mapFocus?.roomId}
+            onOpenScheduleEvent={(dayId, blockId, group) => {
+              setScheduleFocus({
+                dayId,
+                blockId,
+                group,
+                scrollNonce: Date.now(),
+              });
+              setTab("schedule");
+            }}
+          />
+        ) : null}
 
-        {tab === "schedule" ? <CampSchedule /> : null}
+        {tab === "schedule" ? (
+          <CampSchedule
+            teams={data?.standings ?? []}
+            focusDayId={scheduleFocus?.dayId}
+            focusBlockId={scheduleFocus?.blockId}
+            focusGroup={scheduleFocus?.group}
+            scrollNonce={scheduleFocus?.scrollNonce}
+            onScheduleFocusConsumed={() => setScheduleFocus(null)}
+            onViewLocation={(payload) => {
+              if (payload.mapped && payload.floorId && payload.roomId) {
+                setMapFocus({
+                  floorId: payload.floorId,
+                  roomId: payload.roomId,
+                });
+                setTab("map");
+              }
+            }}
+          />
+        ) : null}
 
         <motion.p
           className="text-center text-xs font-semibold text-muted-soft sm:text-sm"

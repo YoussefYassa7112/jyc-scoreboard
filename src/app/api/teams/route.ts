@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { pointEvents, teams } from "@/db/schema";
+import { pointEvents, teams, type CampGroup } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { TEAM_COLORS } from "@/lib/standings";
 
 export const dynamic = "force-dynamic";
+
+function parseCampGroup(value: unknown): CampGroup | null {
+  if (value === "red" || value === "green") return value;
+  return null;
+}
 
 export async function GET() {
   try {
@@ -15,6 +20,7 @@ export async function GET() {
         id: teams.id,
         name: teams.name,
         color: teams.color,
+        campGroup: teams.campGroup,
         sortOrder: teams.sortOrder,
         createdAt: teams.createdAt,
         score: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`.mapWith(
@@ -28,6 +34,7 @@ export async function GET() {
         teams.id,
         teams.name,
         teams.color,
+        teams.campGroup,
         teams.sortOrder,
         teams.createdAt,
       )
@@ -52,10 +59,19 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       color?: string;
+      campGroup?: string;
     };
     const name = body.name?.trim();
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
+    const campGroup = parseCampGroup(body.campGroup);
+    if (!campGroup) {
+      return NextResponse.json(
+        { error: "Camp group must be red or green" },
+        { status: 400 },
+      );
     }
 
     const db = getDb();
@@ -70,6 +86,7 @@ export async function POST(request: Request) {
       .values({
         name,
         color,
+        campGroup,
         sortOrder: existing.length,
       })
       .returning();
