@@ -10,6 +10,7 @@ import type { StandingRow } from "@/lib/standings";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
 import { BuildingMap } from "./BuildingMap";
+import { CampPhotosButton } from "./CampPhotosButton";
 import { CampSchedule } from "./CampSchedule";
 import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
@@ -204,6 +205,10 @@ export function Scoreboard() {
                 · as of {formatAsOf(data.asOf)}
               </span>
             ) : null}
+          </div>
+
+          <div className="mt-4 flex justify-center">
+            <CampPhotosButton online={online} />
           </div>
         </header>
 

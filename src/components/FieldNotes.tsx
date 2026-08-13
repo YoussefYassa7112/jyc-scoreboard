@@ -9,6 +9,7 @@ type Props = {
   online: boolean;
   postingId: string | null;
   postingAll: boolean;
+  className?: string;
   onPost: (note: FieldNote) => void;
   onDiscard: (id: string) => void;
   onPostAll: () => void;
@@ -25,12 +26,15 @@ export function FieldNotes({
   online,
   postingId,
   postingAll,
+  className = "",
   onPost,
   onDiscard,
   onPostAll,
 }: Props) {
   return (
-    <section className="panel relative flex h-full flex-col overflow-hidden rounded-3xl p-4 sm:p-5">
+    <section
+      className={`panel relative flex h-full flex-col overflow-hidden rounded-3xl p-4 sm:p-5 ${className}`}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-8 top-0 h-3 rounded-b-md bg-[#c45c26]/80 shadow-sm"

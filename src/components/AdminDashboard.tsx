@@ -528,10 +528,9 @@ export function AdminDashboard() {
         ) : (
           <>
             <section className="grid gap-5 lg:grid-cols-2">
-              <div className="flex flex-col gap-5">
               <form
                 onSubmit={submitPoints}
-                className="panel rounded-3xl p-5"
+                className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-1"
               >
                 <h2 className="display-font text-xl font-bold">Add or deduct points</h2>
                 <p className="mt-1 text-sm font-semibold text-muted-soft">
@@ -630,7 +629,24 @@ export function AdminDashboard() {
                 )}
               </form>
 
-              <form onSubmit={createTeam} className="panel rounded-3xl p-5">
+              <FieldNotes
+                notes={fieldNotes}
+                online={online}
+                postingId={postingNoteId}
+                postingAll={postingAll}
+                className="lg:col-start-2 lg:row-start-1 lg:row-span-2"
+                onPost={postFieldNote}
+                onDiscard={(id) => {
+                  persistNotes(fieldNotes.filter((n) => n.id !== id));
+                  flash("Note discarded", "It was only on this device.");
+                }}
+                onPostAll={postAllFieldNotes}
+              />
+
+              <form
+                onSubmit={createTeam}
+                className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-2"
+              >
                 <h2 className="display-font text-xl font-bold">Create team</h2>
                 <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Add as many teams as you need — names are fully dynamic.
@@ -700,20 +716,6 @@ export function AdminDashboard() {
                   </BusyLabel>
                 </button>
               </form>
-              </div>
-
-              <FieldNotes
-                notes={fieldNotes}
-                online={online}
-                postingId={postingNoteId}
-                postingAll={postingAll}
-                onPost={postFieldNote}
-                onDiscard={(id) => {
-                  persistNotes(fieldNotes.filter((n) => n.id !== id));
-                  flash("Note discarded", "It was only on this device.");
-                }}
-                onPostAll={postAllFieldNotes}
-              />
             </section>
 
             <SpiderChart teams={sortedTeams} />
