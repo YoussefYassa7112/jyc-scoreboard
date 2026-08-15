@@ -395,6 +395,7 @@ export function BuildingMap({
   onFocusClearedRef.current = onFocusCleared;
   const mountedRef = useRef(true);
   const [floorId, setFloorId] = useState(defaultFloorId);
+  const [floorDir, setFloorDir] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
@@ -407,10 +408,25 @@ export function BuildingMap({
     };
   }, []);
 
+  function goToFloor(nextId: string, options?: { keepSelection?: boolean }) {
+    if (nextId === floorId) return;
+    const from = floors.findIndex((f) => f.id === floorId);
+    const to = floors.findIndex((f) => f.id === nextId);
+    setFloorDir(to >= from ? 1 : -1);
+    setFloorId(nextId);
+    if (!options?.keepSelection) {
+      setSelectedId(null);
+      setHighlightBlockId(null);
+      notifyFocusCleared();
+    }
+  }
+
   useEffect(() => {
-    if (focusFloorId) setFloorId(focusFloorId);
+    if (focusFloorId) goToFloor(focusFloorId, { keepSelection: true });
     if (focusRoomId) setSelectedId(focusRoomId);
     if (focusBlockId) setHighlightBlockId(focusBlockId);
+    // goToFloor reads floorId; only re-run when the focus target changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusFloorId, focusRoomId, focusBlockId]);
 
   // Arriving from a schedule card: bring the map into view, then flash the room
@@ -531,10 +547,7 @@ export function BuildingMap({
               <button
                 key={f.id}
                 type="button"
-                onClick={() => {
-                  setFloorId(f.id);
-                  clearSelection();
-                }}
+                onClick={() => goToFloor(f.id)}
                 className={`min-h-11 cursor-pointer rounded-xl px-2 py-2 text-sm font-extrabold transition sm:px-3.5 ${
                   active
                     ? "bg-star text-on-star shadow-sm"
@@ -574,7 +587,16 @@ export function BuildingMap({
         ))}
       </div>
 
-      <div className="mt-4 overflow-auto rounded-2xl border-2 border-saddle/15 bg-chip/40 p-1.5 sm:p-3">
+      <div className="mt-4 overflow-hidden rounded-2xl border-2 border-saddle/15 bg-chip/40">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={floor.id}
+            initial={{ opacity: 0, x: 36 * floorDir }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -36 * floorDir }}
+            transition={{ duration: 0.34, ease: easeSoft }}
+            className="overflow-auto p-1.5 sm:p-3"
+          >
         <motion.svg
           viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
           className="mx-auto block h-auto w-full max-w-4xl touch-pan-x touch-pan-y"
@@ -875,6 +897,8 @@ export function BuildingMap({
             className="pointer-events-none"
           />
         </motion.svg>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <AnimatePresence initial={false}>
@@ -915,7 +939,7 @@ export function BuildingMap({
                     key={`${link.floorId}-${link.roomId}`}
                     type="button"
                     onClick={() => {
-                      setFloorId(link.floorId);
+                      goToFloor(link.floorId, { keepSelection: true });
                       setSelectedId(link.roomId);
                       setHighlightBlockId(null);
                       setSpotlightKey(Date.now());

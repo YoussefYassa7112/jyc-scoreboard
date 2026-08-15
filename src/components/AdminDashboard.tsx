@@ -1022,7 +1022,9 @@ export function AdminDashboard() {
                         </div>
                         <span
                           className={`display-font shrink-0 text-lg font-bold ${
-                            row.delta > 0 ? "text-emerald-400" : "text-star"
+                            row.delta > 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
                           }`}
                         >
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
