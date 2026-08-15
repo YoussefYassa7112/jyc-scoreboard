@@ -11,10 +11,29 @@ export type StandingRow = {
   campGroup: "red" | "green" | null;
 };
 
-export async function getStandings(): Promise<{
+type StandingsPayload = {
   standings: StandingRow[];
   asOf: string;
-}> {
+};
+
+/** Short in-memory TTL so ~100 polling phones share one Neon query per isolate. */
+const STANDINGS_TTL_MS = 4_000;
+let standingsCache: { at: number; data: StandingsPayload } | null = null;
+
+export function invalidateStandingsCache() {
+  standingsCache = null;
+}
+
+export async function getStandingsCached(): Promise<StandingsPayload> {
+  if (standingsCache && Date.now() - standingsCache.at < STANDINGS_TTL_MS) {
+    return standingsCache.data;
+  }
+  const data = await getStandings();
+  standingsCache = { at: Date.now(), data };
+  return data;
+}
+
+export async function getStandings(): Promise<StandingsPayload> {
   const db = getDb();
 
   const rows = await db

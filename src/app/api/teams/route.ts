@@ -3,7 +3,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pointEvents, teams, type CampGroup } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { TEAM_COLORS } from "@/lib/standings";
+import { invalidateStandingsCache, TEAM_COLORS } from "@/lib/standings";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +90,8 @@ export async function POST(request: Request) {
         sortOrder: existing.length,
       })
       .returning();
+
+    invalidateStandingsCache();
 
     return NextResponse.json({ team }, { status: 201 });
   } catch (error) {

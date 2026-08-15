@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { panelIn, springSnappy } from "@/lib/motion";
 import type { FieldNote } from "@/lib/field-notes";
 import { BusyLabel } from "./Spinner";
 
@@ -32,7 +33,9 @@ export function FieldNotes({
   onPostAll,
 }: Props) {
   return (
-    <section
+    <motion.section
+      layout
+      variants={panelIn}
       className={`panel relative flex h-full flex-col overflow-hidden rounded-3xl p-4 sm:p-5 ${className}`}
     >
       <div
@@ -52,18 +55,26 @@ export function FieldNotes({
             post them.
           </p>
         </div>
-        {notes.length > 0 && online ? (
-          <button
-            type="button"
-            onClick={onPostAll}
-            disabled={postingAll || postingId !== null}
-            className="btn-cta rounded-xl bg-buzz px-4 py-2 text-sm font-extrabold disabled:opacity-50"
-          >
-            <BusyLabel busy={postingAll} busyLabel="Posting all…">
-              {`Post all (${notes.length})`}
-            </BusyLabel>
-          </button>
-        ) : null}
+        <AnimatePresence initial={false}>
+          {notes.length > 0 && online ? (
+            <motion.button
+              key="post-all"
+              layout
+              initial={{ opacity: 0, scale: 0.9, y: 6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 6 }}
+              transition={springSnappy}
+              type="button"
+              onClick={onPostAll}
+              disabled={postingAll || postingId !== null}
+              className="btn-cta rounded-xl bg-buzz px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+            >
+              <BusyLabel busy={postingAll} busyLabel="Posting all…">
+                {`Post all (${notes.length})`}
+              </BusyLabel>
+            </motion.button>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       {notes.length === 0 ? (
@@ -153,6 +164,6 @@ export function FieldNotes({
           </AnimatePresence>
         </ul>
       )}
-    </section>
+    </motion.section>
   );
 }

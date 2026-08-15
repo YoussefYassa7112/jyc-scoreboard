@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pointEvents, teams } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { getPointHistory } from "@/lib/standings";
+import { getPointHistory, invalidateStandingsCache } from "@/lib/standings";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +75,8 @@ export async function POST(request: Request) {
         note,
       })
       .returning();
+
+    invalidateStandingsCache();
 
     return NextResponse.json(
       {

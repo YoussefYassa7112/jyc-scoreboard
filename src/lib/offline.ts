@@ -59,17 +59,21 @@ export function readMyTeamSnapshot(): MyTeamSnapshot | null {
   }
 }
 
+/** Lets the board react when the schedule changes the camper's team. */
+export const TEAM_CHANGED_EVENT = "camp-my-team-changed";
+
 export function writeMyTeamSnapshot(snapshot: MyTeamSnapshot | null) {
   if (typeof window === "undefined") return;
   try {
     if (!snapshot) {
       window.localStorage.removeItem(TEAM_STORAGE_KEY);
-      return;
+    } else {
+      window.localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(snapshot));
     }
-    window.localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(snapshot));
   } catch {
     /* ignore */
   }
+  window.dispatchEvent(new CustomEvent(TEAM_CHANGED_EVENT));
 }
 
 export function isBrowserOnline() {

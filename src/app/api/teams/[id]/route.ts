@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { pointEvents, teams, type CampGroup } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
+import { invalidateStandingsCache } from "@/lib/standings";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -66,6 +67,8 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
+    invalidateStandingsCache();
+
     return NextResponse.json({ team });
   } catch (error) {
     console.error("update team error", error);
@@ -100,6 +103,8 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (deleted.length === 0) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
+
+    invalidateStandingsCache();
 
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -4,11 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { firstMappedLocationId, getLocation } from "@/data/locations";
 import {
-  campDays,
   greenCabins,
   redCabins,
+  type CampDay,
   type ScheduleBlock,
 } from "@/data/schedule";
+import {
+  clearRemindersForDay,
+} from "@/lib/event-reminders";
+import {
+  DEMO_DAY_ID,
+  getScheduleDays,
+  resetDemoScheduleClock,
+  setDemoScheduleEnabled,
+} from "@/lib/schedule-demo";
 import {
   readMyTeamSnapshot,
   writeMyTeamSnapshot,
@@ -16,17 +25,28 @@ import {
 } from "@/lib/offline";
 import type { StandingRow } from "@/lib/standings";
 import {
-  eventDateTimes,
+  blockStatus,
+  eventCountdown,
   findCampDayForDate,
-  findNextEvent,
+  findLiveEvents,
+  findUpcomingEvent,
+  findUpcomingExclusive,
   formatCountdown,
   isoDateKey,
+  type BlockStatus,
+  type ScheduleTrack,
 } from "@/lib/schedule-time";
+import { springSnappy } from "@/lib/motion";
+import { NowNextBoard, type UpcomingLane } from "./NowNextBoard";
+import { RemindMeToggle } from "./RemindMeToggle";
 
 type TrackFilter = "overview" | "red" | "green";
 
 type Props = {
   teams: StandingRow[];
+  /** 15-minutes-before reminder opt-in, owned by the board */
+  remindersOn?: boolean;
+  onRemindersChange?: (on: boolean) => void;
   focusDayId?: string | null;
   focusBlockId?: string | null;
   focusGroup?: "all" | "red" | "green" | null;
@@ -48,6 +68,7 @@ function chromeClasses(chrome: "all" | "red" | "green") {
       cardBorder: "border-[#2F8F4E]/55 border-l-[#2F8F4E]",
       time: "text-[#2F8F4E]",
       ring: "ring-[#2F8F4E]",
+      glowRgb: "47, 143, 78",
     };
   }
   if (chrome === "red") {
@@ -55,12 +76,14 @@ function chromeClasses(chrome: "all" | "red" | "green") {
       cardBorder: "border-[#C45C26]/55 border-l-[#C45C26]",
       time: "text-[#C45C26]",
       ring: "ring-[#C45C26]",
+      glowRgb: "196, 92, 38",
     };
   }
   return {
     cardBorder: "border-saddle/20 border-l-[#1E6BB8]",
     time: "text-[#1E6BB8]",
     ring: "ring-woody",
+    glowRgb: "196, 92, 38",
   };
 }
 
@@ -69,6 +92,8 @@ function BlockCard({
   accent,
   chrome,
   highlighted,
+  status = "untimed",
+  endsInMs,
   onViewMap,
 }: {
   block: ScheduleBlock;
@@ -76,34 +101,95 @@ function BlockCard({
   /** Active track color — tints times/outlines for green vs red */
   chrome: "all" | "red" | "green";
   highlighted?: boolean;
+  status?: BlockStatus;
+  endsInMs?: number | null;
   onViewMap?: () => void;
 }) {
   // Prefer the selected track color so shared "everyone" blocks match Red/Green.
   const colorKey = chrome !== "all" ? chrome : accent;
   const colors = chromeClasses(colorKey);
+  const done = status === "done";
+  const live = status === "live";
 
   return (
     <motion.article
       layout
       id={`schedule-block-${block.id}`}
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border border-l-4 bg-card p-3.5 text-card-ink shadow-sm sm:p-4 ${colors.cardBorder} ${
-        highlighted ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-transparent` : ""
-      }`}
+      animate={
+        highlighted && !done
+          ? {
+              opacity: 1,
+              y: 0,
+              scale: [1, 1.02, 1, 1.015, 1],
+              boxShadow: [
+                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
+                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 12px rgba(${colors.glowRgb}, 0.3)`,
+                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
+                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 12px rgba(${colors.glowRgb}, 0.24)`,
+                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
+              ],
+            }
+          : { opacity: 1, y: 0, scale: 1 }
+      }
+      transition={highlighted && !done ? { duration: 2.2, ease: "easeInOut" } : springSnappy}
+      className={`relative overflow-hidden rounded-2xl border border-l-4 p-3.5 text-card-ink shadow-sm sm:p-4 ${
+        done
+          ? "schedule-done border-[#8a8178]/40 border-l-[#8a8178] bg-[#ebe4da] dark:bg-card"
+          : `bg-card ${colors.cardBorder}`
+      } ${
+        highlighted && !done
+          ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-transparent`
+          : ""
+      } ${live ? "ring-2 ring-woody/70" : ""}`}
     >
+      <AnimatePresence>
+        {done ? (
+          <motion.span
+            key="done"
+            initial={{ scale: 1.7, rotate: -22, opacity: 0, x: 12 }}
+            animate={{ scale: 1, rotate: -8, opacity: 1, x: 0 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={springSnappy}
+            className="absolute right-3 top-3 z-10 rounded-full bg-[#6b7280] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md"
+          >
+            ✓ Done
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
+      {live ? (
+        <motion.span
+          className="absolute right-3 top-3 z-10 rounded-full bg-woody px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-on-strong shadow-md"
+          animate={{ scale: [1, 1.08, 1] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+        >
+          Happening now
+        </motion.span>
+      ) : null}
+
       {block.time ? (
         <p
-          className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${colors.time}`}
+          className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+            done ? "text-muted-soft line-through" : colors.time
+          }`}
         >
           {block.time}
         </p>
       ) : null}
-      <h4 className="display-font mt-0.5 text-base font-bold text-card-ink sm:text-lg">
+      <h4
+        className={`display-font mt-0.5 pr-24 text-base font-bold sm:text-lg ${
+          done ? "text-muted line-through decoration-2" : "text-card-ink"
+        }`}
+      >
         {block.title}
       </h4>
+      {live && endsInMs != null ? (
+        <p className="mt-1 text-sm font-extrabold tabular-nums text-woody">
+          Ends in {formatCountdown(endsInMs)}
+        </p>
+      ) : null}
       {block.location ? (
-        <p className="mt-1 text-sm font-bold text-accent">
+        <p className={`mt-1 text-sm font-bold ${done ? "text-muted-soft" : "text-accent"}`}>
           <span className="text-muted-soft">Location · </span>
           {block.location}
         </p>
@@ -140,6 +226,8 @@ function Section({
   title,
   tint,
   chrome,
+  day,
+  now,
   blocks,
   cabins,
   highlightBlockId,
@@ -148,6 +236,8 @@ function Section({
   title: string;
   tint: "all" | "red" | "green";
   chrome: "all" | "red" | "green";
+  day: CampDay;
+  now: Date;
   blocks: ScheduleBlock[];
   cabins?: string[];
   highlightBlockId?: string | null;
@@ -175,16 +265,22 @@ function Section({
         ) : null}
       </div>
       <div className="space-y-2.5">
-        {blocks.map((block) => (
-          <BlockCard
-            key={block.id}
-            block={block}
-            accent={tint}
-            chrome={chrome}
-            highlighted={highlightBlockId === block.id}
-            onViewMap={onViewMapFor ? () => onViewMapFor(block) : undefined}
-          />
-        ))}
+        {blocks.map((block) => {
+          const status = blockStatus(day, block, now);
+          const count = status === "live" ? eventCountdown(day, block, now) : null;
+          return (
+            <BlockCard
+              key={block.id}
+              block={block}
+              accent={tint}
+              chrome={chrome}
+              status={status}
+              endsInMs={count?.endsIn}
+              highlighted={highlightBlockId === block.id}
+              onViewMap={onViewMapFor ? () => onViewMapFor(block) : undefined}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -192,6 +288,8 @@ function Section({
 
 export function CampSchedule({
   teams,
+  remindersOn,
+  onRemindersChange,
   focusDayId,
   focusBlockId,
   focusGroup,
@@ -199,10 +297,8 @@ export function CampSchedule({
   onScheduleFocusConsumed,
   onViewLocation,
 }: Props) {
-  const todayDay = findCampDayForDate();
-  const [dayId, setDayId] = useState(
-    () => todayDay?.id ?? campDays[0]?.id ?? "day-1",
-  );
+  const [dayId, setDayId] = useState("day-1");
+  const [allowDemo, setAllowDemo] = useState(false);
   const [track, setTrack] = useState<TrackFilter>("overview");
   const [myTeamId, setMyTeamId] = useState<number | "">("");
   const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
@@ -210,6 +306,7 @@ export function CampSchedule({
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [localScrollNonce, setLocalScrollNonce] = useState(0);
+  const [demoEpoch, setDemoEpoch] = useState(0);
   const teamTrackReady = useRef(false);
   const pendingScroll = useRef<{
     blockId: string;
@@ -223,6 +320,13 @@ export function CampSchedule({
     if (!snap) return;
     setMyTeamId(snap.teamId);
     setTeamSnapshot(snap);
+  }, []);
+
+  useEffect(() => {
+    setDemoScheduleEnabled(true);
+    setAllowDemo(process.env.NODE_ENV === "development");
+    const days = getScheduleDays(new Date(), true);
+    if (days[0]?.id === DEMO_DAY_ID) setDayId(DEMO_DAY_ID);
   }, []);
 
   // Keep localStorage snapshot in sync when live standings include the team.
@@ -311,8 +415,23 @@ export function CampSchedule({
   }, [localScrollNonce]);
 
   useEffect(() => {
-    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
-    return () => window.clearInterval(id);
+    let id = 0;
+    const start = () => {
+      setNowTick(Date.now());
+      window.clearInterval(id);
+      id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    };
+    const stop = () => window.clearInterval(id);
+    const onVis = () => {
+      if (document.hidden) stop();
+      else start();
+    };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   function selectTeam(id: number | "") {
@@ -359,36 +478,48 @@ export function CampSchedule({
     setLocalScrollNonce(token);
   }
 
-  const day = useMemo(
-    () => campDays.find((d) => d.id === dayId) ?? campDays[0],
-    [dayId],
+  const calendarKey = isoDateKey(new Date(nowTick));
+  const days = useMemo(
+    () => getScheduleDays(new Date(), allowDemo),
+    [allowDemo, demoEpoch, calendarKey],
+  );
+  const day = useMemo(() => {
+    return days.find((d) => d.id === dayId) ?? days[0]!;
+  }, [days, dayId]);
+  const todayDay = findCampDayForDate(new Date(nowTick), days);
+  const clock = new Date(nowTick);
+  const isSplit = day.mode === "split";
+  const viewingEveryone = !isSplit || track === "overview";
+  const activeTrack: ScheduleTrack = viewingEveryone
+    ? "overview"
+    : track === "red" || track === "green"
+      ? track
+      : "overview";
+  const showGroupedNowNext = isSplit && track === "overview";
+
+  const liveEvents = useMemo(
+    () => findLiveEvents(activeTrack, clock, days),
+    // clock is derived from nowTick; days is stable for the session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeTrack, nowTick, days],
   );
 
-  const nextInfo = useMemo(() => {
-    void nowTick;
-    const group =
-      myTeam?.campGroup === "red" || myTeam?.campGroup === "green"
-        ? myTeam.campGroup
-        : track === "overview"
-          ? "overview"
-          : track;
-    return findNextEvent(group, new Date(nowTick));
-  }, [myTeam?.campGroup, track, nowTick]);
+  const upcomingLanes = useMemo((): UpcomingLane[] => {
+    if (showGroupedNowNext) {
+      return [
+        { track: "all", result: findUpcomingEvent("all", clock, days) },
+        { track: "red", result: findUpcomingExclusive("red", clock, days) },
+        { track: "green", result: findUpcomingExclusive("green", clock, days) },
+      ];
+    }
+    const laneTrack =
+      activeTrack === "red" || activeTrack === "green" ? activeTrack : "all";
+    return [
+      { track: laneTrack, result: findUpcomingEvent(activeTrack, clock, days) },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showGroupedNowNext, activeTrack, nowTick, days]);
 
-  const nextCountdown = useMemo(() => {
-    if (nextInfo.kind !== "next" && nextInfo.kind !== "before") return null;
-    const times = eventDateTimes(nextInfo.day, nextInfo.block);
-    if (!times) return null;
-    const now = nowTick;
-    return {
-      startsIn: times.start.getTime() - now,
-      endsIn: times.end.getTime() - now,
-      inProgress: now >= times.start.getTime() && now < times.end.getTime(),
-      ended: now >= times.end.getTime(),
-    };
-  }, [nextInfo, nowTick]);
-
-  const isSplit = day.mode === "split";
   const chrome: "all" | "red" | "green" =
     track === "red" || track === "green" ? track : "all";
   const morning = day.blocks.filter(
@@ -452,6 +583,27 @@ export function CampSchedule({
         </p>
       </div>
 
+      {day.id === DEMO_DAY_ID ? (
+        <div className="mt-3 rounded-2xl border-2 border-woody/40 bg-chip/80 px-4 py-3">
+          <p className="text-sm font-bold text-woody">
+            Test day — overlapping Red/Green events, timers, faded Done cards,
+            and reminder popups. Hidden once camp starts. Local only.
+          </p>
+          <button
+            type="button"
+            className="btn-soft mt-2 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+            onClick={() => {
+              resetDemoScheduleClock();
+              clearRemindersForDay(DEMO_DAY_ID);
+              setDemoEpoch((n) => n + 1);
+              setNowTick(Date.now());
+            }}
+          >
+            Restart test events
+          </button>
+        </div>
+      ) : null}
+
       <div className="mt-4">
         <label className="block text-sm font-bold text-muted">
           My team
@@ -462,7 +614,7 @@ export function CampSchedule({
             }
             className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
           >
-            <option value="">Choose your team</option>
+            <option value="">Everyone — see all groups</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -514,75 +666,30 @@ export function CampSchedule({
       </div>
 
       <div className="surface-card mt-4 rounded-2xl border-2 p-4">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
-          Next up
+        <NowNextBoard
+          now={clock}
+          live={liveEvents}
+          upcoming={upcomingLanes}
+          grouped={showGroupedNowNext}
+          onJump={jumpToBlock}
+        />
+        <p className="mt-3 text-[11px] font-semibold text-muted-soft">
+          As of {clock.toLocaleString()} · {isoDateKey(clock)}
         </p>
-        {nextInfo.kind === "next" || nextInfo.kind === "before" ? (
-          <>
-            <p className="display-font mt-1 text-lg font-bold text-card-ink">
-              {nextInfo.block.title}
-            </p>
-            <p className="mt-0.5 text-sm font-semibold text-muted">
-              {nextInfo.kind === "before"
-                ? `Camp starts · ${nextInfo.day.dateLabel}`
-                : nextInfo.day.dateLabel}
-              {nextInfo.block.time ? ` · ${nextInfo.block.time}` : ""}
-            </p>
-            {nextInfo.block.location ? (
-              <p className="mt-1 text-sm font-bold text-accent">
-                {nextInfo.block.location}
-              </p>
-            ) : null}
-            {nextCountdown ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-chip/80 px-2.5 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
-                    {nextCountdown.inProgress ? "Started" : "Starts in"}
-                  </p>
-                  <p className="display-font text-base font-bold tabular-nums text-card-ink">
-                    {nextCountdown.inProgress
-                      ? "Now"
-                      : formatCountdown(nextCountdown.startsIn)}
-                  </p>
-                </div>
-                <div className="rounded-xl bg-chip/80 px-2.5 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
-                    Ends in
-                  </p>
-                  <p className="display-font text-base font-bold tabular-nums text-card-ink">
-                    {nextCountdown.ended
-                      ? "Done"
-                      : formatCountdown(nextCountdown.endsIn)}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              className="btn-soft mt-3 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
-              onClick={() =>
-                jumpToBlock(
-                  nextInfo.day.id,
-                  nextInfo.block.id,
-                  nextInfo.block.group,
-                )
-              }
-            >
-              Jump to this day
-            </button>
-          </>
-        ) : nextInfo.kind === "after" ? (
-          <p className="mt-1 text-sm font-semibold text-muted">
-            Camp is over — thanks for an amazing weekend!
-          </p>
-        ) : (
-          <p className="mt-1 text-sm font-semibold text-muted">
-            No timed events available yet.
-          </p>
-        )}
-        <p className="mt-2 text-[11px] font-semibold text-muted-soft">
-          As of {new Date(nowTick).toLocaleString()} · {isoDateKey(new Date())}
-        </p>
+
+        {onRemindersChange ? (
+          <RemindMeToggle
+            enabled={Boolean(remindersOn)}
+            onChange={onRemindersChange}
+            trackLabel={
+              myTeam?.campGroup === "red"
+                ? "Red group"
+                : myTeam?.campGroup === "green"
+                  ? "Green group"
+                  : "Everyone, Red, and Green"
+            }
+          />
+        ) : null}
       </div>
 
       {mapNotice ? (
@@ -592,7 +699,7 @@ export function CampSchedule({
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {campDays.map((d) => {
+        {days.map((d) => {
           const active = d.id === dayId;
           return (
             <button
@@ -619,7 +726,7 @@ export function CampSchedule({
         <div className="mt-3 flex flex-wrap gap-2">
           {(
             [
-              ["overview", "Full day"],
+              ["overview", "Everyone"],
               ["red", "Red group"],
               ["green", "Green group"],
             ] as const
@@ -669,6 +776,8 @@ export function CampSchedule({
               title="Full day — Everyone together"
               tint="all"
               chrome={chrome}
+              day={day}
+              now={new Date(nowTick)}
               blocks={fullDay}
               highlightBlockId={highlightId}
               onViewMapFor={handleViewMap}
@@ -679,7 +788,9 @@ export function CampSchedule({
                 title="Morning — Everyone together"
                 tint="all"
                 chrome={chrome}
-                blocks={morning}
+                day={day}
+              now={new Date(nowTick)}
+              blocks={morning}
                 highlightBlockId={highlightId}
                 onViewMapFor={handleViewMap}
               />
@@ -690,7 +801,9 @@ export function CampSchedule({
                     title="Red group"
                     tint="red"
                     chrome="red"
-                    blocks={redBlocks}
+                    day={day}
+              now={new Date(nowTick)}
+              blocks={redBlocks}
                     cabins={redCabins}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
@@ -699,7 +812,9 @@ export function CampSchedule({
                     title="Green group"
                     tint="green"
                     chrome="green"
-                    blocks={greenBlocks}
+                    day={day}
+              now={new Date(nowTick)}
+              blocks={greenBlocks}
                     cabins={greenCabins}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
@@ -712,7 +827,9 @@ export function CampSchedule({
                   title="Red group"
                   tint="red"
                   chrome={chrome}
-                  blocks={redBlocks}
+                  day={day}
+              now={new Date(nowTick)}
+              blocks={redBlocks}
                   cabins={redCabins}
                   highlightBlockId={highlightId}
                   onViewMapFor={handleViewMap}
@@ -724,7 +841,9 @@ export function CampSchedule({
                   title="Green group"
                   tint="green"
                   chrome={chrome}
-                  blocks={greenBlocks}
+                  day={day}
+              now={new Date(nowTick)}
+              blocks={greenBlocks}
                   cabins={greenCabins}
                   highlightBlockId={highlightId}
                   onViewMapFor={handleViewMap}
@@ -735,7 +854,9 @@ export function CampSchedule({
                 title="Evening — Everyone together"
                 tint="all"
                 chrome={chrome}
-                blocks={evening}
+                day={day}
+              now={new Date(nowTick)}
+              blocks={evening}
                 highlightBlockId={highlightId}
                 onViewMapFor={handleViewMap}
               />

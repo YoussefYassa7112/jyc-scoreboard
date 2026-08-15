@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
+import { fadeSoft, springSoft } from "@/lib/motion";
 import { useOnline } from "@/lib/use-online";
 import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
@@ -44,7 +46,11 @@ export function AdminLoginForm() {
   return (
     <main className="relative flex min-h-dvh items-center justify-center px-4 py-10">
       <SkyDecor />
-      <form
+      <motion.form
+        layout
+        initial={{ opacity: 0, y: 18, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={springSoft}
         onSubmit={onSubmit}
         className="panel relative z-10 w-full max-w-md rounded-3xl p-6 sm:p-8"
       >
@@ -80,9 +86,20 @@ export function AdminLoginForm() {
           />
         </label>
 
-        {error ? (
-          <p className="mt-3 text-sm font-bold text-woody">{error}</p>
-        ) : null}
+        <AnimatePresence initial={false}>
+          {error ? (
+            <motion.p
+              key="login-error"
+              initial={{ opacity: 0, y: -6, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -6, height: 0 }}
+              transition={fadeSoft}
+              className="mt-3 overflow-hidden text-sm font-bold text-woody"
+            >
+              {error}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
 
         <button
           type="submit"
@@ -100,7 +117,7 @@ export function AdminLoginForm() {
         >
           Back to scoreboard
         </Link>
-      </form>
+      </motion.form>
     </main>
   );
 }

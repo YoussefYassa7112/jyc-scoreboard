@@ -17,6 +17,8 @@ import { blocksAtRoom } from "@/lib/schedule-time";
 type BuildingMapProps = {
   focusFloorId?: string | null;
   focusRoomId?: string | null;
+  /** Bumped on every schedule→map jump so the room re-pulses on arrival */
+  focusArrivalNonce?: number | null;
   onOpenScheduleEvent?: (
     dayId: string,
     blockId: string,
@@ -275,6 +277,7 @@ function Decorations({
 export function BuildingMap({
   focusFloorId,
   focusRoomId,
+  focusArrivalNonce,
   onOpenScheduleEvent,
 }: BuildingMapProps) {
   const { theme } = useTheme();
@@ -283,11 +286,23 @@ export function BuildingMap({
   const [floorId, setFloorId] = useState(defaultFloorId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
 
   useEffect(() => {
     if (focusFloorId) setFloorId(focusFloorId);
     if (focusRoomId) setSelectedId(focusRoomId);
   }, [focusFloorId, focusRoomId]);
+
+  // Arriving from a schedule card: bring the map into view, then flash the room
+  // so it is obvious which building the event points at.
+  useEffect(() => {
+    if (!focusArrivalNonce || !focusRoomId) return;
+    setSpotlightKey(focusArrivalNonce);
+    const timer = window.setTimeout(() => {
+      wrapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [focusArrivalNonce, focusRoomId]);
 
   const floor = useMemo(() => getFloor(floorId), [floorId]);
   const selected = useMemo(
@@ -522,6 +537,25 @@ export function BuildingMap({
                     {line}
                   </text>
                 ))}
+                {active && spotlightKey ? (
+                  <motion.rect
+                    key={`spotlight-${spotlightKey}`}
+                    x={room.x - 5}
+                    y={room.y - 5}
+                    width={room.w + 10}
+                    height={room.h + 10}
+                    rx={9}
+                    fill="none"
+                    stroke={dark ? "#38bdf8" : "#c45c26"}
+                    className="pointer-events-none"
+                    initial={{ opacity: 0, strokeWidth: 2 }}
+                    animate={{
+                      opacity: [0, 0.95, 0.1, 0.95, 0],
+                      strokeWidth: [2, 10, 3, 10, 2],
+                    }}
+                    transition={{ duration: 2, ease: "easeInOut" }}
+                  />
+                ) : null}
               </g>
             );
           })}

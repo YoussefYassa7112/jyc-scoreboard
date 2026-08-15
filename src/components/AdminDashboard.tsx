@@ -2,15 +2,27 @@
 
 import {
   FormEvent,
+  MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
+import {
+  contentSwap,
+  fadeSoft,
+  listItemIn,
+  panelIn,
+  springSnappy,
+  springSoft,
+  staggerParent,
+} from "@/lib/motion";
 import {
   createFieldNote,
   readAdminTeamsCache,
@@ -55,6 +67,7 @@ export function AdminDashboard() {
   const router = useRouter();
   const { theme } = useTheme();
   const online = useOnline();
+  const [leavingToBoard, startLeaveToBoard] = useTransition();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [toasts, setToasts] = useState<AdminToast[]>([]);
@@ -213,6 +226,13 @@ export function AdminDashboard() {
     if (online) return true;
     fail("You're offline", "Connect to WiFi to change teams or post points.");
     return false;
+  }
+
+  function goToScoreboard(e: ReactMouseEvent<HTMLAnchorElement>) {
+    // Let ctrl/cmd/middle clicks open a new tab the normal way.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    startLeaveToBoard(() => router.push("/"));
   }
 
   function logout() {
@@ -483,11 +503,20 @@ export function AdminDashboard() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <main className="relative min-h-dvh px-4 py-6 sm:px-6 md:px-8 md:py-8">
       {theme !== "dark" ? <SkyDecor /> : null}
 
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-5">
-        <header className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4">
+      <motion.div
+        className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-5"
+        variants={staggerParent}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.header
+          variants={panelIn}
+          className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4"
+        >
           <div>
             <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
               Camp control
@@ -499,9 +528,14 @@ export function AdminDashboard() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/"
+              prefetch
+              onClick={goToScoreboard}
+              aria-busy={leavingToBoard}
               className="btn-soft rounded-xl border-2 px-4 py-2 text-sm font-extrabold"
             >
-              View scoreboard
+              <BusyLabel busy={leavingToBoard} busyLabel="Opening board…">
+                View scoreboard
+              </BusyLabel>
             </Link>
             <button
               type="button"
@@ -514,21 +548,34 @@ export function AdminDashboard() {
               </BusyLabel>
             </button>
           </div>
-        </header>
+        </motion.header>
 
         <OfflineBanner
           online={online}
           detail="Live scores and team edits need WiFi. You can still jot awards on Field notes, then post them when you're back online."
         />
 
+        <AnimatePresence mode="wait" initial={false}>
         {loading ? (
-          <p className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft">
+          <motion.p
+            key="loading"
+            variants={panelIn}
+            exit={{ opacity: 0, y: -10, transition: fadeSoft }}
+            className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft"
+          >
             Loading…
-          </p>
+          </motion.p>
         ) : (
-          <>
+          <motion.div
+            key="content"
+            variants={contentSwap}
+            className="flex flex-col gap-5"
+          >
+            <LayoutGroup>
             <section className="grid gap-5 lg:grid-cols-2">
-              <form
+              <motion.form
+                layout
+                variants={panelIn}
                 onSubmit={submitPoints}
                 className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-1"
               >
@@ -595,39 +642,55 @@ export function AdminDashboard() {
                   />
                 </label>
 
-                {online ? (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    <button
-                      type="submit"
-                      disabled={teams.length === 0 || isBusy("submit-points")}
-                      className="btn-cta w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {online ? (
+                    <motion.div
+                      key="online-actions"
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={springSoft}
+                      className="mt-4 grid gap-2 sm:grid-cols-2"
                     >
-                      <BusyLabel
-                        busy={isBusy("submit-points")}
-                        busyLabel="Submitting…"
+                      <button
+                        type="submit"
+                        disabled={teams.length === 0 || isBusy("submit-points")}
+                        className="btn-cta w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
                       >
-                        Submit points
-                      </BusyLabel>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveToFieldNotes}
-                      disabled={teams.length === 0 || isBusy("submit-points")}
-                      className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                        <BusyLabel
+                          busy={isBusy("submit-points")}
+                          busyLabel="Submitting…"
+                        >
+                          Submit points
+                        </BusyLabel>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveToFieldNotes}
+                        disabled={teams.length === 0 || isBusy("submit-points")}
+                        className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                      >
+                        Save for later
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.button
+                      key="offline-action"
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={springSoft}
+                      type="submit"
+                      disabled={teams.length === 0}
+                      className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
                     >
-                      Save for later
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="submit"
-                    disabled={teams.length === 0}
-                    className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                  >
-                    Save to field notes
-                  </button>
-                )}
-              </form>
+                      Save to field notes
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </motion.form>
 
               <FieldNotes
                 notes={fieldNotes}
@@ -643,7 +706,9 @@ export function AdminDashboard() {
                 onPostAll={postAllFieldNotes}
               />
 
-              <form
+              <motion.form
+                layout
+                variants={panelIn}
                 onSubmit={createTeam}
                 className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-2"
               >
@@ -694,10 +759,19 @@ export function AdminDashboard() {
                           key={c}
                           type="button"
                           aria-label={`Pick ${c}`}
+                          aria-pressed={newColor.toLowerCase() === c.toLowerCase()}
                           onClick={() => setNewColor(c)}
-                          className="h-8 w-8 rounded-full border-2 border-white/80 shadow"
+                          className="relative h-8 w-8 rounded-full border-2 border-white/80 shadow transition-transform duration-200 hover:scale-110 active:scale-95"
                           style={{ backgroundColor: c }}
-                        />
+                        >
+                          {newColor.toLowerCase() === c.toLowerCase() ? (
+                            <motion.span
+                              layoutId="new-color-ring"
+                              transition={springSnappy}
+                              className="pointer-events-none absolute -inset-1.5 rounded-full ring-2 ring-saddle dark:ring-white/70"
+                            />
+                          ) : null}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -715,29 +789,47 @@ export function AdminDashboard() {
                     Add team
                   </BusyLabel>
                 </button>
-              </form>
+              </motion.form>
             </section>
 
-            <SpiderChart teams={sortedTeams} />
+            <motion.div variants={panelIn}>
+              <SpiderChart teams={sortedTeams} />
+            </motion.div>
 
-            <section className="panel rounded-3xl p-5">
+            <motion.section layout variants={panelIn} className="panel rounded-3xl p-5">
               <h2 className="display-font text-xl font-bold">Teams</h2>
               {sortedTeams.length === 0 ? (
                 <p className="mt-3 font-semibold text-muted-soft">
                   No teams yet. Create your first team above.
                 </p>
               ) : (
-                <ul className="mt-4 flex flex-col gap-3">
+                <motion.ul layout className="mt-4 flex flex-col gap-3">
+                  <AnimatePresence initial={false}>
                   {sortedTeams.map((team, index) => {
                     const teamBusy =
                       isBusy(`team-${team.id}`) || isBusy(`delete-${team.id}`);
                     return (
-                    <li
+                    <motion.li
                       key={team.id}
-                      className="surface-card rounded-2xl border-2 p-3 sm:p-4"
+                      layout
+                      variants={listItemIn}
+                      initial="hidden"
+                      animate="show"
+                      exit="exit"
+                      transition={springSoft}
+                      className="surface-card overflow-hidden rounded-2xl border-2 p-3 sm:p-4"
                     >
+                      <AnimatePresence mode="popLayout" initial={false}>
                       {editingId === team.id ? (
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                        <motion.div
+                          key="edit"
+                          layout="position"
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 8 }}
+                          transition={springSoft}
+                          className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                        >
                           <label className="flex-1 text-sm font-bold text-muted">
                             Name
                             <input
@@ -791,9 +883,17 @@ export function AdminDashboard() {
                               Cancel
                             </button>
                           </div>
-                        </div>
+                        </motion.div>
                       ) : (
-                        <div className="flex flex-col gap-3">
+                        <motion.div
+                          key="view"
+                          layout="position"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={springSoft}
+                          className="flex flex-col gap-3"
+                        >
                           <div className="flex items-start gap-3">
                             <span
                               className="display-font flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
@@ -860,24 +960,35 @@ export function AdminDashboard() {
                             >
                               Delete
                             </button>
-                            {teamBusy ? (
-                              <span className="col-span-2 inline-flex items-center gap-2 text-sm font-bold text-muted-soft sm:col-span-1">
-                                <Spinner />
-                                Saving…
-                              </span>
-                            ) : null}
+                            <AnimatePresence initial={false}>
+                              {teamBusy ? (
+                                <motion.span
+                                  key="saving"
+                                  initial={{ opacity: 0, x: -6 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -6 }}
+                                  transition={fadeSoft}
+                                  className="col-span-2 inline-flex items-center gap-2 text-sm font-bold text-muted-soft sm:col-span-1"
+                                >
+                                  <Spinner />
+                                  Saving…
+                                </motion.span>
+                              ) : null}
+                            </AnimatePresence>
                           </div>
-                        </div>
+                        </motion.div>
                       )}
-                    </li>
+                      </AnimatePresence>
+                    </motion.li>
                     );
                   })}
-                </ul>
+                  </AnimatePresence>
+                </motion.ul>
               )}
-            </section>
+            </motion.section>
 
             <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="panel rounded-3xl p-5">
+              <motion.div layout variants={panelIn} className="panel rounded-3xl p-5">
                 <h2 className="display-font text-xl font-bold">Point history</h2>
                 {history.length === 0 ? (
                   <p className="mt-3 font-semibold text-muted-soft">
@@ -885,9 +996,15 @@ export function AdminDashboard() {
                   </p>
                 ) : (
                   <ul className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+                    <AnimatePresence initial={false}>
                     {history.map((row) => (
-                      <li
+                      <motion.li
                         key={row.id}
+                        layout
+                        initial={{ opacity: 0, x: -14, scale: 0.98 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 14, scale: 0.98 }}
+                        transition={springSoft}
                         className="surface-card flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
                       >
                         <div className="min-w-0">
@@ -910,27 +1027,43 @@ export function AdminDashboard() {
                         >
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
                         </span>
-                      </li>
+                      </motion.li>
                     ))}
+                    </AnimatePresence>
                   </ul>
                 )}
-              </div>
+              </motion.div>
 
-              <div className="panel rounded-3xl p-5 text-center">
+              <motion.div layout variants={panelIn} className="panel rounded-3xl p-5 text-center">
                 <h2 className="display-font text-xl font-bold">Camper QR code</h2>
                 <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Print this so kids can open the live scoreboard.
                 </p>
-                {qrDataUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={qrDataUrl}
-                    alt="QR code to camp scoreboard"
-                    className="mx-auto mt-4 w-52 rounded-2xl border-2 border-field-border bg-white p-2"
-                  />
-                ) : (
-                  <p className="mt-8 font-semibold text-muted-soft">Generating QR…</p>
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {qrDataUrl ? (
+                    <motion.img
+                      key="qr"
+                      src={qrDataUrl}
+                      alt="QR code to camp scoreboard"
+                      initial={{ opacity: 0, scale: 0.92 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={springSoft}
+                      className="mx-auto mt-4 w-52 rounded-2xl border-2 border-field-border bg-white p-2"
+                    />
+                  ) : (
+                    <motion.p
+                      key="qr-loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={fadeSoft}
+                      className="mt-8 font-semibold text-muted-soft"
+                    >
+                      Generating QR…
+                    </motion.p>
+                  )}
+                </AnimatePresence>
                 <p className="mt-3 break-all text-xs font-bold text-muted-soft">
                   {publicUrl}
                 </p>
@@ -942,11 +1075,13 @@ export function AdminDashboard() {
                 >
                   Download QR PNG
                 </button>
-              </div>
+              </motion.div>
             </section>
-          </>
+            </LayoutGroup>
+          </motion.div>
         )}
-      </div>
+        </AnimatePresence>
+      </motion.div>
 
       <AdminToasts
         toasts={toasts}
@@ -964,5 +1099,6 @@ export function AdminDashboard() {
         onCancel={() => setPendingDelete(null)}
       />
     </main>
+    </MotionConfig>
   );
 }

@@ -1,14 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
+  useEventReminders,
+  useReminderOptIn,
+  type DueReminder,
+} from "@/lib/event-reminders";
+import { easeSoft } from "@/lib/motion";
+import {
+  readMyTeamSnapshot,
   readStandingsCache,
   writeStandingsCache,
+  TEAM_CHANGED_EVENT,
+  type MyTeamSnapshot,
 } from "@/lib/offline";
+import { diffStandings, type BoardAlert } from "@/lib/rank-alerts";
 import type { StandingRow } from "@/lib/standings";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
+import { AdminToasts, type AdminToast } from "./AdminToasts";
+import { BoardAlerts } from "./BoardAlerts";
 import { BuildingMap } from "./BuildingMap";
 import { CampPhotosButton } from "./CampPhotosButton";
 import { CampSchedule } from "./CampSchedule";
@@ -24,6 +36,21 @@ const TABS: { id: BoardTab; label: string }[] = [
   { id: "map", label: "Map" },
   { id: "schedule", label: "Schedule" },
 ];
+
+/** Panels travel in the direction of the tab you moved toward. */
+const panelVariants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    x: direction >= 0 ? 56 : -56,
+    scale: 0.98,
+  }),
+  center: { opacity: 1, x: 0, scale: 1 },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction >= 0 ? -40 : 40,
+    scale: 0.98,
+  }),
+};
 
 type StandingsResponse = {
   standings: StandingRow[];
@@ -59,9 +86,11 @@ export function Scoreboard() {
   const [loading, setLoading] = useState(true);
   const [staleCache, setStaleCache] = useState(false);
   const [tab, setTab] = useState<BoardTab>("standings");
+  const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
     roomId: string;
+    arrivalNonce: number;
   } | null>(null);
   const [scheduleFocus, setScheduleFocus] = useState<{
     dayId: string;
@@ -70,6 +99,79 @@ export function Scoreboard() {
     scrollNonce: number;
   } | null>(null);
   const isDark = theme === "dark";
+
+  const [alerts, setAlerts] = useState<BoardAlert[]>([]);
+  const [toasts, setToasts] = useState<AdminToast[]>([]);
+  const [myTeam, setMyTeam] = useState<MyTeamSnapshot | null>(null);
+  const [remindersOn, setRemindersOn] = useReminderOptIn();
+
+  // Baseline for rank comparisons. Only live responses set it, so hydrating from
+  // cache never fires a stale "new leader" alert.
+  const lastLiveStandings = useRef<StandingRow[] | null>(null);
+  const myTeamIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const snapshot = readMyTeamSnapshot();
+      setMyTeam(snapshot);
+      myTeamIdRef.current = snapshot?.teamId ?? null;
+    };
+    sync();
+    window.addEventListener(TEAM_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(TEAM_CHANGED_EVENT, sync);
+  }, []);
+
+  const pushAlerts = useCallback((incoming: BoardAlert[]) => {
+    if (incoming.length === 0) return;
+    setAlerts((current) => [...current, ...incoming].slice(-3));
+    for (const alert of incoming) {
+      const life = alert.kind === "leader" ? 12000 : 8000;
+      window.setTimeout(() => {
+        setAlerts((current) => current.filter((a) => a.id !== alert.id));
+      }, life);
+    }
+  }, []);
+
+  /** Diff each live snapshot against the previous one, never per point event. */
+  const trackStandings = useCallback(
+    (next: StandingRow[]) => {
+      const previous = lastLiveStandings.current;
+      lastLiveStandings.current = next;
+      if (!previous) return;
+      pushAlerts(diffStandings(previous, next, myTeamIdRef.current));
+    },
+    [pushAlerts],
+  );
+
+  const reminderGroup =
+    myTeam?.campGroup === "red" || myTeam?.campGroup === "green"
+      ? myTeam.campGroup
+      : "overview";
+
+  const pushReminderToast = useCallback((reminder: DueReminder) => {
+    const id = `reminder-${reminder.key}`;
+    setToasts((current) => [
+      ...current.filter((toast) => toast.id !== id).slice(-2),
+      {
+        id,
+        kind: "reminder",
+        title: reminder.title,
+        detail: reminder.body,
+      },
+    ]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 12_000);
+  }, []);
+
+  useEventReminders(reminderGroup, remindersOn, pushReminderToast);
+
+  function goToTab(next: BoardTab) {
+    const from = TABS.findIndex((t) => t.id === tab);
+    const to = TABS.findIndex((t) => t.id === next);
+    setTabDirection(to >= from ? 1 : -1);
+    setTab(next);
+  }
 
   // Hydrate last standings so Schedule personalization works immediately offline.
   useEffect(() => {
@@ -100,10 +202,11 @@ export function Scoreboard() {
       }
 
       try {
-        const res = await fetch("/api/standings", { cache: "no-store" });
+        const res = await fetch("/api/standings");
         if (!res.ok) throw new Error("Failed to load");
         const json = (await res.json()) as StandingsResponse;
         if (!cancelled) {
+          trackStandings(json.standings);
           setData(json);
           writeStandingsCache(json);
           setStaleCache(false);
@@ -132,10 +235,26 @@ export function Scoreboard() {
       };
     }
 
-    const id = setInterval(load, 3000);
+    let id = 0;
+    const startPolling = () => {
+      window.clearInterval(id);
+      id = window.setInterval(load, 8_000);
+    };
+    const onVis = () => {
+      if (document.hidden) {
+        window.clearInterval(id);
+        return;
+      }
+      void load();
+      startPolling();
+    };
+
+    if (!document.hidden) startPolling();
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
     };
     // `data` intentionally omitted — only gate polling on connectivity
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -235,21 +354,37 @@ export function Scoreboard() {
                   // Manual tab changes should never reuse a leftover map→schedule
                   // scroll/highlight intent.
                   setScheduleFocus(null);
-                  setTab(item.id);
+                  goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 py-2.5 text-sm font-extrabold transition sm:px-3 sm:text-base ${
-                  active
-                    ? "bg-woody text-on-strong shadow-sm"
-                    : "text-ink hover:bg-chip/80"
+                className={`display-font relative flex-1 rounded-xl px-2 py-2.5 text-sm font-extrabold transition-colors sm:px-3 sm:text-base ${
+                  active ? "text-on-strong" : "text-ink hover:bg-chip/60"
                 }`}
                 aria-current={active ? "page" : undefined}
               >
-                {item.label}
+                {active ? (
+                  <motion.span
+                    layoutId="board-tab-pill"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    className="absolute inset-0 rounded-xl bg-woody shadow-sm"
+                  />
+                ) : null}
+                <span className="relative z-10">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
+        <AnimatePresence mode="wait" custom={tabDirection} initial={false}>
+          <motion.div
+            key={tab}
+            custom={tabDirection}
+            variants={panelVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.28, ease: easeSoft }}
+            className="flex flex-col gap-5 md:gap-7"
+          >
         {tab === "standings" ? (
         <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
           <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
@@ -407,6 +542,7 @@ export function Scoreboard() {
           <BuildingMap
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
+            focusArrivalNonce={mapFocus?.arrivalNonce}
             onOpenScheduleEvent={(dayId, blockId, group) => {
               setScheduleFocus({
                 dayId,
@@ -414,7 +550,7 @@ export function Scoreboard() {
                 group,
                 scrollNonce: Date.now(),
               });
-              setTab("schedule");
+              goToTab("schedule");
             }}
           />
         ) : null}
@@ -422,6 +558,8 @@ export function Scoreboard() {
         {tab === "schedule" ? (
           <CampSchedule
             teams={data?.standings ?? []}
+            remindersOn={remindersOn}
+            onRemindersChange={setRemindersOn}
             focusDayId={scheduleFocus?.dayId}
             focusBlockId={scheduleFocus?.blockId}
             focusGroup={scheduleFocus?.group}
@@ -432,12 +570,15 @@ export function Scoreboard() {
                 setMapFocus({
                   floorId: payload.floorId,
                   roomId: payload.roomId,
+                  arrivalNonce: Date.now(),
                 });
-                setTab("map");
+                goToTab("map");
               }
             }}
           />
         ) : null}
+          </motion.div>
+        </AnimatePresence>
 
         <motion.p
           className="text-center text-xs font-semibold text-muted-soft sm:text-sm"
@@ -447,6 +588,19 @@ export function Scoreboard() {
           Scan the camp QR anytime to check who&apos;s leading the adventure
         </motion.p>
       </div>
+
+      <AdminToasts
+        toasts={toasts}
+        onDismiss={(id) =>
+          setToasts((current) => current.filter((toast) => toast.id !== id))
+        }
+      />
+      <BoardAlerts
+        alerts={alerts}
+        onDismiss={(id) =>
+          setAlerts((current) => current.filter((a) => a.id !== id))
+        }
+      />
     </main>
   );
 }

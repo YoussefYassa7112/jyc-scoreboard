@@ -89,18 +89,29 @@ export function isoDateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function findCampDayForDate(date = new Date()): CampDay | null {
+export function findCampDayForDate(
+  date = new Date(),
+  days: CampDay[] = campDays,
+): CampDay | null {
   const key = isoDateKey(date);
-  return campDays.find((d) => d.dateISO === key) ?? null;
+  return days.find((d) => d.dateISO === key) ?? null;
 }
+
+/** overview = every block; all = shared only; red/green = that track + shared */
+export type ScheduleTrack = ScheduleGroup | "overview";
 
 export function blocksForGroup(
   day: CampDay,
-  group: ScheduleGroup | "overview",
+  group: ScheduleTrack,
 ): ScheduleBlock[] {
   if (group === "overview") return day.blocks;
   return day.blocks.filter((b) => b.group === "all" || b.group === group);
 }
+
+export type TimedEvent = {
+  day: CampDay;
+  block: ScheduleBlock;
+};
 
 export type NextEventResult =
   | { kind: "next"; day: CampDay; block: ScheduleBlock }
@@ -108,17 +119,106 @@ export type NextEventResult =
   | { kind: "after" }
   | { kind: "none" };
 
-export function findNextEvent(
-  group: "red" | "green" | "overview",
+export type BlockStatus = "upcoming" | "live" | "done" | "untimed";
+
+export function blockStatus(
+  day: CampDay,
+  block: ScheduleBlock,
   now = new Date(),
+): BlockStatus {
+  const times = eventDateTimes(day, block);
+  if (!times) return "untimed";
+  const t = now.getTime();
+  if (t >= times.end.getTime()) return "done";
+  if (t >= times.start.getTime()) return "live";
+  return "upcoming";
+}
+
+export function findNextEvent(
+  group: ScheduleTrack,
+  now = new Date(),
+  days: CampDay[] = campDays,
+): NextEventResult {
+  return findTimedEvent(group, now, days, "end");
+}
+
+/** Next block that has not started yet — used for 15-minute reminders. */
+export function findUpcomingEvent(
+  group: ScheduleTrack,
+  now = new Date(),
+  days: CampDay[] = campDays,
+): NextEventResult {
+  return findTimedEvent(group, now, days, "start");
+}
+
+/** Next block on this color only — skips shared Everyone events. */
+export function findUpcomingExclusive(
+  group: ScheduleGroup,
+  now = new Date(),
+  days: CampDay[] = campDays,
+): NextEventResult {
+  return findTimedEvent(group, now, days, "start", true);
+}
+
+/** Every block currently in progress for this track (can be more than one). */
+export function findLiveEvents(
+  group: ScheduleTrack,
+  now = new Date(),
+  days: CampDay[] = campDays,
+): TimedEvent[] {
+  const todayKey = isoDateKey(now);
+  const day = days.find((d) => d.dateISO === todayKey);
+  if (!day) return [];
+
+  const live: TimedEvent[] = [];
+  for (const block of blocksForGroup(day, group)) {
+    if (blockStatus(day, block, now) === "live") {
+      live.push({ day, block });
+    }
+  }
+  return live;
+}
+
+export function eventCountdown(
+  day: CampDay,
+  block: ScheduleBlock,
+  now = new Date(),
+): { startsIn: number; endsIn: number; status: BlockStatus } | null {
+  const times = eventDateTimes(day, block);
+  if (!times) return null;
+  const t = now.getTime();
+  return {
+    startsIn: times.start.getTime() - t,
+    endsIn: times.end.getTime() - t,
+    status: blockStatus(day, block, now),
+  };
+}
+
+function blocksForTrack(
+  day: CampDay,
+  group: ScheduleTrack,
+  exclusive: boolean,
+): ScheduleBlock[] {
+  if (exclusive && group !== "overview") {
+    return day.blocks.filter((b) => b.group === group);
+  }
+  return blocksForGroup(day, group);
+}
+
+function findTimedEvent(
+  group: ScheduleTrack,
+  now: Date,
+  days: CampDay[],
+  edge: "start" | "end",
+  exclusive = false,
 ): NextEventResult {
   const todayKey = isoDateKey(now);
-  const firstDay = campDays[0];
-  const lastDay = campDays[campDays.length - 1];
+  const firstDay = days[0];
+  const lastDay = days[days.length - 1];
   if (!firstDay || !lastDay) return { kind: "none" };
 
   if (todayKey < firstDay.dateISO) {
-    const blocks = blocksForGroup(firstDay, group);
+    const blocks = blocksForTrack(firstDay, group, exclusive);
     const firstTimed = blocks.find((b) => parseTimeRange(b.time));
     if (firstTimed) return { kind: "before", day: firstDay, block: firstTimed };
     return { kind: "before", day: firstDay, block: blocks[0] ?? firstDay.blocks[0] };
@@ -128,18 +228,17 @@ export function findNextEvent(
     return { kind: "after" };
   }
 
-  // Search today then later days
-  const startIdx = campDays.findIndex((d) => d.dateISO >= todayKey);
-  for (let i = Math.max(0, startIdx); i < campDays.length; i++) {
-    const day = campDays[i];
-    const blocks = blocksForGroup(day, group);
-    const nowMin =
-      day.dateISO === todayKey ? minutesSinceMidnight(now) : -1;
+  const startIdx = days.findIndex((d) => d.dateISO >= todayKey);
+  for (let i = Math.max(0, startIdx); i < days.length; i++) {
+    const day = days[i];
+    const blocks = blocksForTrack(day, group, exclusive);
+    const nowMin = day.dateISO === todayKey ? minutesSinceMidnight(now) : -1;
 
     for (const block of blocks) {
       const range = parseTimeRange(block.time);
       if (!range) continue;
-      if (day.dateISO > todayKey || range.endMin > nowMin) {
+      const edgeMin = edge === "start" ? range.startMin : range.endMin;
+      if (day.dateISO > todayKey || edgeMin > nowMin) {
         return { kind: "next", day, block };
       }
     }

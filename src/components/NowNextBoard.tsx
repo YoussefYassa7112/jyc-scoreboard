@@ -1,0 +1,313 @@
+"use client";
+
+import type { ScheduleGroup } from "@/data/schedule";
+import {
+  eventCountdown,
+  formatCountdown,
+  type NextEventResult,
+  type TimedEvent,
+} from "@/lib/schedule-time";
+
+export type UpcomingLane = {
+  track: ScheduleGroup;
+  result: NextEventResult;
+};
+
+type Props = {
+  now: Date;
+  live: TimedEvent[];
+  upcoming: UpcomingLane[];
+  grouped: boolean;
+  onJump: (dayId: string, blockId: string, group: ScheduleGroup) => void;
+};
+
+function trackTheme(track: ScheduleGroup) {
+  if (track === "red") {
+    return {
+      label: "Red",
+      bar: "bg-[#C45C26]",
+      border: "border-[#C45C26]/50",
+      chip: "bg-[#C45C26] text-white",
+      time: "text-[#C45C26]",
+    };
+  }
+  if (track === "green") {
+    return {
+      label: "Green",
+      bar: "bg-[#2F8F4E]",
+      border: "border-[#2F8F4E]/50",
+      chip: "bg-[#2F8F4E] text-white",
+      time: "text-[#2F8F4E]",
+    };
+  }
+  return {
+    label: "Everyone",
+    bar: "bg-[#1E6BB8]",
+    border: "border-[#1E6BB8]/45",
+    chip: "bg-[#1E6BB8] text-white",
+    time: "text-[#1E6BB8]",
+  };
+}
+
+function JumpButton({
+  onClick,
+  label,
+}: {
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="btn-soft mt-2 rounded-xl border px-3 py-1.5 text-[11px] font-extrabold"
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function LiveCard({
+  item,
+  now,
+  onJump,
+}: {
+  item: TimedEvent;
+  now: Date;
+  onJump: Props["onJump"];
+}) {
+  const theme = trackTheme(item.block.group);
+  const count = eventCountdown(item.day, item.block, now);
+
+  return (
+    <article
+      className={`relative overflow-hidden rounded-2xl border-2 bg-card p-3.5 ${theme.border}`}
+    >
+      <span
+        className={`absolute inset-y-0 left-0 w-1.5 ${theme.bar}`}
+        aria-hidden
+      />
+      <div className="pl-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${theme.chip}`}
+          >
+            {theme.label}
+          </span>
+          <span className="rounded-full bg-woody px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-on-strong">
+            Happening now
+          </span>
+        </div>
+        <h3 className="display-font mt-1.5 text-base font-bold text-card-ink sm:text-lg">
+          {item.block.title}
+        </h3>
+        <p className={`mt-0.5 text-xs font-extrabold ${theme.time}`}>
+          {item.block.time}
+          {item.block.location ? ` · ${item.block.location}` : ""}
+        </p>
+        {count ? (
+          <p className="mt-2 text-sm font-extrabold tabular-nums text-card-ink">
+            Ends in {formatCountdown(count.endsIn)}
+          </p>
+        ) : null}
+        <JumpButton
+          label="Jump to this event"
+          onClick={() => onJump(item.day.id, item.block.id, item.block.group)}
+        />
+      </div>
+    </article>
+  );
+}
+
+function NextCard({
+  lane,
+  now,
+  onJump,
+}: {
+  lane: UpcomingLane;
+  now: Date;
+  onJump: Props["onJump"];
+}) {
+  const theme = trackTheme(lane.track);
+  const result = lane.result;
+
+  if (result.kind === "after") {
+    return (
+      <article
+        className={`relative overflow-hidden rounded-2xl border-2 bg-card p-3.5 ${theme.border}`}
+      >
+        <span
+          className={`absolute inset-y-0 left-0 w-1.5 ${theme.bar}`}
+          aria-hidden
+        />
+        <div className="pl-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${theme.chip}`}
+          >
+            {theme.label} next
+          </span>
+          <p className="mt-2 text-sm font-semibold text-muted">
+            No more timed events on this track.
+          </p>
+        </div>
+      </article>
+    );
+  }
+
+  if (result.kind === "none") {
+    return (
+      <article
+        className={`relative overflow-hidden rounded-2xl border-2 bg-card p-3.5 ${theme.border}`}
+      >
+        <span
+          className={`absolute inset-y-0 left-0 w-1.5 ${theme.bar}`}
+          aria-hidden
+        />
+        <div className="pl-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${theme.chip}`}
+          >
+            {theme.label} next
+          </span>
+          <p className="mt-2 text-sm font-semibold text-muted">
+            No timed events available yet.
+          </p>
+        </div>
+      </article>
+    );
+  }
+
+  const count = eventCountdown(result.day, result.block, now);
+  const eventTheme = trackTheme(result.block.group);
+  const campStart = result.kind === "before";
+
+  return (
+    <article
+      className={`relative overflow-hidden rounded-2xl border-2 bg-card p-3.5 ${eventTheme.border}`}
+    >
+      <span
+        className={`absolute inset-y-0 left-0 w-1.5 ${eventTheme.bar}`}
+        aria-hidden
+      />
+      <div className="pl-2">
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${eventTheme.chip}`}
+        >
+          {eventTheme.label}
+        </span>
+        <h3 className="display-font mt-1.5 text-base font-bold text-card-ink sm:text-lg">
+          {result.block.title}
+        </h3>
+        <p className="mt-0.5 text-sm font-semibold text-muted">
+          {campStart ? `Camp starts · ${result.day.dateLabel}` : result.day.dateLabel}
+          {result.block.time ? ` · ${result.block.time}` : ""}
+        </p>
+        {result.block.location ? (
+          <p className="mt-1 text-sm font-bold text-accent">
+            {result.block.location}
+          </p>
+        ) : null}
+        {count ? (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-chip/80 px-2.5 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
+                Starts in
+              </p>
+              <p className="display-font text-base font-bold tabular-nums text-card-ink">
+                {formatCountdown(count.startsIn)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-chip/80 px-2.5 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
+                Ends in
+              </p>
+              <p className="display-font text-base font-bold tabular-nums text-card-ink">
+                {formatCountdown(count.endsIn)}
+              </p>
+            </div>
+          </div>
+        ) : null}
+        <JumpButton
+          label="Jump to this day"
+          onClick={() =>
+            onJump(result.day.id, result.block.id, result.block.group)
+          }
+        />
+      </div>
+    </article>
+  );
+}
+
+export function NowNextBoard({
+  now,
+  live,
+  upcoming,
+  grouped,
+  onJump,
+}: Props) {
+  const campOver =
+    upcoming.length > 0 && upcoming.every((lane) => lane.result.kind === "after");
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
+            Happening now
+          </p>
+          {live.length > 1 ? (
+            <p className="text-[11px] font-extrabold text-woody">
+              {live.length} events at the same time
+            </p>
+          ) : null}
+        </div>
+        {live.length === 0 ? (
+          <p className="mt-2 text-sm font-semibold text-muted">
+            Nothing is happening right now.
+          </p>
+        ) : (
+          <div
+            className={`mt-2 grid gap-2.5 ${
+              live.length > 1 ? "sm:grid-cols-2" : ""
+            }`}
+          >
+            {live.map((item) => (
+              <LiveCard
+                key={`${item.day.id}-${item.block.id}`}
+                item={item}
+                now={now}
+                onJump={onJump}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
+          {grouped ? "Next up · Everyone, Red, Green" : "Next up"}
+        </p>
+        {campOver ? (
+          <p className="mt-2 text-sm font-semibold text-muted">
+            Camp is over — thanks for an amazing weekend!
+          </p>
+        ) : (
+          <div
+            className={`mt-2 grid gap-2.5 ${
+              grouped ? "lg:grid-cols-3" : ""
+            }`}
+          >
+            {upcoming.map((lane) => (
+              <NextCard
+                key={lane.track}
+                lane={lane}
+                now={now}
+                onJump={onJump}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
