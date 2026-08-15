@@ -18,7 +18,7 @@ const CHECK_INTERVAL_MS = 4_000;
 const SENT_LIMIT = 120;
 
 export type ReminderGroup = ScheduleTrack;
-export type ReminderPhase = "upcoming" | "started" | "ended";
+export type ReminderPhase = "upcoming" | "started";
 
 function readOptIn() {
   if (typeof window === "undefined") return false;
@@ -151,24 +151,19 @@ function reminderFromBlock(
       phase,
       headline: "Happening now",
       title: item.block.title,
-      body,
-    };
-  }
-  if (phase === "ended") {
-    return {
-      key: phaseKey(item.dayId, item.block.id, "ended"),
-      phase,
-      headline: "Just ended",
-      title: item.block.title,
-      body,
+      body: item.block.location
+        ? `Head to ${item.block.location}`
+        : body,
     };
   }
   return {
     key: phaseKey(item.dayId, item.block.id, "upcoming"),
     phase,
-    headline: "Coming up",
-    title: `In ${minutes} min · ${item.block.title}`,
-    body,
+    headline: "Time to go",
+    title: `${item.block.title} · ${minutes} min`,
+    body: item.block.location
+      ? `Walk over to ${item.block.location}`
+      : body,
     minutes,
   };
 }
@@ -178,9 +173,10 @@ function isLive(item: TimedItem, nowMs: number) {
 }
 
 /**
- * One alert at a time, in this order: event started → event ended → next
- * upcoming (15 min). Opening the board with `previousNow` null catch-up
- * announces a live event (for late campers) or the next one that's close.
+ * One alert at a time: “it's starting” first, then “time to walk over”
+ * 15 minutes before the next thing — even if something else is still live.
+ * Opening the board with `previousNow` null catch-up announces a live event
+ * (late campers) or the next close one. Ended events stay quiet.
  */
 export function findScheduleAlert(
   group: ReminderGroup,
@@ -203,20 +199,6 @@ export function findScheduleAlert(
     started.sort((a, b) => a.start - b.start);
     return reminderFromBlock(started[0]!, "started", nowMs);
   }
-
-  if (prevMs != null) {
-    const ended = timed.filter((item) => {
-      if (sent.has(phaseKey(item.dayId, item.block.id, "ended"))) return false;
-      return prevMs < item.end && item.end <= nowMs;
-    });
-    if (ended.length) {
-      ended.sort((a, b) => b.end - a.end);
-      return reminderFromBlock(ended[0]!, "ended", nowMs);
-    }
-  }
-
-  const live = timed.some((item) => isLive(item, nowMs));
-  if (live) return null;
 
   const next = timed.find((item) => item.start > nowMs);
   if (!next) return null;
@@ -270,8 +252,8 @@ export function clearRemindersForDay(dayId: string) {
 }
 
 /**
- * Upcoming / started / ended toasts for the camper's track. Runs on open,
- * every few seconds, and when the tab becomes visible again.
+ * “Time to go” / “Happening now” toasts for the camper's track. Runs on
+ * open, every few seconds, and when the tab becomes visible again.
  */
 export function useEventReminders(
   group: ReminderGroup,
@@ -294,7 +276,6 @@ export function useEventReminders(
     if (!enabled) return;
 
     function check() {
-      if (typeof document !== "undefined" && document.hidden) return;
       const now = new Date();
       const reminder = findScheduleAlert(
         group,
@@ -311,12 +292,19 @@ export function useEventReminders(
     check();
     const id = window.setInterval(check, CHECK_INTERVAL_MS);
     const onVis = () => {
-      if (!document.hidden) check();
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      check();
     };
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onVis);
+    window.addEventListener("focus", onVis);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", onVis);
+      window.removeEventListener("focus", onVis);
     };
   }, [group, enabled]);
 }

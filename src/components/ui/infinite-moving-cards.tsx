@@ -60,8 +60,8 @@ export function InfiniteMovingCards({
     <div
       ref={containerRef}
       className={cn(
-        "scroller relative z-10 mx-auto max-w-3xl overflow-hidden rounded-full border border-saddle/20 bg-card/90 py-2 shadow-[0_8px_30px_rgba(42,31,20,0.10)] backdrop-blur-md",
-        "[mask-image:linear-gradient(to_right,transparent,white_12%,white_88%,transparent)]",
+        "scroller relative z-10 mx-auto max-w-3xl overflow-hidden rounded-full border border-saddle/25 bg-card py-2 shadow-sm",
+        "[mask-image:linear-gradient(to_right,transparent,white_6%,white_94%,transparent)]",
         className,
       )}
     >
@@ -76,9 +76,9 @@ export function InfiniteMovingCards({
         {items.map((item, idx) => (
           <li
             key={`${item.quote}-${idx}`}
-            className="relative w-auto max-w-none shrink-0 rounded-full border border-saddle/20 bg-chip px-3.5 py-1.5 shadow-sm"
+            className="relative w-auto max-w-none shrink-0 rounded-full border border-saddle/20 bg-chip px-3 py-1.5 shadow-sm"
           >
-            <span className="display-font flex items-center gap-1.5 whitespace-nowrap text-xs font-bold tracking-wide text-chip-ink sm:text-sm">
+            <span className="display-font flex items-center gap-1.5 whitespace-nowrap text-[13px] font-extrabold tracking-wide text-card-ink sm:text-sm">
               {item.emoji ? <span className="text-sm sm:text-[15px]">{item.emoji}</span> : null}
               {item.quote}
             </span>

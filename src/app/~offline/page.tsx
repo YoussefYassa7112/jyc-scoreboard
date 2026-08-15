@@ -16,7 +16,7 @@ export default function OfflinePage() {
         </p>
         <Link
           href="/"
-          className="btn-cta mt-6 inline-flex rounded-xl bg-woody px-4 py-3 text-sm font-extrabold"
+          className="btn-cta mt-6 inline-flex rounded-xl bg-star px-4 py-3 text-sm font-extrabold"
         >
           Try home again
         </Link>

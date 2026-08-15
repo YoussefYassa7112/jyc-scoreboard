@@ -8,6 +8,7 @@ import {
   useReminderOptIn,
   type DueReminder,
 } from "@/lib/event-reminders";
+import { showLocalNotification } from "@/lib/notify";
 import { easeSoft } from "@/lib/motion";
 import {
   readMyTeamSnapshot,
@@ -96,6 +97,7 @@ export function Scoreboard() {
     floorId: string;
     roomId: string;
     arrivalNonce: number;
+    blockId?: string;
   } | null>(null);
   const [scheduleFocus, setScheduleFocus] = useState<{
     dayId: string;
@@ -193,12 +195,7 @@ export function Scoreboard() {
 
   const pushReminderToast = useCallback((reminder: DueReminder) => {
     const id = `reminder-${reminder.key}`;
-    const kind =
-      reminder.phase === "started"
-        ? "started"
-        : reminder.phase === "ended"
-          ? "ended"
-          : "reminder";
+    const kind = reminder.phase === "started" ? "started" : "reminder";
     setToasts((current) => [
       ...current.filter(
         (toast) =>
@@ -215,7 +212,16 @@ export function Scoreboard() {
     ]);
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 5_600);
+    }, 14_000);
+    try {
+      navigator.vibrate?.([180, 70, 180]);
+    } catch {
+      /* unsupported */
+    }
+    void showLocalNotification(
+      reminder.phase === "started" ? "Happening now" : "Time to go",
+      { body: `${reminder.title}. ${reminder.body}`, tag: reminder.key },
+    );
   }, []);
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast);
@@ -223,9 +229,13 @@ export function Scoreboard() {
   function goToTab(next: BoardTab) {
     const from = TABS.findIndex((t) => t.id === tab);
     const to = TABS.findIndex((t) => t.id === next);
+    if (tab === "map" && next !== "map") setMapFocus(null);
     setTabDirection(to >= from ? 1 : -1);
     setTab(next);
   }
+
+  const clearMapFocus = useCallback(() => setMapFocus(null), []);
+  const clearScheduleFocus = useCallback(() => setScheduleFocus(null), []);
 
   // Hydrate last standings so Schedule personalization works immediately offline.
   useEffect(() => {
@@ -238,6 +248,7 @@ export function Scoreboard() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     async function load() {
       if (!navigator.onLine) {
@@ -258,17 +269,21 @@ export function Scoreboard() {
       try {
         const headers: HeadersInit = {};
         if (lastEtag.current) headers["If-None-Match"] = lastEtag.current;
-        const res = await fetch("/api/standings", { headers });
-        if (res.status === 304) {
-          if (!cancelled) {
-            setStaleCache(false);
-            setError(null);
-            setLoading(false);
-          }
+        const res = await fetch("/api/standings", {
+          headers,
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        if (res.status === 304 || res.status === 204) {
+          setStaleCache(false);
+          setError(null);
+          setLoading(false);
           return;
         }
         if (!res.ok) throw new Error("Failed to load");
-        const json = (await res.json()) as StandingsResponse;
+        const raw = await res.text();
+        if (!raw) return;
+        const json = JSON.parse(raw) as StandingsResponse;
         const etag = res.headers.get("etag");
         if (etag) lastEtag.current = etag;
         else if (json.rev) lastEtag.current = `"${json.rev}"`;
@@ -279,18 +294,18 @@ export function Scoreboard() {
           setError(null);
           setLoading(false);
         }
-      } catch {
-        if (!cancelled) {
-          const cached = readStandingsCache();
-          if (cached) {
-            setData({ standings: cached.standings, asOf: cached.asOf });
-            setStaleCache(true);
-            setError(null);
-          } else {
-            setError("Could not load standings. Check your connection.");
-          }
-          setLoading(false);
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        const cached = readStandingsCache();
+        if (cached) {
+          setData({ standings: cached.standings, asOf: cached.asOf });
+          setStaleCache(true);
+          setError(null);
+        } else {
+          setError("Could not load standings. Check your connection.");
         }
+        setLoading(false);
       }
     }
 
@@ -298,6 +313,7 @@ export function Scoreboard() {
     if (!online) {
       return () => {
         cancelled = true;
+        controller.abort();
       };
     }
 
@@ -321,6 +337,7 @@ export function Scoreboard() {
     document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
@@ -329,7 +346,7 @@ export function Scoreboard() {
   }, [online, tab]);
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">
+    <main className="relative min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10">
       {!isDark ? <SkyDecor /> : null}
       {!isDark ? <SurpriseFX /> : null}
 
@@ -365,10 +382,10 @@ export function Scoreboard() {
             </motion.span>
           </motion.div>
 
-          <p className="display-font text-sm font-semibold uppercase tracking-[0.28em] text-muted sm:text-base">
+          <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
             Welcome to the JYC
           </p>
-          <h1 className="display-font mt-2 text-4xl font-bold text-ink drop-shadow-sm sm:text-5xl md:text-6xl">
+          <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
             Camp Scoreboard
           </h1>
 
@@ -377,7 +394,7 @@ export function Scoreboard() {
           <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
             <span
               className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
-                online && !staleCache ? "bg-woody" : "bg-muted-soft"
+                online && !staleCache ? "bg-red-500" : "bg-muted-soft"
               }`}
             />
             <span>
@@ -424,8 +441,10 @@ export function Scoreboard() {
                   setScheduleFocus(null);
                   goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 py-2.5 text-sm font-extrabold transition-colors sm:px-3 sm:text-base ${
-                  active ? "text-on-strong" : "text-ink hover:bg-chip/60"
+                className={`display-font relative flex-1 rounded-xl px-2 py-3 text-sm font-extrabold transition-colors sm:px-3 sm:py-2.5 sm:text-base ${
+                  active
+                    ? "text-on-star"
+                    : "cursor-pointer text-ink ring-1 ring-saddle/20 hover:bg-chip/70 hover:ring-saddle/35"
                 }`}
                 aria-current={active ? "page" : undefined}
               >
@@ -433,7 +452,7 @@ export function Scoreboard() {
                   <motion.span
                     layoutId="board-tab-pill"
                     transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                    className="absolute inset-0 rounded-xl bg-woody shadow-sm"
+                    className="absolute inset-0 rounded-xl bg-star shadow-sm"
                   />
                 ) : null}
                 <span className="relative z-10">{item.label}</span>
@@ -469,7 +488,7 @@ export function Scoreboard() {
           ) : null}
 
           {error && !data ? (
-            <p className="py-16 text-center text-lg font-bold text-woody">
+            <p className="py-16 text-center text-lg font-bold text-star">
               {error}
             </p>
           ) : null}
@@ -515,7 +534,7 @@ export function Scoreboard() {
                           isFirst
                             ? "sheriff-glow border-saddle/20 bg-first-card"
                             : topThree
-                              ? "border-woody/40 bg-card"
+                              ? "border-star/40 bg-card"
                               : "border-saddle/20 bg-card"
                         }`}
                       >
@@ -567,7 +586,7 @@ export function Scoreboard() {
                           </div>
 
                           <div className="min-w-0 flex-1">
-                            <p className="display-font truncate text-xl font-bold text-card-ink sm:text-2xl md:text-3xl">
+                            <p className="display-font truncate text-lg font-bold text-card-ink sm:text-2xl md:text-3xl">
                               {team.name}
                             </p>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
@@ -587,7 +606,7 @@ export function Scoreboard() {
                               stiffness: 420,
                               damping: 16,
                             }}
-                            className="display-font shrink-0 text-3xl font-bold tabular-nums text-card-ink sm:text-4xl md:text-5xl"
+                            className="display-font shrink-0 text-[1.65rem] font-bold tabular-nums leading-none text-card-ink sm:text-4xl md:text-5xl"
                           >
                             {team.score}
                           </motion.div>
@@ -602,15 +621,13 @@ export function Scoreboard() {
         </section>
         ) : null}
 
-        {tab === "standings" ? (
-          <OrbitArena standings={data?.standings ?? []} />
-        ) : null}
-
         {tab === "map" ? (
           <BuildingMap
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
             focusArrivalNonce={mapFocus?.arrivalNonce}
+            focusBlockId={mapFocus?.blockId}
+            onFocusCleared={clearMapFocus}
             onOpenScheduleEvent={(dayId, blockId, group, from) => {
               setScheduleFocus({
                 dayId,
@@ -639,13 +656,14 @@ export function Scoreboard() {
             focusFloorId={scheduleFocus?.fromFloorId}
             focusRoomId={scheduleFocus?.fromRoomId}
             scrollNonce={scheduleFocus?.scrollNonce}
-            onScheduleFocusConsumed={() => setScheduleFocus(null)}
+            onScheduleFocusConsumed={clearScheduleFocus}
             onViewLocation={(payload) => {
               if (payload.mapped && payload.floorId && payload.roomId) {
                 setMapFocus({
                   floorId: payload.floorId,
                   roomId: payload.roomId,
                   arrivalNonce: Date.now(),
+                  blockId: payload.blockId,
                 });
                 goToTab("map");
               }
@@ -654,6 +672,13 @@ export function Scoreboard() {
         ) : null}
           </motion.div>
         </AnimatePresence>
+
+        <div
+          className={tab === "standings" ? "mt-5 md:mt-7" : "hidden"}
+          aria-hidden={tab !== "standings"}
+        >
+          <OrbitArena standings={data?.standings ?? []} />
+        </div>
 
         <motion.p
           className="text-center text-xs font-semibold text-muted-soft sm:text-sm"

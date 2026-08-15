@@ -28,7 +28,7 @@ export const cafeteriaFloor: FloorPlan = {
       name: "Cafeteria",
       labelLines: ["Cafeteria"],
       blurb: "Main dining hall — meals, topics, and indoor gatherings.",
-      kind: "lounge",
+      kind: "activity",
       x: 50,
       y: 170,
       w: 800,

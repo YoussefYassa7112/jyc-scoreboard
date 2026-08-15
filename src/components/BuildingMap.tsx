@@ -28,6 +28,9 @@ type BuildingMapProps = {
   focusRoomId?: string | null;
   /** Bumped on every schedule→map jump so the room re-pulses on arrival */
   focusArrivalNonce?: number | null;
+  /** Schedule block to highlight in the room's event list */
+  focusBlockId?: string | null;
+  onFocusCleared?: () => void;
   onOpenScheduleEvent?: (
     dayId: string,
     blockId: string,
@@ -42,7 +45,6 @@ const kindFillLight: Record<RoomKind, string> = {
   service: "#dce8f5",
   office: "#e5d4f5",
   stairs: "#f0e6c8",
-  lounge: "#ffd6d0",
   outdoor: "#d8f0c8",
   water: "#b8dff0",
   building: "#e8d4b8",
@@ -54,7 +56,6 @@ const kindFillDark: Record<RoomKind, string> = {
   service: "#1a3348",
   office: "#2a2240",
   stairs: "#2f2a18",
-  lounge: "#3a2228",
   outdoor: "#1a3320",
   water: "#163044",
   building: "#3a2e1c",
@@ -66,10 +67,10 @@ function roomFill(
   active: boolean,
   dimmed: boolean,
 ) {
-  const base = dark ? kindFillDark[kind] : kindFillLight[kind];
-  if (active) return dark ? "#0ea5e9" : "#f4d35e";
+  const floorFill = dark ? "#152038" : "#fff8ee";
+  if (active) return floorFill;
   if (dimmed) return dark ? "#152038" : "#f3efe6";
-  return base;
+  return dark ? kindFillDark[kind] : kindFillLight[kind];
 }
 
 /** Pick a font size that keeps every label line inside the room. */
@@ -383,20 +384,34 @@ export function BuildingMap({
   focusFloorId,
   focusRoomId,
   focusArrivalNonce,
+  focusBlockId,
+  onFocusCleared,
   onOpenScheduleEvent,
 }: BuildingMapProps) {
   const { theme } = useTheme();
   const dark = theme === "dark";
   const wrapRef = useRef<HTMLElement>(null);
+  const onFocusClearedRef = useRef(onFocusCleared);
+  onFocusClearedRef.current = onFocusCleared;
+  const mountedRef = useRef(true);
   const [floorId, setFloorId] = useState(defaultFloorId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
+  const [highlightBlockId, setHighlightBlockId] = useState<string | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (focusFloorId) setFloorId(focusFloorId);
     if (focusRoomId) setSelectedId(focusRoomId);
-  }, [focusFloorId, focusRoomId]);
+    if (focusBlockId) setHighlightBlockId(focusBlockId);
+  }, [focusFloorId, focusRoomId, focusBlockId]);
 
   // Arriving from a schedule card: bring the map into view, then flash the room
   // so it is obvious which building the event points at.
@@ -408,6 +423,13 @@ export function BuildingMap({
     }, 320);
     return () => window.clearTimeout(timer);
   }, [focusArrivalNonce, focusRoomId]);
+
+  useEffect(() => {
+    if (!highlightBlockId || !selectedId) return;
+    document
+      .getElementById(`map-event-${highlightBlockId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [highlightBlockId, selectedId]);
 
   const floor = useMemo(() => getFloor(floorId), [floorId]);
   const selected = useMemo(
@@ -422,14 +444,28 @@ export function BuildingMap({
   const wall = dark ? "rgba(226,232,240,0.85)" : "#2a1f14";
   const floorBg = dark ? "#0b1224" : "#faf6ee";
   const ink = dark ? "#e2e8f0" : "#2a1f14";
-  const muted = dark ? "#94a3b8" : "#7a5c4a";
+  const starStroke = dark ? "#B8E062" : "#6B4226";
+
+  function notifyFocusCleared() {
+    if (!mountedRef.current) return;
+    onFocusClearedRef.current?.();
+  }
 
   function clearSelection() {
     setSelectedId(null);
+    setHighlightBlockId(null);
+    notifyFocusCleared();
   }
 
   function onRoomActivate(room: MapRoom) {
-    setSelectedId((id) => (id === room.id ? null : room.id));
+    if (selectedId === room.id) {
+      setSelectedId(null);
+      setHighlightBlockId(null);
+      notifyFocusCleared();
+      return;
+    }
+    setSelectedId(room.id);
+    setHighlightBlockId(null);
   }
 
   function onMapBlur(e: FocusEvent<HTMLElement>) {
@@ -445,16 +481,16 @@ export function BuildingMap({
       onBlur={onMapBlur}
       className="panel toy-box relative overflow-hidden rounded-3xl p-3 outline-none sm:p-5 md:p-6"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
             Building guide
           </p>
-          <h2 className="display-font text-2xl font-bold text-ink sm:text-3xl">
+          <h2 className="display-font text-xl font-bold text-ink sm:text-3xl">
             {floor.siteTitle ?? "CENTRAL"} · {floor.label}
           </h2>
           <p className="mt-1 text-sm font-semibold text-muted">
-            Tap a room for details · tap empty space or leave focus to reset
+            Tap a room for details
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -462,7 +498,7 @@ export function BuildingMap({
             type="button"
             aria-label="Zoom out"
             onClick={() => setZoom((z) => Math.max(0.85, +(z - 0.15).toFixed(2)))}
-            className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+            className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
           >
             −
           </button>
@@ -470,7 +506,7 @@ export function BuildingMap({
             type="button"
             aria-label="Zoom in"
             onClick={() => setZoom((z) => Math.min(1.6, +(z + 0.15).toFixed(2)))}
-            className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+            className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
           >
             +
           </button>
@@ -480,7 +516,7 @@ export function BuildingMap({
               setZoom(1);
               clearSelection();
             }}
-            className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+            className="btn-soft cursor-pointer rounded-xl border px-3 text-xs font-extrabold min-h-11"
           >
             Reset
           </button>
@@ -488,7 +524,7 @@ export function BuildingMap({
       </div>
 
       {floors.length > 1 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {floors.map((f) => {
             const active = f.id === floorId;
             return (
@@ -499,10 +535,10 @@ export function BuildingMap({
                   setFloorId(f.id);
                   clearSelection();
                 }}
-                className={`rounded-xl px-3.5 py-2 text-sm font-extrabold transition ${
+                className={`min-h-11 cursor-pointer rounded-xl px-2 py-2 text-sm font-extrabold transition sm:px-3.5 ${
                   active
-                    ? "bg-woody text-on-strong shadow-sm"
-                    : "border border-saddle/20 bg-card text-card-ink"
+                    ? "bg-star text-on-star shadow-sm"
+                    : "border border-saddle/25 bg-card text-card-ink ring-1 ring-saddle/15 hover:bg-chip"
                 }`}
               >
                 {f.label}
@@ -512,7 +548,7 @@ export function BuildingMap({
         </div>
       ) : (
         <div className="mt-3">
-          <span className="inline-flex rounded-xl bg-woody px-3.5 py-2 text-sm font-extrabold text-on-strong">
+          <span className="inline-flex rounded-xl bg-star px-3.5 py-2 text-sm font-extrabold text-on-star">
             {floor.label}
           </span>
         </div>
@@ -538,7 +574,7 @@ export function BuildingMap({
         ))}
       </div>
 
-      <div className="mt-4 overflow-auto rounded-2xl border-2 border-saddle/15 bg-chip/40 p-2 sm:p-3">
+      <div className="mt-4 overflow-auto rounded-2xl border-2 border-saddle/15 bg-chip/40 p-1.5 sm:p-3">
         <motion.svg
           viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
           className="mx-auto block h-auto w-full max-w-4xl touch-pan-x touch-pan-y"
@@ -556,6 +592,21 @@ export function BuildingMap({
             if (e.target === e.currentTarget) clearSelection();
           }}
         >
+          <defs>
+            <filter
+              id="map-inner-halo"
+              x="-50%"
+              y="-50%"
+              width="200%"
+              height="200%"
+            >
+              <feGaussianBlur stdDeviation="5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <rect
             width={floor.viewBox.w}
             height={floor.viewBox.h}
@@ -568,10 +619,13 @@ export function BuildingMap({
             x={floor.viewBox.w / 2}
             y={28}
             textAnchor="middle"
-            fill={muted}
-            fontSize={13}
+            fill={ink}
+            stroke={dark ? "#0b1224" : "#fff8ee"}
+            strokeWidth={4}
+            paintOrder="stroke"
+            fontSize={16}
             fontWeight={800}
-            style={{ letterSpacing: "0.14em" }}
+            style={{ letterSpacing: "0.16em" }}
             className="pointer-events-none"
           >
             {floor.banner}
@@ -595,19 +649,26 @@ export function BuildingMap({
             const cy = room.y + room.h / 2;
             const ellipse = room.shape === "ellipse";
             const fill = roomFill(room.kind, dark, active, dimmed);
-            const stroke = active ? (dark ? "#38bdf8" : "#c45c26") : wall;
+            const stroke = active ? starStroke : wall;
+            const haloW = Math.max(
+              10,
+              Math.min(24, Math.min(room.w, room.h) * 0.22),
+            );
             const shared = {
               fill,
               stroke,
-              strokeWidth: active ? 3 : 1.6,
+              strokeWidth: active ? 3.2 : 1.6,
               className: "cursor-pointer",
-              style: { outline: "none" as const },
+              style: { outline: "none" as const, cursor: "pointer" },
               initial: false as const,
+              whileHover: {
+                strokeWidth: active ? 3.6 : 2.8,
+              },
               animate: {
                 filter: active
                   ? dark
-                    ? "drop-shadow(0 0 10px rgba(56,189,248,0.45))"
-                    : "drop-shadow(0 0 10px rgba(196,92,38,0.35))"
+                    ? "drop-shadow(0 0 14px rgba(184,224,98,0.7))"
+                    : "drop-shadow(0 0 12px rgba(196,146,90,0.55))"
                   : "drop-shadow(0 0 0 rgba(0,0,0,0))",
               },
               onClick: (e: MouseEvent) => {
@@ -647,6 +708,79 @@ export function BuildingMap({
                     {...shared}
                   />
                 )}
+                {active ? (
+                  <>
+                    <clipPath id={`map-halo-clip-${room.id}`}>
+                      {ellipse ? (
+                        <ellipse
+                          cx={cx}
+                          cy={cy}
+                          rx={room.w / 2}
+                          ry={room.h / 2}
+                        />
+                      ) : (
+                        <rect
+                          x={room.x}
+                          y={room.y}
+                          width={room.w}
+                          height={room.h}
+                          rx={6}
+                        />
+                      )}
+                    </clipPath>
+                    <g
+                      clipPath={`url(#map-halo-clip-${room.id})`}
+                      className="pointer-events-none"
+                    >
+                      {ellipse ? (
+                        <motion.ellipse
+                          cx={cx}
+                          cy={cy}
+                          rx={room.w / 2}
+                          ry={room.h / 2}
+                          fill="none"
+                          stroke={starStroke}
+                          strokeWidth={haloW}
+                          filter="url(#map-inner-halo)"
+                          initial={false}
+                          animate={{
+                            opacity: dark
+                              ? [0.5, 0.82, 0.5]
+                              : [0.38, 0.62, 0.38],
+                          }}
+                          transition={{
+                            duration: 2.4,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      ) : (
+                        <motion.rect
+                          x={room.x}
+                          y={room.y}
+                          width={room.w}
+                          height={room.h}
+                          rx={6}
+                          fill="none"
+                          stroke={starStroke}
+                          strokeWidth={haloW}
+                          filter="url(#map-inner-halo)"
+                          initial={false}
+                          animate={{
+                            opacity: dark
+                              ? [0.5, 0.82, 0.5]
+                              : [0.38, 0.62, 0.38],
+                          }}
+                          transition={{
+                            duration: 2.4,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                      )}
+                    </g>
+                  </>
+                ) : null}
                 <g
                   transform={
                     room.labelRotate
@@ -665,7 +799,11 @@ export function BuildingMap({
                       }
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fill={ink}
+                      fill={dark ? "#fff8ee" : "#1a120c"}
+                      stroke={dark ? "#0b1224" : "#fff8ee"}
+                      strokeWidth={active ? 3.5 : 2.6}
+                      paintOrder="stroke"
+                      strokeLinejoin="round"
                       fontSize={fontSize}
                       fontWeight={800}
                       className="pointer-events-none select-none"
@@ -684,7 +822,7 @@ export function BuildingMap({
                       rx={room.w / 2 + 6}
                       ry={room.h / 2 + 6}
                       fill="none"
-                      stroke={dark ? "#38bdf8" : "#c45c26"}
+                      stroke={starStroke}
                       className="pointer-events-none"
                       initial={{ opacity: 0, strokeWidth: 2 }}
                       animate={{
@@ -702,7 +840,7 @@ export function BuildingMap({
                       height={room.h + 10}
                       rx={9}
                       fill="none"
-                      stroke={dark ? "#38bdf8" : "#c45c26"}
+                      stroke={starStroke}
                       className="pointer-events-none"
                       initial={{ opacity: 0, strokeWidth: 2 }}
                       animate={{
@@ -739,15 +877,17 @@ export function BuildingMap({
         </motion.svg>
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence initial={false}>
         {selected ? (
           <motion.div
             key={selected.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="surface-card mt-4 rounded-2xl border-2 p-4"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.34, ease: easeSoft }}
+            className="overflow-hidden"
           >
+            <div className="surface-card mt-4 rounded-2xl border-2 p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
@@ -763,9 +903,9 @@ export function BuildingMap({
               <button
                 type="button"
                 onClick={clearSelection}
-                className="btn-soft rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+                className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 py-2 text-xs font-extrabold"
               >
-                Clear
+                Clear room
               </button>
             </div>
             {selected.linksTo?.length ? (
@@ -777,11 +917,12 @@ export function BuildingMap({
                     onClick={() => {
                       setFloorId(link.floorId);
                       setSelectedId(link.roomId);
+                      setHighlightBlockId(null);
                       setSpotlightKey(Date.now());
                     }}
-                    className="btn-cta rounded-xl bg-woody px-3 py-1.5 text-xs font-extrabold"
+                    className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2 text-xs font-extrabold"
                   >
-                    {link.label}
+                    {link.label} →
                   </button>
                 ))}
               </div>
@@ -789,7 +930,7 @@ export function BuildingMap({
 
             <div className="mt-4 border-t border-saddle/15 pt-3">
               <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
-                Scheduled here
+                Scheduled here · tap an event
               </p>
               {roomEvents.length === 0 ? (
                 <p className="mt-1 text-sm font-semibold text-muted">
@@ -797,8 +938,10 @@ export function BuildingMap({
                 </p>
               ) : (
                 <ul className="mt-2 space-y-2">
-                  {roomEvents.map(({ day, block }) => (
-                    <li key={`${day.id}-${block.id}`}>
+                  {roomEvents.map(({ day, block }) => {
+                    const highlighted = highlightBlockId === block.id;
+                    return (
+                    <li key={`${day.id}-${block.id}`} id={`map-event-${block.id}`}>
                       <button
                         type="button"
                         onClick={() =>
@@ -809,35 +952,48 @@ export function BuildingMap({
                             { floorId, roomId: selected.id },
                           )
                         }
-                        className="w-full rounded-xl bg-chip/80 px-3 py-2 text-left transition hover:bg-chip"
+                        className={`w-full cursor-pointer rounded-xl border-2 px-3 py-2 text-left transition ${
+                          highlighted
+                            ? "border-star bg-star/15 ring-2 ring-star/40"
+                            : "border-transparent bg-chip/80 hover:border-saddle/30 hover:bg-chip"
+                        }`}
                       >
                         <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-muted-soft">
                           <span>{day.label}</span>
                           {block.time ? <span>· {block.time}</span> : null}
-                          {block.group === "red" || block.group === "green" ? (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
+                              block.group === "green"
+                                ? "bg-[#2F8F4E]"
+                                : block.group === "red"
+                                  ? "bg-[#C45C26]"
+                                  : "bg-[#1E6BB8]"
+                            }`}
+                          >
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
-                                block.group === "green"
-                                  ? "bg-[#2F8F4E]"
-                                  : "bg-[#C45C26]"
-                              }`}
-                            >
-                              <span
-                                className="h-1.5 w-1.5 rounded-full bg-white/90"
-                                aria-hidden
-                              />
-                              {block.group}
-                            </span>
-                          ) : null}
+                              className="h-1.5 w-1.5 rounded-full bg-white/90"
+                              aria-hidden
+                            />
+                            {block.group === "green"
+                              ? "Green"
+                              : block.group === "red"
+                                ? "Red"
+                                : "Everyone"}
+                          </span>
                         </p>
                         <p className="display-font text-sm font-bold text-card-ink">
                           {block.title}
                         </p>
+                        <p className="mt-1 text-[11px] font-extrabold text-star">
+                          Open in schedule →
+                        </p>
                       </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
+            </div>
             </div>
           </motion.div>
         ) : (
@@ -845,9 +1001,9 @@ export function BuildingMap({
             key="hint"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-4 text-center text-sm font-semibold text-muted-soft"
+            className="mt-4 text-center text-sm font-extrabold text-star"
           >
-            Select any spot on the map
+            Tap a room on the map
           </motion.p>
         )}
       </AnimatePresence>

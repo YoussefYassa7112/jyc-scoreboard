@@ -40,7 +40,7 @@ export function FieldNotes({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-8 top-0 h-3 rounded-b-md bg-[#c45c26]/80 shadow-sm"
+        className="pointer-events-none absolute inset-x-8 top-0 h-3 rounded-b-md bg-star/80 shadow-sm"
       />
       <div className="mt-2 flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
@@ -67,7 +67,7 @@ export function FieldNotes({
               type="button"
               onClick={onPostAll}
               disabled={postingAll || postingId !== null}
-              className="btn-cta rounded-xl bg-buzz px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+              className="btn-cta rounded-xl bg-star px-4 py-2 text-sm font-extrabold disabled:opacity-50"
             >
               <BusyLabel busy={postingAll} busyLabel="Posting all…">
                 {`Post all (${notes.length})`}
@@ -120,7 +120,7 @@ export function FieldNotes({
                     </div>
                     <span
                       className={`display-font shrink-0 text-2xl font-bold tabular-nums ${
-                        note.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-woody"
+                        note.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-star"
                       }`}
                     >
                       {note.delta > 0 ? `+${note.delta}` : note.delta}
@@ -140,7 +140,7 @@ export function FieldNotes({
                       type="button"
                       onClick={() => onPost(note)}
                       disabled={!online || busy}
-                      className="btn-cta rounded-xl bg-buzz px-3 py-2 text-sm font-extrabold disabled:opacity-50"
+                      className="btn-cta rounded-xl bg-star px-3 py-2 text-sm font-extrabold disabled:opacity-50"
                     >
                       <BusyLabel
                         busy={postingId === note.id}
@@ -153,7 +153,7 @@ export function FieldNotes({
                       type="button"
                       onClick={() => onDiscard(note.id)}
                       disabled={busy}
-                      className="rounded-xl border border-woody/40 px-3 py-2 text-sm font-extrabold text-woody disabled:opacity-50"
+                      className="rounded-xl border border-star/40 px-3 py-2 text-sm font-extrabold text-star disabled:opacity-50"
                     >
                       Discard
                     </button>

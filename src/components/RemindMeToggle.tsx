@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { fadeSoft } from "@/lib/motion";
+import {
+  isIosDevice,
+  isStandaloneApp,
+  notifySupport,
+  requestNotifyPermission,
+} from "@/lib/notify";
 
 type Props = {
   enabled: boolean;
@@ -14,21 +20,36 @@ type Props = {
 export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
   const [hint, setHint] = useState<string | null>(null);
 
-  function toggle() {
+  async function toggle() {
     if (enabled) {
       onChange(false);
       setHint("Reminders off.");
       return;
     }
     onChange(true);
+    const support = notifySupport();
+    if (support === "supported") {
+      await requestNotifyPermission();
+    }
+    try {
+      await navigator.wakeLock?.request("screen");
+    } catch {
+      /* unsupported or not visible */
+    }
+    if (isIosDevice() && !isStandaloneApp()) {
+      setHint(
+        `On — a popup 15 minutes before ${trackLabel} events. Keep this page open. For lock-screen alerts, Add to Home Screen, then open it from there.`,
+      );
+      return;
+    }
     setHint(
-      `On — popups when ${trackLabel} events are coming, starting, or ending. Keep this page open.`,
+      `On — a popup 15 minutes before ${trackLabel} events, and again when they start. Keep this page open.`,
     );
   }
 
   useEffect(() => {
     if (!hint) return;
-    const timer = window.setTimeout(() => setHint(null), 6000);
+    const timer = window.setTimeout(() => setHint(null), 10000);
     return () => window.clearTimeout(timer);
   }, [hint]);
 
@@ -38,8 +59,8 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
         type="button"
         onClick={toggle}
         aria-pressed={enabled}
-        className={`btn-soft inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold ${
-          enabled ? "border-[#2F8F4E]/60 text-[#2F8F4E]" : ""
+        className={`btn-soft inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold ${
+          enabled ? "border-star/60 text-star" : ""
         }`}
       >
         <motion.span
@@ -73,9 +94,9 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
 
       {enabled ? (
         <p className="mt-1.5 text-[11px] font-semibold text-muted-soft">
-          A message pops up on this page when something is coming, starting, or
-          ending — works offline, no extra permissions. Leave the app open in a
-          tab.
+          One message at a time: 15 minutes before the next event, then again
+          when it starts. Keep this page open on your phone — Safari pauses it
+          if you switch apps.
         </p>
       ) : null}
     </div>

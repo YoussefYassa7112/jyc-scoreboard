@@ -26,7 +26,7 @@ export function CampPhotosButton({ online }: Props) {
   );
 
   const shell =
-    "btn-soft display-font relative inline-flex w-full items-center justify-center rounded-2xl border-2 px-5 py-3 text-base font-extrabold sm:w-auto";
+    "btn-soft display-font relative inline-flex w-full max-w-xs items-center justify-center rounded-2xl border-2 px-5 py-3 text-base font-extrabold sm:w-auto";
 
   return (
     <div className="relative flex flex-col items-center">

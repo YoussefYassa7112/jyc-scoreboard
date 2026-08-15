@@ -64,6 +64,7 @@ type Props = {
     floorId?: string;
     roomId?: string;
     label: string;
+    blockId?: string;
   }) => void;
 };
 
@@ -72,30 +73,23 @@ function chromeClasses(chrome: "all" | "red" | "green") {
     return {
       cardBorder: "border-[#2F8F4E]/55 border-l-[#2F8F4E]",
       time: "text-[#2F8F4E]",
-      ring: "ring-[#2F8F4E]",
-      glowRgb: "47, 143, 78",
     };
   }
   if (chrome === "red") {
     return {
       cardBorder: "border-[#C45C26]/55 border-l-[#C45C26]",
       time: "text-[#C45C26]",
-      ring: "ring-[#C45C26]",
-      glowRgb: "196, 92, 38",
     };
   }
   return {
-    cardBorder: "border-saddle/20 border-l-[#1E6BB8]",
+    cardBorder: "border-[#1E6BB8]/50 border-l-[#1E6BB8]",
     time: "text-[#1E6BB8]",
-    ring: "ring-woody",
-    glowRgb: "196, 92, 38",
   };
 }
 
 function BlockCard({
   block,
   accent,
-  chrome,
   highlighted,
   status = "untimed",
   endsInMs,
@@ -104,17 +98,14 @@ function BlockCard({
 }: {
   block: ScheduleBlock;
   accent: "all" | "red" | "green";
-  /** Active track color — tints times/outlines for green vs red */
-  chrome: "all" | "red" | "green";
   highlighted?: boolean;
   status?: BlockStatus;
   endsInMs?: number | null;
   onViewMap?: (locationId?: string) => void;
   mapSpots?: { id: string; label: string }[];
 }) {
-  // Prefer the selected track color so shared "everyone" blocks match Red/Green.
-  const colorKey = chrome !== "all" ? chrome : accent;
-  const colors = chromeClasses(colorKey);
+  // Color by the event's own group — Everyone stays blue even on Red/Green.
+  const colors = chromeClasses(accent);
   const done = status === "done";
   const live = status === "live";
 
@@ -129,13 +120,6 @@ function BlockCard({
               opacity: 1,
               y: 0,
               scale: [1, 1.02, 1, 1.015, 1],
-              boxShadow: [
-                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
-                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 12px rgba(${colors.glowRgb}, 0.3)`,
-                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
-                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 12px rgba(${colors.glowRgb}, 0.24)`,
-                `0 1px 2px 0 rgba(0,0,0,0.05), 0 0 0 0 rgba(${colors.glowRgb}, 0)`,
-              ],
             }
           : { opacity: 1, y: 0, scale: 1 }
       }
@@ -146,57 +130,65 @@ function BlockCard({
           : `bg-card ${colors.cardBorder}`
       } ${
         highlighted && !done
-          ? `ring-2 ${colors.ring} ring-offset-2 ring-offset-transparent`
+          ? `ring-2 ring-star ring-offset-2 ring-offset-transparent`
           : ""
-      } ${live ? "ring-2 ring-woody/70" : ""}`}
+      } ${live ? "ring-2 ring-star/70" : ""}`}
     >
-      <AnimatePresence>
-        {done ? (
-          <motion.span
-            key="done"
-            initial={{ scale: 1.7, rotate: -22, opacity: 0, x: 12 }}
-            animate={{ scale: 1, rotate: -8, opacity: 1, x: 0 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={springSnappy}
-            className="absolute right-3 top-3 z-10 rounded-full bg-[#6b7280] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md"
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {block.time ? (
+            <p
+              className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+                done ? "text-muted-soft line-through" : colors.time
+              }`}
+            >
+              {block.time}
+            </p>
+          ) : null}
+          <h4
+            className={`display-font mt-0.5 text-base font-bold sm:text-lg ${
+              done ? "text-muted line-through decoration-2" : "text-card-ink"
+            }`}
           >
-            ✓ Done
+            {block.title}
+          </h4>
+        </div>
+        <AnimatePresence>
+          {done ? (
+            <motion.span
+              key="done"
+              initial={{ scale: 1.7, rotate: -22, opacity: 0, x: 12 }}
+              animate={{ scale: 1, rotate: -8, opacity: 1, x: 0 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={springSnappy}
+              className="shrink-0 rounded-full bg-[#6b7280] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md"
+            >
+              ✓ Done
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
+        {live ? (
+          <motion.span
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md"
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <span className="live-dot h-1.5 w-1.5 rounded-full bg-white" />
+            Live
           </motion.span>
         ) : null}
-      </AnimatePresence>
-      {live ? (
-        <motion.span
-          className="absolute right-3 top-3 z-10 rounded-full bg-woody px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-on-strong shadow-md"
-          animate={{ scale: [1, 1.08, 1] }}
-          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-        >
-          Happening now
-        </motion.span>
-      ) : null}
-
-      {block.time ? (
-        <p
-          className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
-            done ? "text-muted-soft line-through" : colors.time
-          }`}
-        >
-          {block.time}
-        </p>
-      ) : null}
-      <h4
-        className={`display-font mt-0.5 pr-24 text-base font-bold sm:text-lg ${
-          done ? "text-muted line-through decoration-2" : "text-card-ink"
-        }`}
-      >
-        {block.title}
-      </h4>
+      </div>
       {live && endsInMs != null ? (
-        <p className="mt-1 text-sm font-extrabold tabular-nums text-woody">
+        <p className="mt-1 text-sm font-extrabold tabular-nums text-red-600">
           Ends in {formatCountdown(endsInMs)}
         </p>
       ) : null}
       {block.location ? (
-        <p className={`mt-1 text-sm font-bold ${done ? "text-muted-soft" : "text-accent"}`}>
+        <p
+          className={`mt-1 text-sm font-bold ${
+            done ? "text-muted-soft" : colors.time
+          }`}
+        >
           <span className="text-muted-soft">Location · </span>
           {block.location}
         </p>
@@ -217,28 +209,28 @@ function BlockCard({
         </ul>
       ) : null}
       {onViewMap && (block.locationIds?.length || block.location) ? (
-        mapSpots && mapSpots.length > 1 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {mapSpots.map((spot) => (
+        <div className="relative z-10 mt-3 flex flex-wrap gap-2">
+          {mapSpots && mapSpots.length > 1 ? (
+            mapSpots.map((spot) => (
               <button
                 key={spot.id}
                 type="button"
                 onClick={() => onViewMap(spot.id)}
-                className="btn-soft rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+                className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
               >
-                View {spot.label}
+                View {spot.label} →
               </button>
-            ))}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onViewMap(mapSpots?.[0]?.id)}
-            className="btn-soft mt-3 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
-          >
-            View on map
-          </button>
-        )
+            ))
+          ) : (
+            <button
+              type="button"
+              onClick={() => onViewMap(mapSpots?.[0]?.id)}
+              className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
+            >
+              View on map →
+            </button>
+          )}
+        </div>
       ) : null}
     </motion.article>
   );
@@ -255,7 +247,6 @@ function shortMapLabel(label: string) {
 function Section({
   title,
   tint,
-  chrome,
   day,
   now,
   blocks,
@@ -265,7 +256,6 @@ function Section({
 }: {
   title: string;
   tint: "all" | "red" | "green";
-  chrome: "all" | "red" | "green";
   day: CampDay;
   now: Date;
   blocks: ScheduleBlock[];
@@ -303,7 +293,6 @@ function Section({
               key={block.id}
               block={block}
               accent={tint}
-              chrome={chrome}
               status={status}
               endsInMs={count?.endsIn}
               highlighted={highlightBlockId === block.id}
@@ -535,10 +524,10 @@ export function CampSchedule({
   }
 
   const calendarKey = isoDateKey(new Date(nowTick));
-  const days = useMemo(
-    () => getScheduleDays(new Date(), allowDemo),
-    [allowDemo, demoEpoch, calendarKey],
-  );
+  const days = useMemo(() => {
+    void demoEpoch;
+    return getScheduleDays(new Date(), allowDemo);
+  }, [allowDemo, calendarKey, demoEpoch]);
   const day = useMemo(() => {
     return days.find((d) => d.id === dayId) ?? days[0]!;
   }, [days, dayId]);
@@ -592,7 +581,7 @@ export function CampSchedule({
       ? "bg-[#2F8F4E] text-on-strong shadow-sm"
       : chrome === "red"
         ? "bg-[#C45C26] text-on-strong shadow-sm"
-        : "bg-woody text-on-strong shadow-sm";
+        : "bg-star text-on-star shadow-sm";
 
   function handleViewMap(block: ScheduleBlock, locationId?: string) {
     setMapNotice(null);
@@ -616,6 +605,7 @@ export function CampSchedule({
         floorId: chosen.floorId,
         roomId: chosen.roomId,
         label: chosen.label,
+        blockId: block.id,
       });
       return;
     }
@@ -650,14 +640,14 @@ export function CampSchedule({
       </div>
 
       {day.id === DEMO_DAY_ID ? (
-        <div className="mt-3 rounded-2xl border-2 border-woody/40 bg-chip/80 px-4 py-3">
-          <p className="text-sm font-bold text-woody">
+        <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
+          <p className="text-sm font-bold text-star">
             Test day — overlapping Red/Green events, timers, faded Done cards,
             and reminder popups. Hidden once camp starts. Local only.
           </p>
           <button
             type="button"
-            className="btn-soft mt-2 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+            className="btn-soft mt-2 min-h-11 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
             onClick={() => {
               resetDemoScheduleClock();
               clearRemindersForDay(DEMO_DAY_ID);
@@ -724,7 +714,7 @@ export function CampSchedule({
             </p>
           </div>
         ) : myTeamId ? (
-          <p className="mt-3 rounded-2xl border-2 border-woody/30 bg-chip/80 px-4 py-3 text-sm font-bold text-woody">
+          <p className="mt-3 rounded-2xl border-2 border-star/30 bg-chip/80 px-4 py-3 text-sm font-bold text-star">
             This team is not assigned to Red or Green yet — ask an admin to set
             its camp group.
           </p>
@@ -759,12 +749,12 @@ export function CampSchedule({
       </div>
 
       {mapNotice ? (
-        <p className="mt-3 rounded-2xl border-2 border-woody/40 bg-chip/80 px-4 py-3 text-sm font-bold text-woody">
+        <p className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3 text-sm font-bold text-star">
           {mapNotice}
         </p>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {days.map((d) => {
           const active = d.id === dayId;
           return (
@@ -776,10 +766,10 @@ export function CampSchedule({
                 setDayId(d.id);
                 setHighlightId(null);
               }}
-              className={`rounded-xl px-3.5 py-2 text-sm font-extrabold transition ${
+              className={`min-h-11 shrink-0 cursor-pointer rounded-xl px-3.5 py-2 text-sm font-extrabold transition ${
                 active
                   ? dayActiveClass
-                  : "border border-saddle/20 bg-card text-card-ink"
+                  : "border border-saddle/25 bg-card text-card-ink hover:bg-chip"
               }`}
             >
               {d.label}
@@ -789,7 +779,7 @@ export function CampSchedule({
       </div>
 
       {isSplit ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {(
             [
               ["overview", "Everyone"],
@@ -819,7 +809,7 @@ export function CampSchedule({
                   setTrack(id);
                   setHighlightId(null);
                 }}
-                className={`rounded-xl border px-3.5 py-2 text-sm font-extrabold transition ${color}`}
+                className={`min-h-11 cursor-pointer rounded-xl border px-2 py-2 text-center text-xs font-extrabold transition sm:px-3.5 sm:text-sm ${color}`}
               >
                 {label}
               </button>
@@ -841,7 +831,6 @@ export function CampSchedule({
             <Section
               title="Full day — Everyone together"
               tint="all"
-              chrome={chrome}
               day={day}
               now={new Date(nowTick)}
               blocks={fullDay}
@@ -853,7 +842,6 @@ export function CampSchedule({
               <Section
                 title="Morning — Everyone together"
                 tint="all"
-                chrome={chrome}
                 day={day}
               now={new Date(nowTick)}
               blocks={morning}
@@ -866,7 +854,6 @@ export function CampSchedule({
                   <Section
                     title="Red group"
                     tint="red"
-                    chrome="red"
                     day={day}
               now={new Date(nowTick)}
               blocks={redBlocks}
@@ -877,7 +864,6 @@ export function CampSchedule({
                   <Section
                     title="Green group"
                     tint="green"
-                    chrome="green"
                     day={day}
               now={new Date(nowTick)}
               blocks={greenBlocks}
@@ -892,7 +878,6 @@ export function CampSchedule({
                 <Section
                   title="Red group"
                   tint="red"
-                  chrome={chrome}
                   day={day}
               now={new Date(nowTick)}
               blocks={redBlocks}
@@ -906,7 +891,6 @@ export function CampSchedule({
                 <Section
                   title="Green group"
                   tint="green"
-                  chrome={chrome}
                   day={day}
               now={new Date(nowTick)}
               blocks={greenBlocks}
@@ -919,7 +903,6 @@ export function CampSchedule({
               <Section
                 title="Evening — Everyone together"
                 tint="all"
-                chrome={chrome}
                 day={day}
               now={new Date(nowTick)}
               blocks={evening}

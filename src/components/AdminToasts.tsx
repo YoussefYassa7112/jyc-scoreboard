@@ -19,7 +19,7 @@ type Props = {
 export function AdminToasts({ toasts, onDismiss }: Props) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[80] flex flex-col items-end gap-2 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[22rem]"
+      className="pointer-events-none fixed inset-x-3 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.75rem))] z-[80] flex flex-col gap-2 sm:inset-x-auto sm:top-auto sm:bottom-6 sm:right-6 sm:w-[22rem]"
       aria-live="polite"
     >
       <AnimatePresence>
@@ -35,7 +35,7 @@ export function AdminToasts({ toasts, onDismiss }: Props) {
               : ended
                 ? "Just ended"
                 : reminder
-                  ? "Coming up"
+                  ? "Time to go"
                   : "Hold up";
           const emoji = success
             ? "⭐"
@@ -64,12 +64,12 @@ export function AdminToasts({ toasts, onDismiss }: Props) {
                 success
                   ? "border-emerald-400/50 bg-[#ecfdf3] text-emerald-800 dark:bg-[#123024] dark:text-emerald-200"
                   : started
-                    ? "border-woody/50 bg-[#fff1e6] text-woody dark:bg-[#3a2218] dark:text-[#f0a46a]"
+                    ? "border-red-500/60 bg-red-50 text-red-700 dark:bg-[#3f1010] dark:text-red-200"
                     : ended
                       ? "border-saddle/25 bg-chip text-card-ink dark:border-white/15 dark:bg-[#1e293b] dark:text-slate-200"
                       : reminder
-                        ? "border-[#1E6BB8]/45 bg-[#e8f3fc] text-[#1E6BB8] dark:bg-[#102033] dark:text-[#7dd3fc]"
-                        : "border-woody/50 bg-[#fff1e6] text-woody dark:bg-[#3a2218] dark:text-[#f0a46a]"
+                        ? "border-red-500/50 bg-red-50 text-red-700 dark:bg-[#3f1010] dark:text-red-200"
+                        : "border-star/50 bg-[#f3ebe4] text-star dark:bg-[#1a2e14] dark:text-[#B8E062]"
               }`}
             >
               <p className="display-font text-sm font-extrabold">

@@ -82,7 +82,7 @@ export function AdminLoginForm() {
             autoComplete="current-password"
             required
             disabled={!online}
-            className="field w-full rounded-xl border-2 px-4 py-3 text-base font-semibold outline-none ring-woody/40 focus:ring-4 disabled:opacity-60"
+            className="field w-full rounded-xl border-2 px-4 py-3 text-base font-semibold outline-none ring-star/40 focus:ring-4 disabled:opacity-60"
           />
         </label>
 
@@ -94,7 +94,7 @@ export function AdminLoginForm() {
               animate={{ opacity: 1, y: 0, height: "auto" }}
               exit={{ opacity: 0, y: -6, height: 0 }}
               transition={fadeSoft}
-              className="mt-3 overflow-hidden text-sm font-bold text-woody"
+              className="mt-3 overflow-hidden text-sm font-bold text-star"
             >
               {error}
             </motion.p>
@@ -104,7 +104,7 @@ export function AdminLoginForm() {
         <button
           type="submit"
           disabled={loading || !online}
-          className="btn-cta mt-5 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
+          className="btn-cta mt-5 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
         >
           <BusyLabel busy={loading} busyLabel="Signing in…">
             Enter admin
@@ -113,7 +113,7 @@ export function AdminLoginForm() {
 
         <Link
           href="/"
-          className="mt-4 block text-center text-sm font-bold text-buzz underline-offset-2 hover:underline"
+          className="mt-4 block text-center text-sm font-bold text-star underline-offset-2 hover:underline"
         >
           Back to scoreboard
         </Link>

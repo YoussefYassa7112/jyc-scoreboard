@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const rev = await getStandingsRevision();
     const etag = `"${rev}"`;
     if (request.headers.get("if-none-match") === etag) {
-      return new NextResponse(null, {
+      return new Response(null, {
         status: 304,
         headers: {
           ETag: etag,

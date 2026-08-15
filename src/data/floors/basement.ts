@@ -118,7 +118,7 @@ export const basementFloor: FloorPlan = {
       name: "Salle Le Nordet",
       labelLines: ["Salle Le Nordet"],
       blurb: "Lounge with sofas and fireplace — main gathering spot.",
-      kind: "lounge",
+      kind: "activity",
       x: 500,
       y: 320,
       w: 350,

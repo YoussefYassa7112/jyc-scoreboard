@@ -31,18 +31,25 @@ function demoUnlocked() {
 }
 
 export function resetDemoScheduleClock() {
-  originMs = null;
-  if (typeof window !== "undefined") {
-    window.sessionStorage.removeItem(ORIGIN_KEY);
+  originMs = Date.now();
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(ORIGIN_KEY, String(originMs));
+  } catch {
+    /* private mode */
   }
 }
 
 function demoOrigin(now: Date): Date {
   if (typeof window !== "undefined") {
     if (originMs == null) {
-      const stored = window.sessionStorage.getItem(ORIGIN_KEY);
-      originMs = stored ? Number(stored) : now.getTime();
-      window.sessionStorage.setItem(ORIGIN_KEY, String(originMs));
+      try {
+        const stored = window.sessionStorage.getItem(ORIGIN_KEY);
+        originMs = stored ? Number(stored) : Date.now();
+        window.sessionStorage.setItem(ORIGIN_KEY, String(originMs));
+      } catch {
+        originMs = Date.now();
+      }
     }
     return new Date(originMs);
   }

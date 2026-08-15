@@ -59,10 +59,10 @@ function JumpButton({
   return (
     <button
       type="button"
-      className="btn-soft mt-2 rounded-xl border px-3 py-1.5 text-[11px] font-extrabold"
+      className="btn-cta mt-2 min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2 text-[11px] font-extrabold"
       onClick={onClick}
     >
-      {label}
+      {label} →
     </button>
   );
 }
@@ -94,8 +94,9 @@ function LiveCard({
           >
             {theme.label}
           </span>
-          <span className="rounded-full bg-woody px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-on-strong">
-            Happening now
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
+            <span className="live-dot h-1.5 w-1.5 rounded-full bg-white" />
+            Live
           </span>
         </div>
         <h3 className="display-font mt-1.5 text-base font-bold text-card-ink sm:text-lg">
@@ -106,7 +107,7 @@ function LiveCard({
           {item.block.location ? ` · ${item.block.location}` : ""}
         </p>
         {count ? (
-          <p className="mt-2 text-sm font-extrabold tabular-nums text-card-ink">
+          <p className="mt-2 text-sm font-extrabold tabular-nums text-red-600">
             Ends in {formatCountdown(count.endsIn)}
           </p>
         ) : null}
@@ -250,13 +251,13 @@ export function NowNextBoard({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border-2 border-woody/35 bg-chip/50">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-woody px-3.5 py-2.5">
-          <h3 className="display-font text-lg font-bold text-on-strong sm:text-xl">
+      <section className="overflow-hidden rounded-2xl border-2 border-star/35 bg-chip/50">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-star px-3.5 py-2.5">
+          <h3 className="display-font text-lg font-bold text-on-star sm:text-xl">
             Happening now
           </h3>
           {live.length > 1 ? (
-            <p className="text-[11px] font-extrabold text-on-strong/90">
+            <p className="text-[11px] font-extrabold text-on-star/90">
               {live.length} events at the same time
             </p>
           ) : null}
@@ -285,13 +286,13 @@ export function NowNextBoard({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border-2 border-[#1E6BB8]/40 bg-[#1E6BB8]/10">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#1E6BB8] px-3.5 py-2.5">
-          <h3 className="display-font text-lg font-bold text-on-strong sm:text-xl">
+      <section className="overflow-hidden rounded-2xl border-2 border-star/40 bg-star/10">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-star px-3.5 py-2.5">
+          <h3 className="display-font text-lg font-bold text-on-star sm:text-xl">
             Coming up next
           </h3>
           {grouped ? (
-            <p className="text-[11px] font-extrabold text-on-strong/90">
+            <p className="text-[11px] font-extrabold text-on-star/90">
               Everyone · Red · Green
             </p>
           ) : null}

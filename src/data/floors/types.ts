@@ -9,7 +9,6 @@ export type RoomKind =
   | "service"
   | "office"
   | "stairs"
-  | "lounge"
   | "outdoor"
   | "water"
   | "building";
@@ -83,7 +82,6 @@ export const kindLabel: Record<RoomKind, string> = {
   service: "Service",
   office: "Office",
   stairs: "Stairs",
-  lounge: "Lounge",
   outdoor: "Outdoor",
   water: "Water",
   building: "Building",

@@ -158,8 +158,8 @@ export function SpiderChart({ teams }: Props) {
       theme === "dark" ? "rgba(148,163,184,0.28)" : "rgba(92,64,51,0.18)";
     const labelFill = theme === "dark" ? "#e2e8f0" : "#2a1f14";
     const fillPoly =
-      theme === "dark" ? "rgba(56,189,248,0.22)" : "rgba(196,92,38,0.2)";
-    const strokePoly = theme === "dark" ? "#38bdf8" : "#c45c26";
+      theme === "dark" ? "rgba(184,224,98,0.22)" : "rgba(107,66,38,0.2)";
+    const strokePoly = theme === "dark" ? "#B8E062" : "#6B4226";
 
     const angles = sorted.map((_, i) => i * angleSlice - Math.PI / 2);
 

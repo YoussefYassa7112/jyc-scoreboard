@@ -12,9 +12,9 @@ export function OfflineBanner({ online, detail }: Props) {
   return (
     <div
       role="status"
-      className="rounded-2xl border-2 border-woody/40 bg-chip/90 px-4 py-3 text-left shadow-sm"
+      className="rounded-2xl border-2 border-star/40 bg-chip/90 px-4 py-3 text-left shadow-sm"
     >
-      <p className="text-sm font-extrabold text-woody">You&apos;re offline</p>
+      <p className="text-sm font-extrabold text-star">You&apos;re offline</p>
       <p className="mt-1 text-sm font-semibold text-muted">
         {detail ??
           "Map and Schedule still work. Live scores need WiFi."}

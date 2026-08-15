@@ -12,6 +12,9 @@
   --woody: #c45c26;
   --saddle: #5c4033;
   --buzz-blue: #1e6bb8;
+  /* App chrome — Woody leather in light, Buzz lime in dark. Not a camp group. */
+  --star: #6b4226;
+  --on-star: #fff8ee;
   --cloud: #fff8ee;
   --ink: #2a1f14;
   --panel: rgba(255, 248, 238, 0.92);
@@ -28,7 +31,7 @@
   --field: #ffffff;
   --field-ink: #2a1f14;
   --field-border: rgba(92, 64, 51, 0.22);
-  --accent: #1e6bb8;
+  --accent: #6b4226;
   --first-card: #fff4d6;
   --on-strong: #ffffff;
   --ring: rgba(92, 64, 51, 0.2);
@@ -43,6 +46,8 @@ html.dark {
   --woody: #f0a46a;
   --saddle: #cbd5e1;
   --buzz-blue: #38bdf8;
+  --star: #b8e062;
+  --on-star: #102014;
   --cloud: #152038;
   --ink: #eef2ff;
   --panel: rgba(15, 23, 42, 0.82);
@@ -58,7 +63,7 @@ html.dark {
   --field: #0b1224;
   --field-ink: #f8fafc;
   --field-border: rgba(148, 163, 184, 0.4);
-  --accent: #7dd3fc;
+  --accent: #b8e062;
   --first-card: #243447;
   --on-strong: #ffffff;
   --ring: rgba(148, 163, 184, 0.35);
@@ -74,6 +79,8 @@ html.dark {
   --color-woody: var(--woody);
   --color-saddle: var(--saddle);
   --color-buzz: var(--buzz-blue);
+  --color-star: var(--star);
+  --color-on-star: var(--on-star);
   --color-cloud: var(--cloud);
   --color-ink: var(--ink);
   --color-card: var(--card);
@@ -105,6 +112,9 @@ html.dark {
 html,
 body {
   min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-x: none;
 }
 
 html {
@@ -239,7 +249,7 @@ textarea {
 }
 
 .field:focus-visible {
-  box-shadow: 0 0 0 4px rgba(196, 92, 38, 0.22);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--star) 30%, transparent);
   outline: none;
 }
 
@@ -253,13 +263,9 @@ textarea {
   }
 }
 
-/* Text on bright filled buttons (buzz / woody / grass) */
+/* Text on filled camp-chrome buttons */
 .btn-cta {
-  color: #fff8ee;
-}
-
-html.dark .btn-cta {
-  color: #0b1224;
+  color: var(--on-star);
 }
 
 .cloud-shape {

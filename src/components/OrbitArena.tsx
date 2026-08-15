@@ -10,30 +10,45 @@ type Props = {
 };
 
 const PLANET_R = 14;
+const LEADER_R = 18;
 const CORE_R = 26;
-const LEVEL_GAP = 34;
-const PAD = 44;
+const LEVEL_GAP = 36;
+const PAD = 48;
+const ORBIT_EASE = 4.2;
 
 type OrbitNode = StandingRow & {
   level: number;
   orbit: number;
+  targetOrbit: number;
   angle: number;
   speed: number;
+  targetSpeed: number;
+  bodyR: number;
+  targetBodyR: number;
+};
+
+type Scene = {
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  world: d3.Selection<SVGGElement, unknown, null, undefined>;
+  stars: d3.Selection<SVGGElement, unknown, null, undefined>;
+  rings: d3.Selection<SVGGElement, unknown, null, undefined>;
+  core: d3.Selection<SVGGElement, unknown, null, undefined>;
+  planets: d3.Selection<SVGGElement, unknown, null, undefined>;
 };
 
 /**
  * Quantum orbit arena — continuous revolution.
  * One ring per distinct score; tied teams share an orbit.
  * Higher score => closer to Camp. Arena grows with unique scores.
+ * Rank/score changes lerp radius instead of wiping the SVG.
  */
 export function OrbitArena({ standings }: Props) {
   const { theme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(
-    null,
-  );
+  const sceneRef = useRef<Scene | null>(null);
   const nodesRef = useRef<OrbitNode[]>([]);
+  const sizeRef = useRef({ current: 220, target: 220 });
   const clockOrigin = useRef(performance.now());
 
   const dataKey = useMemo(
@@ -45,7 +60,6 @@ export function OrbitArena({ standings }: Props) {
     [standings],
   );
 
-  // Build / rebuild geometry when team data or theme changes
   useEffect(() => {
     const svgEl = svgRef.current;
     const wrap = wrapRef.current;
@@ -56,34 +70,42 @@ export function OrbitArena({ standings }: Props) {
       (a, b) => b.score - a.score || a.name.localeCompare(b.name),
     );
 
-    // One orbit per distinct score (ties share a ring)
     const uniqueScores = Array.from(new Set(teams.map((t) => t.score))).sort(
       (a, b) => b - a,
     );
     const orbitCount = Math.max(uniqueScores.length, 1);
     const maxOrbit = CORE_R + 16 + orbitCount * LEVEL_GAP;
-    const size = Math.max(220, maxOrbit * 2 + PAD * 2);
+    const size = Math.max(240, maxOrbit * 2 + PAD * 2);
+    sizeRef.current.target = size;
 
-    svg
-      .attr("viewBox", `0 0 ${size} ${size}`)
-      .attr("width", size)
-      .attr("height", size)
-      .attr("preserveAspectRatio", "xMidYMid meet");
+    const dark = theme === "dark";
+    const ringStroke = dark ? "rgba(148,163,184,0.38)" : "rgba(92,64,51,0.2)";
+    const ringFill = dark ? "rgba(56,189,248,0.045)" : "rgba(232,185,35,0.05)";
+    const labelFill = dark ? "#e2e8f0" : "#2a1f14";
+    const emptyFill = dark ? "#cbd5e1" : "#5c4033";
+    const qFill = dark ? "rgba(186,198,214,0.72)" : "rgba(92,64,51,0.42)";
+    const coreHot = dark ? "#7dd3fc" : "#f4d35e";
+    const coreInner = dark ? "#1d4ed8" : "#c45c26";
+    const coreOuter = dark ? "#38bdf8" : "#e8b923";
+    const leaderRing = dark ? "#f5d76e" : "#c9a227";
+    const campInk = dark ? "#fff8ee" : "#2a1f14";
+    const campHalo = dark ? "#0b1224" : "#fff4d0";
+    const skyFill = dark ? "rgba(15,23,42,0.35)" : "rgba(255,248,238,0.35)";
 
-    svg.selectAll("*").remove();
-
-    const ringStroke =
-      theme === "dark" ? "rgba(148,163,184,0.35)" : "rgba(92,64,51,0.22)";
-    const labelFill = theme === "dark" ? "#e2e8f0" : "#2a1f14";
-    const emptyFill = theme === "dark" ? "#cbd5e1" : "#5c4033";
-    const qFill =
-      theme === "dark" ? "rgba(186,198,214,0.7)" : "rgba(92,64,51,0.45)";
+    ensureDefs(svg, coreHot, coreInner, coreOuter);
+    const scene = ensureScene(svg);
+    sceneRef.current = scene;
 
     if (teams.length === 0) {
-      gRef.current = null;
       nodesRef.current = [];
+      scene.rings.selectAll("*").remove();
+      scene.planets.selectAll("*").remove();
+      scene.core.selectAll("*").remove();
+      scene.stars.selectAll("*").remove();
+      svg.selectAll("text.empty-orbit").remove();
       svg
         .append("text")
+        .attr("class", "empty-orbit")
         .attr("x", size / 2)
         .attr("y", size / 2)
         .attr("text-anchor", "middle")
@@ -91,109 +113,180 @@ export function OrbitArena({ standings }: Props) {
         .attr("font-size", 14)
         .attr("font-weight", 700)
         .text("Add teams to power up the orbit arena");
+      svg
+        .attr("viewBox", `0 0 ${size} ${size}`)
+        .attr("preserveAspectRatio", "xMidYMid meet");
+      sizeRef.current.current = size;
       return;
     }
 
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${size / 2},${size / 2})`);
-    gRef.current = g;
+    svg.selectAll("text.empty-orbit").remove();
+    if (sizeRef.current.current < 2) sizeRef.current.current = size;
+    svg.attr("preserveAspectRatio", "xMidYMid meet");
+
+    scene.world
+      .select("circle.sky")
+      .attr("r", maxOrbit + 28)
+      .attr("fill", skyFill);
+
+    paintStars(scene.stars, maxOrbit + 20, dark);
+    paintCore(scene.core, coreOuter, campInk, campHalo);
 
     const orbitForLevel = (level: number) => CORE_R + 16 + level * LEVEL_GAP;
     const levelByScore = new Map(
       uniqueScores.map((score, idx) => [score, idx + 1]),
     );
 
-    // Draw only rings that currently have a score level
-    uniqueScores.forEach((score, idx) => {
+    const ringData = uniqueScores.map((score, idx) => {
       const level = idx + 1;
-      const r = orbitForLevel(level);
-      g.append("circle")
-        .attr("r", r)
-        .attr("fill", "none")
-        .attr("stroke", ringStroke)
-        .attr("stroke-width", 1.5)
-        .attr("stroke-dasharray", level === 1 ? "0" : "4 7");
-      g.append("text")
-        .attr("x", 0)
-        .attr("y", -r + 3)
-        .attr("text-anchor", "middle")
-        .attr("fill", qFill)
-        .attr("font-size", 9)
-        .attr("font-weight", 700)
-        .text(`${score} pts`);
+      return { score, level, r: orbitForLevel(level) };
     });
 
-    const core = g.append("g");
-    core
-      .append("circle")
-      .attr("r", CORE_R + 8)
-      .attr("fill", "none")
-      .attr("stroke", theme === "dark" ? "#38bdf8" : "#e8b923")
-      .attr("stroke-width", 2)
-      .attr("opacity", 0.75);
-    core
-      .append("circle")
-      .attr("r", CORE_R)
-      .attr("fill", theme === "dark" ? "#1d4ed8" : "#c45c26");
-    core
-      .append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "0.35em")
-      .attr("fill", "#fff8ee")
-      .attr("font-size", 12)
-      .attr("font-weight", 800)
-      .text("CAMP");
+    const ring = scene.rings
+      .selectAll<SVGGElement, (typeof ringData)[number]>("g.ring")
+      .data(ringData, (d) => String(d.level));
 
-    // Spread teammates evenly around their shared orbit
+    const ringEnter = ring.enter().append("g").attr("class", "ring");
+    ringEnter.append("circle").attr("class", "halo").attr("fill", ringFill);
+    ringEnter
+      .append("circle")
+      .attr("class", "track")
+      .attr("fill", "none")
+      .attr("stroke-linecap", "round");
+    ringEnter
+      .append("circle")
+      .attr("class", "drift")
+      .attr("fill", "none")
+      .attr("stroke-linecap", "round");
+    ringEnter
+      .append("text")
+      .attr("class", "pts")
+      .attr("text-anchor", "middle")
+      .attr("font-size", 9)
+      .attr("font-weight", 700);
+
+    const ringMerge = ringEnter.merge(ring);
+    ringMerge.each(function () {
+      const g = d3.select(this);
+      if (g.select("circle.drift").empty()) {
+        g.insert("circle", "text.pts")
+          .attr("class", "drift")
+          .attr("fill", "none")
+          .attr("stroke-linecap", "round");
+      }
+    });
+    const leaderStroke = dark ? "#f5d76e" : "#c9a227";
+    ringMerge
+      .select("circle.halo")
+      .transition()
+      .duration(720)
+      .ease(d3.easeCubicOut)
+      .attr("r", (d) => d.r)
+      .attr("fill", ringFill);
+    ringMerge
+      .select("circle.track")
+      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke))
+      .attr("stroke-width", (d) => (d.level === 1 ? 2.2 : 1.35))
+      .attr("stroke-dasharray", null)
+      .attr("opacity", (d) => (d.level === 1 ? 0.9 : 0.5))
+      .transition()
+      .duration(720)
+      .ease(d3.easeCubicOut)
+      .attr("r", (d) => d.r);
+    ringMerge
+      .select("circle.drift")
+      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke))
+      .attr("stroke-width", 1.7)
+      .attr("opacity", 0.75)
+      .attr(
+        "stroke-dasharray",
+        (d) => `${Math.max(16, d.r * 0.18)} ${Math.max(26, d.r * 0.42)}`,
+      )
+      .transition()
+      .duration(720)
+      .ease(d3.easeCubicOut)
+      .attr("r", (d) => d.r);
+    ringMerge
+      .select("text.pts")
+      .attr("fill", qFill)
+      .text((d) => `${d.score} pts`)
+      .transition()
+      .duration(720)
+      .ease(d3.easeCubicOut)
+      .attr("y", (d) => -d.r + 3);
+    ring.exit().transition().duration(400).style("opacity", 0).remove();
+
     const slotByScore = new Map<number, number>();
     const countByScore = new Map<number, number>();
     for (const team of teams) {
       countByScore.set(team.score, (countByScore.get(team.score) ?? 0) + 1);
     }
 
+    const prevById = new Map(nodesRef.current.map((node) => [node.id, node]));
     const nodes: OrbitNode[] = teams.map((team) => {
       const level = levelByScore.get(team.score) ?? 1;
       const slot = slotByScore.get(team.score) ?? 0;
       slotByScore.set(team.score, slot + 1);
       const onOrbit = countByScore.get(team.score) ?? 1;
-      // Offset each ring a bit so stacked orbits don't line up perfectly
       const phase = (level - 1) * 0.35;
+      const targetOrbit = orbitForLevel(level);
+      const targetSpeed = 0.26 + (orbitCount - level + 1) * 0.048;
+      const targetBodyR = level === 1 ? LEADER_R : PLANET_R;
+      const prev = prevById.get(team.id);
+      if (prev) {
+        return {
+          ...team,
+          level,
+          orbit: prev.orbit,
+          targetOrbit,
+          angle: prev.angle,
+          speed: prev.speed,
+          targetSpeed,
+          bodyR: prev.bodyR,
+          targetBodyR,
+        };
+      }
       return {
         ...team,
         level,
-        orbit: orbitForLevel(level),
+        orbit: targetOrbit * 0.35,
+        targetOrbit,
         angle: phase + (slot / onOrbit) * Math.PI * 2,
-        // Inner (higher score) orbits move a touch faster
-        speed: 0.28 + (orbitCount - level + 1) * 0.045,
+        speed: targetSpeed,
+        targetSpeed,
+        bodyR: targetBodyR * 0.4,
+        targetBodyR,
       };
     });
     nodesRef.current = nodes;
 
-    const planet = g
+    const planet = scene.planets
       .selectAll<SVGGElement, OrbitNode>("g.planet")
-      .data(nodes, (d) => d.id)
-      .join((enter) => {
-        const pg = enter.append("g").attr("class", "planet");
-        pg.append("circle").attr("class", "glow");
-        pg.append("circle").attr("class", "body");
-        pg.append("text").attr("class", "score");
-        pg.append("text").attr("class", "label");
-        return pg;
-      });
+      .data(nodes, (d) => String(d.id));
 
-    planet
+    const enter = planet.enter().append("g").attr("class", "planet").attr("opacity", 0);
+    enter.append("circle").attr("class", "wake");
+    enter.append("circle").attr("class", "glow");
+    enter.append("circle").attr("class", "body");
+    enter.append("text").attr("class", "score");
+    enter.append("text").attr("class", "label");
+    enter.transition().duration(500).attr("opacity", 1);
+
+    const merge = enter.merge(planet);
+    merge
+      .select("circle.wake")
+      .attr("fill", (d) => d.color)
+      .attr("opacity", 0.12);
+    merge
       .select("circle.glow")
-      .attr("r", PLANET_R + 5)
       .attr("fill", (d) => d.color)
-      .attr("opacity", 0.28);
-    planet
+      .attr("opacity", (d) => (d.level === 1 ? 0.42 : 0.26));
+    merge
       .select("circle.body")
-      .attr("r", PLANET_R)
       .attr("fill", (d) => d.color)
-      .attr("stroke", "#fff8ee")
-      .attr("stroke-width", 2);
-    planet
+      .attr("stroke", (d) => (d.level === 1 ? leaderRing : "#fff8ee"))
+      .attr("stroke-width", (d) => (d.level === 1 ? 3.5 : 2));
+    merge
       .select("text.score")
       .attr("text-anchor", "middle")
       .attr("dy", "0.35em")
@@ -204,42 +297,106 @@ export function OrbitArena({ standings }: Props) {
       .attr("stroke", "rgba(0,0,0,0.35)")
       .attr("stroke-width", 2)
       .text((d) => String(d.score));
-    planet
+    merge
       .select("text.label")
       .attr("text-anchor", "middle")
-      .attr("dy", PLANET_R + 14)
       .attr("fill", labelFill)
       .attr("font-size", 11)
       .attr("font-weight", 800)
       .text((d) => (d.name.length > 12 ? `${d.name.slice(0, 11)}…` : d.name));
+
+    planet
+      .exit()
+      .transition()
+      .duration(420)
+      .attr("opacity", 0)
+      .remove();
     // dataKey captures standings content; avoid rebuild on every poll reference change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, theme]);
 
-  // Continuous spin — never resets when standings poll refreshes
   useEffect(() => {
-    const timer = d3.timer(() => {
-      const g = gRef.current;
+    let last = performance.now();
+    let frame = 0;
+    let alive = true;
+
+    function spin(now: number) {
+      if (!alive) return;
+      frame = window.requestAnimationFrame(spin);
+
+      const scene = sceneRef.current;
       const nodes = nodesRef.current;
-      if (!g || nodes.length === 0) return;
+      if (!scene) return;
 
-      const t = (performance.now() - clockOrigin.current) / 1000;
-      g.selectAll<SVGGElement, OrbitNode>("g.planet").attr(
-        "transform",
-        (d) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const t = (now - clockOrigin.current) / 1000;
+      const ease = 1 - Math.exp(-dt * ORBIT_EASE);
+
+      const sizeState = sizeRef.current;
+      sizeState.current += (sizeState.target - sizeState.current) * ease;
+      const size = sizeState.current;
+      scene.svg
+        .attr("viewBox", `0 0 ${size} ${size}`)
+        .attr("preserveAspectRatio", "xMidYMid meet");
+      scene.world.attr("transform", `translate(${size / 2},${size / 2})`);
+
+      const halo = scene.core.select("circle.halo");
+      if (!halo.empty()) {
+        halo
+          .attr("r", CORE_R + 11 + Math.sin(t * 1.7) * 3.5)
+          .attr("opacity", 0.42 + Math.sin(t * 1.7) * 0.16);
+      }
+      scene.stars
+        .selectAll<SVGCircleElement, { twinkle: number }>("circle.star")
+        .attr(
+          "opacity",
+          (d) =>
+            0.18 + (0.45 + 0.35 * Math.sin(t * 1.4 + d.twinkle)) * 0.55,
+        );
+
+      scene.rings
+        .selectAll<SVGCircleElement, { level: number }>("circle.drift")
+        .attr("stroke-dashoffset", (d) => {
+          if (!d) return 0;
+          const dir = d.level % 2 === 0 ? 1 : -1;
+          return dir * t * (14 + d.level * 5);
+        });
+
+      if (nodes.length === 0) return;
+
+      for (const node of nodes) {
+        node.orbit += (node.targetOrbit - node.orbit) * ease;
+        node.speed += (node.targetSpeed - node.speed) * ease;
+        node.bodyR += (node.targetBodyR - node.bodyR) * ease;
+      }
+
+      scene.planets
+        .selectAll<SVGGElement, OrbitNode>("g.planet")
+        .each(function (d) {
+          if (!d) return;
           const a = d.angle + t * d.speed;
-          return `translate(${Math.cos(a) * d.orbit},${Math.sin(a) * d.orbit})`;
-        },
-      );
-    });
+          const x = Math.cos(a) * d.orbit;
+          const y = Math.sin(a) * d.orbit;
+          d3.select(this).attr("transform", `translate(${x},${y})`);
+          d3.select(this).select("circle.wake").attr("r", d.bodyR + 11);
+          d3.select(this).select("circle.glow").attr("r", d.bodyR + 6);
+          d3.select(this).select("circle.body").attr("r", d.bodyR);
+          d3.select(this)
+            .select("text.label")
+            .attr("dy", d.bodyR + 14);
+        });
+    }
 
+    frame = window.requestAnimationFrame(spin);
     return () => {
-      timer.stop();
+      alive = false;
+      window.cancelAnimationFrame(frame);
     };
   }, []);
 
   return (
-    <section className="panel toy-box relative overflow-visible rounded-3xl p-3 sm:p-5">
+    <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5">
       <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
@@ -253,9 +410,129 @@ export function OrbitArena({ standings }: Props) {
           One orbit per score · ties share a ring · closer = ahead
         </p>
       </div>
-      <div ref={wrapRef} className="flex w-full justify-center overflow-visible">
-        <svg ref={svgRef} className="block max-w-full overflow-visible" />
+      <div ref={wrapRef} className="mx-auto w-full max-w-lg overflow-hidden">
+        <svg ref={svgRef} className="block h-auto w-full" />
       </div>
     </section>
   );
+}
+
+function ensureDefs(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  hot: string,
+  inner: string,
+  outer: string,
+) {
+  let defs = svg.select<SVGDefsElement>("defs.orbit-defs");
+  if (defs.empty()) {
+    defs = svg.append("defs").attr("class", "orbit-defs");
+    const glow = defs.append("filter").attr("id", "orbit-glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+    glow.append("feGaussianBlur").attr("stdDeviation", 6).attr("result", "blur");
+    glow
+      .append("feMerge")
+      .selectAll("feMergeNode")
+      .data(["blur", "SourceGraphic"])
+      .enter()
+      .append("feMergeNode")
+      .attr("in", (d) => d);
+
+    const grad = defs.append("radialGradient").attr("id", "camp-core");
+    grad.append("stop").attr("class", "core-inner").attr("offset", "0%");
+    grad.append("stop").attr("class", "core-mid").attr("offset", "55%");
+    grad.append("stop").attr("class", "core-outer").attr("offset", "100%");
+  }
+  defs.select("stop.core-inner").attr("stop-color", hot);
+  defs.select("stop.core-mid").attr("stop-color", inner);
+  defs.select("stop.core-outer").attr("stop-color", outer);
+}
+
+function ensureScene(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+): Scene {
+  let world = svg.select<SVGGElement>("g.world");
+  if (world.empty()) {
+    world = svg.append("g").attr("class", "world");
+    world.append("circle").attr("class", "sky").attr("cx", 0).attr("cy", 0);
+    world.append("g").attr("class", "stars");
+    world.append("g").attr("class", "rings");
+    world.append("g").attr("class", "core");
+    world.append("g").attr("class", "planets");
+  }
+  return {
+    svg,
+    world,
+    stars: world.select("g.stars"),
+    rings: world.select("g.rings"),
+    core: world.select("g.core"),
+    planets: world.select("g.planets"),
+  };
+}
+
+function paintStars(
+  stars: d3.Selection<SVGGElement, unknown, null, undefined>,
+  radius: number,
+  dark: boolean,
+) {
+  if (!stars.select("circle.star").empty()) {
+    stars
+      .selectAll("circle.star")
+      .attr("fill", dark ? "#e2e8f0" : "#e8b923");
+    return;
+  }
+  const dots = d3.range(28).map((i) => {
+    const a = (i / 28) * Math.PI * 2 + (i % 5) * 0.21;
+    const r = radius * (0.42 + ((i * 17) % 10) / 22);
+    return {
+      x: Math.cos(a) * r,
+      y: Math.sin(a) * r,
+      twinkle: i * 0.7,
+      size: i % 4 === 0 ? 1.8 : 1.15,
+    };
+  });
+  stars
+    .selectAll("circle.star")
+    .data(dots)
+    .enter()
+    .append("circle")
+    .attr("class", "star")
+    .attr("cx", (d) => d.x)
+    .attr("cy", (d) => d.y)
+    .attr("r", (d) => d.size)
+    .attr("fill", dark ? "#e2e8f0" : "#e8b923")
+    .attr("opacity", 0.35);
+}
+
+function paintCore(
+  core: d3.Selection<SVGGElement, unknown, null, undefined>,
+  haloStroke: string,
+  campInk: string,
+  campHalo: string,
+) {
+  if (core.select("circle.body").empty()) {
+    core
+      .append("circle")
+      .attr("class", "halo")
+      .attr("fill", "none")
+      .attr("stroke-width", 2.4)
+      .attr("filter", "url(#orbit-glow)");
+    core.append("circle").attr("class", "body").attr("r", CORE_R).attr("filter", "url(#orbit-glow)");
+    core
+      .append("text")
+      .attr("class", "camp-label")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.35em")
+      .attr("font-size", 14)
+      .attr("font-weight", 800)
+      .attr("paint-order", "stroke")
+      .attr("stroke-linejoin", "round")
+      .text("JYC");
+  }
+  core.select("circle.halo").attr("stroke", haloStroke);
+  core.select("circle.body").attr("fill", "url(#camp-core)");
+  core
+    .select("text.camp-label")
+    .attr("fill", campInk)
+    .attr("stroke", campHalo)
+    .attr("stroke-width", 3.5)
+    .text("JYC");
 }

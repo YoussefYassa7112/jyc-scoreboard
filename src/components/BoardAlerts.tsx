@@ -77,16 +77,16 @@ function LeaderTakeover({
         animate={{ scale: 1, y: 0, rotate: 0 }}
         exit={{ scale: 0.88, opacity: 0, y: 16 }}
         transition={springSnappy}
-        className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border-4 border-[#E8B923] bg-cloud px-5 py-8 text-center shadow-[0_28px_90px_rgba(42,31,20,0.5)] sm:px-8 sm:py-10 dark:bg-[#152038]"
+        className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border-4 border-star bg-cloud px-5 py-8 text-center shadow-[0_28px_90px_rgba(42,31,20,0.5)] sm:px-8 sm:py-10 dark:bg-[#152038]"
       >
         <motion.div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-[#E8B923]/35 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-star/35 to-transparent"
           animate={{ x: ["-130%", "130%"] }}
           transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 0.5 }}
         />
 
-        <p className="relative text-xs font-extrabold uppercase tracking-[0.35em] text-woody sm:text-sm">
+        <p className="relative text-xs font-extrabold uppercase tracking-[0.35em] text-star sm:text-sm">
           {alert.mine ? "That's you" : "New leader"}
         </p>
 
@@ -109,7 +109,7 @@ function LeaderTakeover({
         >
           {alert.mine ? "Your team is #1!" : (alert.teamName ?? alert.title)}
         </h2>
-        <p className="display-font relative mt-2 text-2xl font-extrabold text-woody sm:text-3xl">
+        <p className="display-font relative mt-2 text-2xl font-extrabold text-star sm:text-3xl">
           {alert.mine
             ? alert.teamName
               ? `${alert.teamName} just took the lead`
@@ -125,7 +125,7 @@ function LeaderTakeover({
         <button
           type="button"
           onClick={onDismiss}
-          className="relative mt-6 rounded-2xl bg-woody px-5 py-2.5 text-sm font-extrabold text-on-strong shadow-md"
+          className="relative mt-6 rounded-2xl bg-star px-5 py-2.5 text-sm font-extrabold text-on-star shadow-md"
         >
           {alert.mine ? "We did it!" : "Let’s go!"}
         </button>
@@ -166,12 +166,12 @@ function TeamTakeover({
         exit={{ scale: 0.94, opacity: 0, y: 24 }}
         transition={springSoft}
         className="relative w-full max-w-md overflow-hidden rounded-[1.75rem] border-4 bg-cloud px-5 py-6 text-center shadow-[0_22px_70px_rgba(42,31,20,0.38)] sm:px-7 sm:py-8 dark:bg-[#152038]"
-        style={{ borderColor: alert.color ?? "#C45C26" }}
+        style={{ borderColor: alert.color ?? "#6B4226" }}
       >
         <span
           aria-hidden
           className="absolute inset-y-0 left-0 w-2.5"
-          style={{ backgroundColor: alert.color ?? "#C45C26" }}
+          style={{ backgroundColor: alert.color ?? "#6B4226" }}
         />
 
         <motion.span
@@ -198,7 +198,7 @@ function TeamTakeover({
         <button
           type="button"
           onClick={onDismiss}
-          className="mt-5 rounded-2xl bg-woody px-5 py-2.5 text-sm font-extrabold text-on-strong"
+          className="mt-5 rounded-2xl bg-star px-5 py-2.5 text-sm font-extrabold text-on-star"
         >
           Nice
         </button>

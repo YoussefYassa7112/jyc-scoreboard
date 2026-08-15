@@ -57,7 +57,7 @@ export function SkyDecor() {
       {floaters.map((item, i) => (
         <motion.span
           key={`${item.emoji}-${i}`}
-          className={`absolute select-none drop-shadow-md ${item.size}`}
+          className={`absolute select-none drop-shadow-md max-sm:hidden ${item.size}`}
           style={{
             top: "top" in item ? item.top : undefined,
             bottom: "bottom" in item ? item.bottom : undefined,

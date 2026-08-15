@@ -89,8 +89,10 @@ if (arbre) {
     new Date(arbreTimes.end.getTime() - 1000),
   );
   check(
-    "when an event ends, send a just-ended ping (or the next start if they overlap)",
-    afterArbre?.phase === "ended" || afterArbre?.phase === "started",
+    "when an event ends, stay quiet unless the next one is close or already live",
+    afterArbre === null ||
+      afterArbre.phase === "upcoming" ||
+      afterArbre.phase === "started",
     `${afterArbre?.phase} ${afterArbre?.title}`,
   );
 }
@@ -98,28 +100,17 @@ if (arbre) {
 const lunch = greenBlocks.find((b) => b.id === "d1-green-lunch-topic1");
 if (lunch && arbre) {
   const lunchEnd = eventDateTimes(day, lunch)!.end;
-  const endedPing = findScheduleAlert(
+  const afterLunch = findScheduleAlert(
     "green",
     lunchEnd,
     [],
     new Date(lunchEnd.getTime() - 1000),
   );
   check(
-    "gap after an event ends → just-ended first",
-    endedPing?.phase === "ended",
-    `${endedPing?.phase} ${endedPing?.title}`,
-  );
-  const nextAfterEnd = findScheduleAlert(
-    "green",
-    new Date(lunchEnd.getTime() + 1000),
-    endedPing ? [endedPing.key] : [],
-    lunchEnd,
-  );
-  check(
-    "right after that, the next event within 15 min is announced",
-    nextAfterEnd?.phase === "upcoming" &&
-      (nextAfterEnd.key.includes(arbre.id) ?? false),
-    `${nextAfterEnd?.phase} ${nextAfterEnd?.title}`,
+    "gap after an event ends → time-to-go for the next event within 15 min",
+    afterLunch?.phase === "upcoming" &&
+      (afterLunch.key.includes(arbre.id) ?? false),
+    `${afterLunch?.phase} ${afterLunch?.title}`,
   );
 }
 check(

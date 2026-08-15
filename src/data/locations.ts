@@ -1,7 +1,6 @@
 /**
  * Schedule location registry.
- * Rooms with floorId + roomId can be opened on the map;
- * others show a “no map yet” notice.
+ * Rooms with floorId + roomId can be opened on the map.
  */
 
 export type CampLocation = {
@@ -54,15 +53,60 @@ export const campLocations: CampLocation[] = [
     floorId: "outdoor",
     roomId: "forest",
   },
-  { id: "b4-common", label: "B4-B Common Area" },
-  { id: "b4-stgeorge", label: "B4 — St-George" },
-  { id: "r1-churches", label: "B1 — All Churches" },
-  { id: "rooms", label: "Rooms" },
-  { id: "chapel", label: "Chapel" },
-  { id: "campsite", label: "Camp Site" },
-  { id: "open", label: "Open" },
-  { id: "bus", label: "B1-4 (In Bus)" },
-  { id: "on-the-go", label: "On the go" },
+  {
+    id: "b4-common",
+    label: "B4-B Common Area",
+    floorId: "outdoor",
+    roomId: "b4",
+  },
+  {
+    id: "b4-stgeorge",
+    label: "B4 — St-George",
+    floorId: "outdoor",
+    roomId: "b4",
+  },
+  {
+    id: "r1-churches",
+    label: "B1 — All Churches",
+    floorId: "outdoor",
+    roomId: "central",
+  },
+  {
+    id: "rooms",
+    label: "Rooms",
+    floorId: "outdoor",
+    roomId: "central",
+  },
+  {
+    id: "chapel",
+    label: "Chapel",
+    floorId: "outdoor",
+    roomId: "central",
+  },
+  {
+    id: "campsite",
+    label: "Camp Site",
+    floorId: "outdoor",
+    roomId: "campfire",
+  },
+  {
+    id: "open",
+    label: "Open",
+    floorId: "outdoor",
+    roomId: "outdoor",
+  },
+  {
+    id: "bus",
+    label: "B1-4 (In Bus)",
+    floorId: "outdoor",
+    roomId: "central",
+  },
+  {
+    id: "on-the-go",
+    label: "On the go",
+    floorId: "outdoor",
+    roomId: "outdoor",
+  },
   {
     id: "lake",
     label: "Lac Quenouille",

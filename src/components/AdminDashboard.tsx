@@ -656,7 +656,7 @@ export function AdminDashboard() {
                       <button
                         type="submit"
                         disabled={teams.length === 0 || isBusy("submit-points")}
-                        className="btn-cta w-full rounded-xl bg-buzz px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                        className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
                       >
                         <BusyLabel
                           busy={isBusy("submit-points")}
@@ -684,7 +684,7 @@ export function AdminDashboard() {
                       transition={springSoft}
                       type="submit"
                       disabled={teams.length === 0}
-                      className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                      className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
                     >
                       Save to field notes
                     </motion.button>
@@ -780,7 +780,7 @@ export function AdminDashboard() {
                 <button
                   type="submit"
                   disabled={!online || isBusy("create-team")}
-                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
                   <BusyLabel
                     busy={isBusy("create-team")}
@@ -956,7 +956,7 @@ export function AdminDashboard() {
                               type="button"
                               onClick={() => requestDeleteTeam(team.id, team.name)}
                               disabled={teamBusy}
-                              className="rounded-xl border border-woody/40 px-3 py-2 text-sm font-extrabold text-woody disabled:opacity-60"
+                              className="rounded-xl border border-star/40 px-3 py-2 text-sm font-extrabold text-star disabled:opacity-60"
                             >
                               Delete
                             </button>
@@ -1022,7 +1022,7 @@ export function AdminDashboard() {
                         </div>
                         <span
                           className={`display-font shrink-0 text-lg font-bold ${
-                            row.delta > 0 ? "text-emerald-400" : "text-woody"
+                            row.delta > 0 ? "text-emerald-400" : "text-star"
                           }`}
                         >
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
@@ -1071,7 +1071,7 @@ export function AdminDashboard() {
                   type="button"
                   onClick={downloadQr}
                   disabled={!qrDataUrl}
-                  className="btn-cta mt-4 w-full rounded-xl bg-woody px-4 py-3 text-sm font-extrabold disabled:opacity-50"
+                  className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-50"
                 >
                   Download QR PNG
                 </button>

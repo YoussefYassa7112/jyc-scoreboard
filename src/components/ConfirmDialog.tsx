@@ -72,7 +72,7 @@ export function ConfirmDialog({
                 type="button"
                 onClick={onConfirm}
                 disabled={busy}
-                className="btn-cta rounded-xl bg-woody px-4 py-3 text-sm font-extrabold disabled:opacity-60"
+                className="btn-cta rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-60"
               >
                 <BusyLabel busy={busy} busyLabel={busyLabel}>
                   {confirmLabel}
