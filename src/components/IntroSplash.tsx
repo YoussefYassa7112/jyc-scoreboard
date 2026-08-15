@@ -1,29 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const SESSION_KEY = "camp-intro-seen";
 
-export function IntroSplash() {
+const IntroReadyContext = createContext(true);
+
+export function useIntroReady() {
+  return useContext(IntroReadyContext);
+}
+
+function introAlreadySeen() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function IntroReadyProvider({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(introAlreadySeen);
+  const markReady = useCallback(() => setReady(true), []);
+
+  return (
+    <IntroReadyContext.Provider value={ready}>
+      <IntroSplash onReady={markReady} />
+      {children}
+    </IntroReadyContext.Provider>
+  );
+}
+
+function IntroSplash({ onReady }: { onReady: () => void }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.sessionStorage.getItem(SESSION_KEY)) return;
+    if (introAlreadySeen()) {
+      onReady();
+      return;
+    }
     setShow(true);
     const hide = window.setTimeout(() => {
-      window.sessionStorage.setItem(SESSION_KEY, "1");
+      try {
+        window.sessionStorage.setItem(SESSION_KEY, "1");
+      } catch {
+        /* private mode */
+      }
       setShow(false);
     }, 2800);
     return () => window.clearTimeout(hide);
-  }, []);
+  }, [onReady]);
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onReady}>
       {show ? (
         <motion.div
-          className="fixed inset-0 z-[80] flex items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,#1e3a8a_0%,#0b1226_55%,#05070f_100%)]"
+          className="fixed inset-0 z-[90] flex items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,#1e3a8a_0%,#0b1226_55%,#05070f_100%)]"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: "easeInOut" }}
