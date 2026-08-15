@@ -9,7 +9,16 @@ export type RoomKind =
   | "service"
   | "office"
   | "stairs"
-  | "lounge";
+  | "lounge"
+  | "outdoor"
+  | "water"
+  | "building";
+
+export type RoomLink = {
+  floorId: string;
+  roomId: string;
+  label: string;
+};
 
 export type MapRoom = {
   id: string;
@@ -24,6 +33,12 @@ export type MapRoom = {
   h: number;
   /** Vertical bias for the label block inside the room */
   labelAlign?: "top" | "center" | "bottom";
+  /** Circle / pill outdoor spots */
+  shape?: "rect" | "ellipse";
+  /** Degrees — used for the volleyball strip */
+  labelRotate?: number;
+  /** Jump to another floor (stairs, main building) */
+  linksTo?: RoomLink[];
 };
 
 export type ExitMarker = {
@@ -41,12 +56,18 @@ export type FloorDecoration =
   | { type: "stairs"; x: number; y: number; w: number; h: number }
   | { type: "fireplace"; x: number; y: number }
   | { type: "sofas"; spots: SofaSpot[] }
-  | { type: "pin"; x: number; y: number; label: string };
+  | { type: "pin"; x: number; y: number; label: string }
+  | { type: "opening"; x: number; y: number; w: number; h: number }
+  | { type: "trees"; spots: SofaSpot[] }
+  | { type: "road"; x: number; y: number; w: number; h: number; label: string }
+  | { type: "dock"; x: number; y: number; w: number; h: number };
 
 export type FloorPlan = {
   id: string;
   /** Tab / heading label shown in the UI */
   label: string;
+  /** Prefix before the floor name, e.g. CENTRAL */
+  siteTitle?: string;
   /** Drawn in the SVG banner */
   banner: string;
   viewBox: { w: number; h: number };
@@ -63,4 +84,7 @@ export const kindLabel: Record<RoomKind, string> = {
   office: "Office",
   stairs: "Stairs",
   lounge: "Lounge",
+  outdoor: "Outdoor",
+  water: "Water",
+  building: "Building",
 };

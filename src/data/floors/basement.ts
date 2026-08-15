@@ -7,6 +7,7 @@ import type { FloorPlan } from "./types";
 export const basementFloor: FloorPlan = {
   id: "basement",
   label: "Basement",
+  siteTitle: "CENTRAL",
   banner: "CENTRAL — BASEMENT",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",
@@ -128,13 +129,16 @@ export const basementFloor: FloorPlan = {
       id: "stairs",
       name: "Escalier",
       labelLines: ["Stairs"],
-      blurb: "Stairs — H (up) / B (down).",
+      blurb: "Stairs up to the cafeteria (H) and down from this basement (B).",
       kind: "stairs",
       x: 870,
       y: 230,
       w: 70,
       h: 180,
       labelAlign: "top",
+      linksTo: [
+        { floorId: "cafeteria", roomId: "stairs", label: "Go up to Cafeteria" },
+      ],
     },
     {
       id: "bureau",
@@ -179,5 +183,9 @@ export const basementFloor: FloorPlan = {
     },
     // Pin in top-right of Nordet, beside (not on) the title
     { type: "pin", x: 810, y: 348, label: "Gathering" },
+    { type: "opening", x: 123, y: 496, w: 44, h: 6 },
+    { type: "opening", x: 298, y: 496, w: 44, h: 6 },
+    { type: "opening", x: 653, y: 496, w: 44, h: 6 },
+    { type: "opening", x: 857, y: 300, w: 6, h: 44 },
   ],
 };

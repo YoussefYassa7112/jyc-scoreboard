@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 import {
@@ -33,6 +41,9 @@ const kindFillLight: Record<RoomKind, string> = {
   office: "#e5d4f5",
   stairs: "#f0e6c8",
   lounge: "#ffd6d0",
+  outdoor: "#d8f0c8",
+  water: "#b8dff0",
+  building: "#e8d4b8",
 };
 
 const kindFillDark: Record<RoomKind, string> = {
@@ -42,6 +53,9 @@ const kindFillDark: Record<RoomKind, string> = {
   office: "#2a2240",
   stairs: "#2f2a18",
   lounge: "#3a2228",
+  outdoor: "#1a3320",
+  water: "#163044",
+  building: "#3a2e1c",
 };
 
 function roomFill(
@@ -249,6 +263,95 @@ function Decorations({
             </g>
           );
         }
+        if (item.type === "opening") {
+          return (
+            <rect
+              key={idx}
+              x={item.x}
+              y={item.y}
+              width={item.w}
+              height={item.h}
+              rx={2}
+              fill={dark ? "#38bdf8" : "#1e6bb8"}
+              opacity={0.85}
+              className="pointer-events-none"
+            />
+          );
+        }
+        if (item.type === "trees") {
+          return (
+            <g key={idx} aria-hidden>
+              {item.spots.map((s, i) => (
+                <g key={i} transform={`translate(${s.x},${s.y})`}>
+                  <polygon
+                    points="0,-16 10,6 -10,6"
+                    fill={dark ? "#166534" : "#2F8F4E"}
+                    opacity={0.7}
+                  />
+                  <polygon
+                    points="0,-24 8,-4 -8,-4"
+                    fill={dark ? "#15803d" : "#3d8b5a"}
+                    opacity={0.8}
+                  />
+                  <rect
+                    x={-2}
+                    y={6}
+                    width={4}
+                    height={7}
+                    fill={dark ? "#3f2a14" : "#5c4033"}
+                  />
+                </g>
+              ))}
+            </g>
+          );
+        }
+        if (item.type === "road") {
+          return (
+            <g key={idx} aria-hidden>
+              <rect
+                x={item.x}
+                y={item.y}
+                width={item.w}
+                height={item.h}
+                rx={6}
+                fill={dark ? "#334155" : "#9ca3af"}
+              />
+              <text
+                x={item.x + item.w / 2}
+                y={item.y + item.h / 2 + 1}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill={dark ? "#e2e8f0" : "#1f2937"}
+                fontSize={10}
+                fontWeight={800}
+              >
+                {item.label}
+              </text>
+            </g>
+          );
+        }
+        if (item.type === "dock") {
+          return (
+            <g key={idx} aria-hidden>
+              <rect
+                x={item.x}
+                y={item.y}
+                width={item.w}
+                height={10}
+                rx={2}
+                fill={dark ? "#a8a29e" : "#d6c4a8"}
+              />
+              <rect
+                x={item.x + item.w - 14}
+                y={item.y}
+                width={14}
+                height={item.h}
+                rx={2}
+                fill={dark ? "#a8a29e" : "#d6c4a8"}
+              />
+            </g>
+          );
+        }
         // pin
         return (
           <g key={idx} transform={`translate(${item.x},${item.y})`} aria-hidden>
@@ -318,7 +421,6 @@ export function BuildingMap({
   const floorBg = dark ? "#0b1224" : "#faf6ee";
   const ink = dark ? "#e2e8f0" : "#2a1f14";
   const muted = dark ? "#94a3b8" : "#7a5c4a";
-  const windowBlue = dark ? "#38bdf8" : "#1e6bb8";
 
   function clearSelection() {
     setSelectedId(null);
@@ -347,7 +449,7 @@ export function BuildingMap({
             Building guide
           </p>
           <h2 className="display-font text-2xl font-bold text-ink sm:text-3xl">
-            CENTRAL · {floor.label}
+            {floor.siteTitle ?? "CENTRAL"} · {floor.label}
           </h2>
           <p className="mt-1 text-sm font-semibold text-muted">
             Tap a room for details · tap empty space or leave focus to reset
@@ -415,7 +517,9 @@ export function BuildingMap({
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {(Object.keys(kindLabel) as RoomKind[]).map((kind) => (
+        {(
+          [...new Set(floor.rooms.map((r) => r.kind))] as RoomKind[]
+        ).map((kind) => (
           <span
             key={kind}
             className="inline-flex items-center gap-1.5 rounded-full border border-saddle/15 px-2.5 py-1 text-[11px] font-bold text-muted"
@@ -442,7 +546,7 @@ export function BuildingMap({
             transformOrigin: "center top",
           }}
           role="img"
-          aria-label={`${floor.label} floor plan of CENTRAL`}
+          aria-label={`${floor.label} map of ${floor.siteTitle ?? "CENTRAL"}`}
           onClick={(e) => {
             // Clicking empty map canvas clears focus
             if (e.target === e.currentTarget) clearSelection();
@@ -483,107 +587,131 @@ export function BuildingMap({
             const lineH = fontSize * 1.2;
             const startY =
               blockY - ((room.labelLines.length - 1) * lineH) / 2;
+            const cx = room.x + room.w / 2;
+            const cy = room.y + room.h / 2;
+            const ellipse = room.shape === "ellipse";
+            const fill = roomFill(room.kind, dark, active, dimmed);
+            const stroke = active ? (dark ? "#38bdf8" : "#c45c26") : wall;
+            const shared = {
+              fill,
+              stroke,
+              strokeWidth: active ? 3 : 1.6,
+              className: "cursor-pointer",
+              style: { outline: "none" as const },
+              initial: false as const,
+              animate: {
+                filter: active
+                  ? dark
+                    ? "drop-shadow(0 0 10px rgba(56,189,248,0.45))"
+                    : "drop-shadow(0 0 10px rgba(196,92,38,0.35))"
+                  : "drop-shadow(0 0 0 rgba(0,0,0,0))",
+              },
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                onRoomActivate(room);
+              },
+              onKeyDown: (e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onRoomActivate(room);
+                }
+                if (e.key === "Escape") clearSelection();
+              },
+              tabIndex: 0,
+              role: "button" as const,
+              "aria-label": room.name,
+              "aria-pressed": active,
+            };
 
             return (
               <g key={room.id}>
-                <motion.rect
-                  x={room.x}
-                  y={room.y}
-                  width={room.w}
-                  height={room.h}
-                  rx={6}
-                  fill={roomFill(room.kind, dark, active, dimmed)}
-                  stroke={active ? (dark ? "#38bdf8" : "#c45c26") : wall}
-                  strokeWidth={active ? 3 : 1.6}
-                  className="cursor-pointer"
-                  style={{ outline: "none" }}
-                  initial={false}
-                  animate={{
-                    filter: active
-                      ? dark
-                        ? "drop-shadow(0 0 10px rgba(56,189,248,0.45))"
-                        : "drop-shadow(0 0 10px rgba(196,92,38,0.35))"
-                      : "drop-shadow(0 0 0 rgba(0,0,0,0))",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRoomActivate(room);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onRoomActivate(room);
-                    }
-                    if (e.key === "Escape") clearSelection();
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={room.name}
-                  aria-pressed={active}
-                />
-                {room.labelLines.map((line, i) => (
-                  <text
-                    key={`${room.id}-${i}`}
-                    x={room.x + room.w / 2}
-                    y={startY + i * lineH}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill={ink}
-                    fontSize={fontSize}
-                    fontWeight={800}
-                    className="pointer-events-none select-none"
-                    opacity={dimmed ? 0.4 : 1}
-                  >
-                    {line}
-                  </text>
-                ))}
-                {active && spotlightKey ? (
-                  <motion.rect
-                    key={`spotlight-${spotlightKey}`}
-                    x={room.x - 5}
-                    y={room.y - 5}
-                    width={room.w + 10}
-                    height={room.h + 10}
-                    rx={9}
-                    fill="none"
-                    stroke={dark ? "#38bdf8" : "#c45c26"}
-                    className="pointer-events-none"
-                    initial={{ opacity: 0, strokeWidth: 2 }}
-                    animate={{
-                      opacity: [0, 0.95, 0.1, 0.95, 0],
-                      strokeWidth: [2, 10, 3, 10, 2],
-                    }}
-                    transition={{ duration: 2, ease: "easeInOut" }}
+                {ellipse ? (
+                  <motion.ellipse
+                    cx={cx}
+                    cy={cy}
+                    rx={room.w / 2}
+                    ry={room.h / 2}
+                    {...shared}
                   />
+                ) : (
+                  <motion.rect
+                    x={room.x}
+                    y={room.y}
+                    width={room.w}
+                    height={room.h}
+                    rx={6}
+                    {...shared}
+                  />
+                )}
+                <g
+                  transform={
+                    room.labelRotate
+                      ? `rotate(${room.labelRotate} ${cx} ${cy})`
+                      : undefined
+                  }
+                >
+                  {room.labelLines.map((line, i) => (
+                    <text
+                      key={`${room.id}-${i}`}
+                      x={cx}
+                      y={
+                        room.labelRotate
+                          ? cy - ((room.labelLines.length - 1) * lineH) / 2 + i * lineH
+                          : startY + i * lineH
+                      }
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={ink}
+                      fontSize={fontSize}
+                      fontWeight={800}
+                      className="pointer-events-none select-none"
+                      opacity={dimmed ? 0.4 : 1}
+                    >
+                      {line}
+                    </text>
+                  ))}
+                </g>
+                {active && spotlightKey ? (
+                  ellipse ? (
+                    <motion.ellipse
+                      key={`spotlight-${spotlightKey}`}
+                      cx={cx}
+                      cy={cy}
+                      rx={room.w / 2 + 6}
+                      ry={room.h / 2 + 6}
+                      fill="none"
+                      stroke={dark ? "#38bdf8" : "#c45c26"}
+                      className="pointer-events-none"
+                      initial={{ opacity: 0, strokeWidth: 2 }}
+                      animate={{
+                        opacity: [0, 0.95, 0.1, 0.95, 0],
+                        strokeWidth: [2, 10, 3, 10, 2],
+                      }}
+                      transition={{ duration: 2, ease: "easeInOut" }}
+                    />
+                  ) : (
+                    <motion.rect
+                      key={`spotlight-${spotlightKey}`}
+                      x={room.x - 5}
+                      y={room.y - 5}
+                      width={room.w + 10}
+                      height={room.h + 10}
+                      rx={9}
+                      fill="none"
+                      stroke={dark ? "#38bdf8" : "#c45c26"}
+                      className="pointer-events-none"
+                      initial={{ opacity: 0, strokeWidth: 2 }}
+                      animate={{
+                        opacity: [0, 0.95, 0.1, 0.95, 0],
+                        strokeWidth: [2, 10, 3, 10, 2],
+                      }}
+                      transition={{ duration: 2, ease: "easeInOut" }}
+                    />
+                  )
                 ) : null}
               </g>
             );
           })}
-
-          {/* Blue exit openings on outer walls */}
-          {[145, 320, 675].map((x) => (
-            <rect
-              key={`win-${x}`}
-              x={x - 22}
-              y={496}
-              width={44}
-              height={6}
-              rx={2}
-              fill={windowBlue}
-              opacity={0.85}
-              className="pointer-events-none"
-            />
-          ))}
-          <rect
-            x={857}
-            y={300}
-            width={6}
-            height={44}
-            rx={2}
-            fill={windowBlue}
-            opacity={0.85}
-            className="pointer-events-none"
-          />
 
           <Decorations
             items={floor.decorations}
@@ -636,6 +764,24 @@ export function BuildingMap({
                 Clear
               </button>
             </div>
+            {selected.linksTo?.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selected.linksTo.map((link) => (
+                  <button
+                    key={`${link.floorId}-${link.roomId}`}
+                    type="button"
+                    onClick={() => {
+                      setFloorId(link.floorId);
+                      setSelectedId(link.roomId);
+                      setSpotlightKey(Date.now());
+                    }}
+                    className="btn-cta rounded-xl bg-woody px-3 py-1.5 text-xs font-extrabold"
+                  >
+                    {link.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
             <div className="mt-4 border-t border-saddle/15 pt-3">
               <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
@@ -692,7 +838,7 @@ export function BuildingMap({
             animate={{ opacity: 1 }}
             className="mt-4 text-center text-sm font-semibold text-muted-soft"
           >
-            Select any room on the map
+            Select any spot on the map
           </motion.p>
         )}
       </AnimatePresence>
