@@ -114,8 +114,8 @@ export function Scoreboard() {
   const [myTeam, setMyTeam] = useState<MyTeamSnapshot | null>(null);
   const [remindersOn, setRemindersOn] = useReminderOptIn();
 
-  // Baseline for rank comparisons. Only live responses set it, so hydrating from
-  // cache never fires a stale "new leader" alert.
+  // Last standings the camper already saw. Seeded from the phone cache so a
+  // rank change while the portal was closed still gets announced on reopen.
   const lastLiveStandings = useRef<StandingRow[] | null>(null);
   const myTeamIdRef = useRef<number | null>(null);
   const pendingReveal = useRef<StandingsResponse | null>(null);
@@ -157,10 +157,11 @@ export function Scoreboard() {
     if (alerts.length === 0) revealPending();
   }, [alerts.length, revealPending]);
 
-  /** Diff each live snapshot against the previous one, never per point event. */
+  /** Diff each live snapshot against the last one this phone already showed. */
   const trackStandings = useCallback(
     (json: StandingsResponse) => {
-      const previous = lastLiveStandings.current;
+      const previous =
+        lastLiveStandings.current ?? readStandingsCache()?.standings ?? null;
       lastLiveStandings.current = json.standings;
       if (!previous) {
         setData(json);
@@ -241,6 +242,7 @@ export function Scoreboard() {
   useEffect(() => {
     const cached = readStandingsCache();
     if (!cached) return;
+    lastLiveStandings.current = cached.standings;
     setData({ standings: cached.standings, asOf: cached.asOf });
     setStaleCache(true);
     setLoading(false);
@@ -255,6 +257,9 @@ export function Scoreboard() {
         const cached = readStandingsCache();
         if (!cancelled) {
           if (cached) {
+            if (!lastLiveStandings.current) {
+              lastLiveStandings.current = cached.standings;
+            }
             setData({ standings: cached.standings, asOf: cached.asOf });
             setStaleCache(true);
             setError(null);
@@ -335,11 +340,13 @@ export function Scoreboard() {
 
     if (!document.hidden) startPolling();
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onVis);
     return () => {
       cancelled = true;
       controller.abort();
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pageshow", onVis);
     };
     // `data` intentionally omitted — only gate polling on connectivity
     // eslint-disable-next-line react-hooks/exhaustive-deps
