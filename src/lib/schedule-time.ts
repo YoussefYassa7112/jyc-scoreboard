@@ -247,7 +247,10 @@ function findTimedEvent(
   return { kind: "after" };
 }
 
-export function blocksAtRoom(roomId: string): Array<{
+export function blocksAtRoom(
+  roomId: string,
+  floorId?: string,
+): Array<{
   day: CampDay;
   block: ScheduleBlock;
 }> {
@@ -256,7 +259,9 @@ export function blocksAtRoom(roomId: string): Array<{
     for (const block of day.blocks) {
       const hit = block.locationIds?.some((id) => {
         const loc = getLocation(id);
-        return loc?.roomId === roomId || id === roomId;
+        if (loc?.roomId !== roomId) return false;
+        if (floorId && loc.floorId && loc.floorId !== floorId) return false;
+        return true;
       });
       if (hit) out.push({ day, block });
     }

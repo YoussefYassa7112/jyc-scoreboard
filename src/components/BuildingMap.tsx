@@ -10,6 +10,7 @@ import {
   type MouseEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { easeSoft } from "@/lib/motion";
 import { useTheme } from "@/lib/theme";
 import {
   defaultFloorId,
@@ -31,6 +32,7 @@ type BuildingMapProps = {
     dayId: string,
     blockId: string,
     group: "all" | "red" | "green",
+    from: { floorId: string; roomId: string },
   ) => void;
 };
 
@@ -413,8 +415,8 @@ export function BuildingMap({
     [floor.rooms, selectedId],
   );
   const roomEvents = useMemo(
-    () => (selected ? blocksAtRoom(selected.id) : []),
-    [selected],
+    () => (selected ? blocksAtRoom(selected.id, floorId) : []),
+    [selected, floorId],
   );
 
   const wall = dark ? "rgba(226,232,240,0.85)" : "#2a1f14";
@@ -537,14 +539,16 @@ export function BuildingMap({
       </div>
 
       <div className="mt-4 overflow-auto rounded-2xl border-2 border-saddle/15 bg-chip/40 p-2 sm:p-3">
-        <svg
+        <motion.svg
           viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
-          className="mx-auto block h-auto w-full max-w-4xl origin-center touch-pan-x touch-pan-y"
-          style={{
+          className="mx-auto block h-auto w-full max-w-4xl touch-pan-x touch-pan-y"
+          style={{ originX: 0.5, originY: 0 }}
+          initial={false}
+          animate={{
+            scale: zoom,
             minWidth: `${Math.round(320 * zoom)}px`,
-            transform: `scale(${zoom})`,
-            transformOrigin: "center top",
           }}
+          transition={{ duration: 0.38, ease: easeSoft }}
           role="img"
           aria-label={`${floor.label} map of ${floor.siteTitle ?? "CENTRAL"}`}
           onClick={(e) => {
@@ -732,7 +736,7 @@ export function BuildingMap({
             strokeLinejoin="round"
             className="pointer-events-none"
           />
-        </svg>
+        </motion.svg>
       </div>
 
       <AnimatePresence mode="wait">
@@ -798,7 +802,12 @@ export function BuildingMap({
                       <button
                         type="button"
                         onClick={() =>
-                          onOpenScheduleEvent?.(day.id, block.id, block.group)
+                          onOpenScheduleEvent?.(
+                            day.id,
+                            block.id,
+                            block.group,
+                            { floorId, roomId: selected.id },
+                          )
                         }
                         className="w-full rounded-xl bg-chip/80 px-3 py-2 text-left transition hover:bg-chip"
                       >

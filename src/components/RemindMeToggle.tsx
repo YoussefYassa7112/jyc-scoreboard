@@ -22,7 +22,7 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
     }
     onChange(true);
     setHint(
-      `On — a popup will appear 15 minutes before each ${trackLabel} event. Keep this page open.`,
+      `On — popups when ${trackLabel} events are coming, starting, or ending. Keep this page open.`,
     );
   }
 
@@ -53,7 +53,7 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
         >
           {enabled ? "🔔" : "🔕"}
         </motion.span>
-        {enabled ? "Reminders on" : "Remind me 15 min before"}
+        {enabled ? "Reminders on" : "Remind me on this page"}
       </button>
 
       <AnimatePresence initial={false}>
@@ -73,8 +73,9 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
 
       {enabled ? (
         <p className="mt-1.5 text-[11px] font-semibold text-muted-soft">
-          A message pops up on this page — works offline, no extra permissions.
-          Leave the app open in a tab.
+          A message pops up on this page when something is coming, starting, or
+          ending — works offline, no extra permissions. Leave the app open in a
+          tab.
         </p>
       ) : null}
     </div>

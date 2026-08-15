@@ -3,7 +3,11 @@
  * schedule, with a faked clock. Run with: npx tsx scripts/check-reminders.ts
  */
 import { campDays } from "../src/data/schedule";
-import { findDueReminder, findDueReminders } from "../src/lib/event-reminders";
+import {
+  findDueReminder,
+  findDueReminders,
+  findScheduleAlert,
+} from "../src/lib/event-reminders";
 import { diffStandings } from "../src/lib/rank-alerts";
 import { buildDemoDay } from "../src/lib/schedule-demo";
 import {
@@ -37,7 +41,11 @@ const at1minAfter = new Date(start.getTime() + 60_000);
 
 const due = findDueReminder("green", at14min);
 check("14 min before -> reminder due", due !== null, due?.title);
-check("14 min before -> names the right block", due?.key.endsWith(firstTimed.id) ?? false, due?.key);
+check(
+  "14 min before -> names the right block",
+  due?.key.includes(`:${firstTimed.id}:`) ?? false,
+  due?.key,
+);
 check("30 min before -> nothing yet", findDueReminder("green", at30min) === null);
 check("after it started -> no reminder yet (next one is hours away)", findDueReminder("green", at1minAfter) === null);
 
@@ -45,11 +53,73 @@ const ice = greenBlocks.find((b) => b.id.includes("icebreaker") || /ice/i.test(b
 if (ice) {
   const iceStart = eventDateTimes(day, ice)!.start;
   const fourteenBeforeIce = new Date(iceStart.getTime() - 14 * 60_000);
-  const iceDue = findDueReminder("green", fourteenBeforeIce);
+  const arriveLive = findScheduleAlert("green", fourteenBeforeIce, [], null);
   check(
-    "during an earlier event, 14 min before the next start still reminds",
-    iceDue?.key.endsWith(ice.id) ?? false,
-    iceDue?.title,
+    "opening the board during a live event announces it",
+    arriveLive?.phase === "started",
+    arriveLive?.title,
+  );
+  const justStarted = findScheduleAlert(
+    "green",
+    iceStart,
+    [],
+    new Date(iceStart.getTime() - 1000),
+  );
+  check(
+    "when the next event starts, late campers get a started ping",
+    justStarted?.phase === "started" && justStarted.key.includes(ice.id),
+    `${justStarted?.phase} ${justStarted?.title}`,
+  );
+}
+
+const arbre = greenBlocks.find((b) => /arbre/i.test(b.title));
+if (arbre) {
+  const arbreTimes = eventDateTimes(day, arbre)!;
+  const fourteenBeforeArbre = new Date(arbreTimes.start.getTime() - 14 * 60_000);
+  const arbreDue = findDueReminder("green", fourteenBeforeArbre);
+  check(
+    "after the live event ends, next within 15 min reminds",
+    arbreDue?.key.includes(`:${arbre.id}:`) ?? false,
+    arbreDue?.title,
+  );
+  const afterArbre = findScheduleAlert(
+    "green",
+    arbreTimes.end,
+    [],
+    new Date(arbreTimes.end.getTime() - 1000),
+  );
+  check(
+    "when an event ends, send a just-ended ping (or the next start if they overlap)",
+    afterArbre?.phase === "ended" || afterArbre?.phase === "started",
+    `${afterArbre?.phase} ${afterArbre?.title}`,
+  );
+}
+
+const lunch = greenBlocks.find((b) => b.id === "d1-green-lunch-topic1");
+if (lunch && arbre) {
+  const lunchEnd = eventDateTimes(day, lunch)!.end;
+  const endedPing = findScheduleAlert(
+    "green",
+    lunchEnd,
+    [],
+    new Date(lunchEnd.getTime() - 1000),
+  );
+  check(
+    "gap after an event ends → just-ended first",
+    endedPing?.phase === "ended",
+    `${endedPing?.phase} ${endedPing?.title}`,
+  );
+  const nextAfterEnd = findScheduleAlert(
+    "green",
+    new Date(lunchEnd.getTime() + 1000),
+    endedPing ? [endedPing.key] : [],
+    lunchEnd,
+  );
+  check(
+    "right after that, the next event within 15 min is announced",
+    nextAfterEnd?.phase === "upcoming" &&
+      (nextAfterEnd.key.includes(arbre.id) ?? false),
+    `${nextAfterEnd?.phase} ${nextAfterEnd?.title}`,
   );
 }
 check(
@@ -123,8 +193,8 @@ check(
 const overviewDue = findDueReminders("overview", at14min);
 const overviewKeys = overviewDue.map((d) => d.key);
 check(
-  "overview reminders de-dupe the same upcoming block",
-  overviewDue.length >= 1 && overviewKeys.length === new Set(overviewKeys).size,
+  "overview reminders send only the soonest event",
+  overviewDue.length <= 1,
   overviewKeys.join(", "),
 );
 

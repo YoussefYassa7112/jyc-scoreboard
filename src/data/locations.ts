@@ -56,22 +56,13 @@ export const campLocations: CampLocation[] = [
   },
   { id: "b4-common", label: "B4-B Common Area" },
   { id: "b4-stgeorge", label: "B4 — St-George" },
-  { id: "r1-churches", label: "R1 — All Churches" },
+  { id: "r1-churches", label: "B1 — All Churches" },
   { id: "rooms", label: "Rooms" },
   { id: "chapel", label: "Chapel" },
-  {
-    id: "campsite",
-    label: "Camp Site",
-    floorId: "outdoor",
-    roomId: "outdoor",
-  },
-  {
-    id: "open",
-    label: "Open area",
-    floorId: "outdoor",
-    roomId: "outdoor",
-  },
-  { id: "bus", label: "In Bus / Loading" },
+  { id: "campsite", label: "Camp Site" },
+  { id: "open", label: "Open" },
+  { id: "bus", label: "B1-4 (In Bus)" },
+  { id: "on-the-go", label: "On the go" },
   {
     id: "lake",
     label: "Lac Quenouille",
@@ -107,9 +98,30 @@ export function locationHasMap(id: string): boolean {
 export function firstMappedLocationId(
   ids: string[] | undefined,
 ): string | null {
-  if (!ids?.length) return null;
+  return mappedLocations(ids)[0]?.id ?? null;
+}
+
+/** Mapped spots for a schedule block, in listed order. */
+export function mappedLocations(ids: string[] | undefined): CampLocation[] {
+  if (!ids?.length) return [];
+  const out: CampLocation[] = [];
+  const seen = new Set<string>();
   for (const id of ids) {
-    if (locationHasMap(id)) return id;
+    const loc = byId.get(id);
+    if (!loc?.floorId || !loc.roomId) continue;
+    const key = `${loc.floorId}:${loc.roomId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(loc);
   }
-  return null;
+  return out;
+}
+
+export function locationForRoom(
+  floorId: string,
+  roomId: string,
+): CampLocation | undefined {
+  return campLocations.find(
+    (loc) => loc.floorId === floorId && loc.roomId === roomId,
+  );
 }

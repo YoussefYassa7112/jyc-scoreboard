@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { firstMappedLocationId, getLocation } from "@/data/locations";
+import { getLocation, mappedLocations } from "@/data/locations";
 import {
   greenCabins,
   redCabins,
@@ -47,9 +47,14 @@ type Props = {
   /** 15-minutes-before reminder opt-in, owned by the board */
   remindersOn?: boolean;
   onRemindersChange?: (on: boolean) => void;
+  /** Fired when the camper picks a team — announce events in the next 15 minutes */
+  onTeamSwitch?: (group: "overview" | "red" | "green") => void;
   focusDayId?: string | null;
   focusBlockId?: string | null;
   focusGroup?: "all" | "red" | "green" | null;
+  /** Map room this event was opened from — View on map should return here */
+  focusFloorId?: string | null;
+  focusRoomId?: string | null;
   /** Only set when navigating from the map (or similar) — triggers one scroll */
   scrollNonce?: number | null;
   onScheduleFocusConsumed?: () => void;
@@ -95,6 +100,7 @@ function BlockCard({
   status = "untimed",
   endsInMs,
   onViewMap,
+  mapSpots,
 }: {
   block: ScheduleBlock;
   accent: "all" | "red" | "green";
@@ -103,7 +109,8 @@ function BlockCard({
   highlighted?: boolean;
   status?: BlockStatus;
   endsInMs?: number | null;
-  onViewMap?: () => void;
+  onViewMap?: (locationId?: string) => void;
+  mapSpots?: { id: string; label: string }[];
 }) {
   // Prefer the selected track color so shared "everyone" blocks match Red/Green.
   const colorKey = chrome !== "all" ? chrome : accent;
@@ -210,16 +217,39 @@ function BlockCard({
         </ul>
       ) : null}
       {onViewMap && (block.locationIds?.length || block.location) ? (
-        <button
-          type="button"
-          onClick={onViewMap}
-          className="btn-soft mt-3 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
-        >
-          View on map
-        </button>
+        mapSpots && mapSpots.length > 1 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {mapSpots.map((spot) => (
+              <button
+                key={spot.id}
+                type="button"
+                onClick={() => onViewMap(spot.id)}
+                className="btn-soft rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+              >
+                View {spot.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onViewMap(mapSpots?.[0]?.id)}
+            className="btn-soft mt-3 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+          >
+            View on map
+          </button>
+        )
       ) : null}
     </motion.article>
   );
+}
+
+function shortMapLabel(label: string) {
+  return label
+    .replace(/^B1-B\s+/i, "")
+    .replace(/^B1\s+—\s+/i, "")
+    .replace(/^B4-B\s+/i, "")
+    .replace(/^B4\s+—\s+/i, "");
 }
 
 function Section({
@@ -241,7 +271,7 @@ function Section({
   blocks: ScheduleBlock[];
   cabins?: string[];
   highlightBlockId?: string | null;
-  onViewMapFor?: (block: ScheduleBlock) => void;
+  onViewMapFor?: (block: ScheduleBlock, locationId?: string) => void;
 }) {
   if (blocks.length === 0) return null;
 
@@ -277,7 +307,15 @@ function Section({
               status={status}
               endsInMs={count?.endsIn}
               highlighted={highlightBlockId === block.id}
-              onViewMap={onViewMapFor ? () => onViewMapFor(block) : undefined}
+              mapSpots={mappedLocations(block.locationIds).map((loc) => ({
+                id: loc.id,
+                label: shortMapLabel(loc.label),
+              }))}
+              onViewMap={
+                onViewMapFor
+                  ? (locationId) => onViewMapFor(block, locationId)
+                  : undefined
+              }
             />
           );
         })}
@@ -290,9 +328,12 @@ export function CampSchedule({
   teams,
   remindersOn,
   onRemindersChange,
+  onTeamSwitch,
   focusDayId,
   focusBlockId,
   focusGroup,
+  focusFloorId,
+  focusRoomId,
   scrollNonce,
   onScheduleFocusConsumed,
   onViewLocation,
@@ -304,6 +345,11 @@ export function CampSchedule({
   const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [preferredMap, setPreferredMap] = useState<{
+    blockId: string;
+    floorId: string;
+    roomId: string;
+  } | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [localScrollNonce, setLocalScrollNonce] = useState(0);
   const [demoEpoch, setDemoEpoch] = useState(0);
@@ -393,7 +439,14 @@ export function CampSchedule({
     setHighlightId(focusBlockId);
     pendingScroll.current = { blockId: focusBlockId, token };
     setLocalScrollNonce(token);
-  }, [scrollNonce, focusBlockId, focusDayId, focusGroup]);
+    if (focusFloorId && focusRoomId) {
+      setPreferredMap({
+        blockId: focusBlockId,
+        floorId: focusFloorId,
+        roomId: focusRoomId,
+      });
+    }
+  }, [scrollNonce, focusBlockId, focusDayId, focusGroup, focusFloorId, focusRoomId]);
 
   // Scroll only when localScrollNonce changes (map click or Jump) — not on
   // manual day/track tab changes.
@@ -457,6 +510,9 @@ export function CampSchedule({
       setTrack(next.campGroup);
     }
     teamTrackReady.current = true;
+    if (next.campGroup === "red" || next.campGroup === "green") {
+      onTeamSwitch?.(next.campGroup);
+    }
   }
 
   function cancelPendingScroll() {
@@ -538,18 +594,28 @@ export function CampSchedule({
         ? "bg-[#C45C26] text-on-strong shadow-sm"
         : "bg-woody text-on-strong shadow-sm";
 
-  function handleViewMap(block: ScheduleBlock) {
+  function handleViewMap(block: ScheduleBlock, locationId?: string) {
     setMapNotice(null);
     const ids = block.locationIds ?? [];
-    const mappedId = firstMappedLocationId(ids);
-    if (mappedId) {
-      const loc = getLocation(mappedId)!;
+    const spots = mappedLocations(ids);
+    const chosen =
+      (locationId ? spots.find((loc) => loc.id === locationId) : undefined) ??
+      (preferredMap?.blockId === block.id
+        ? spots.find(
+            (loc) =>
+              loc.floorId === preferredMap.floorId &&
+              loc.roomId === preferredMap.roomId,
+          )
+        : undefined) ??
+      spots[0];
+
+    if (chosen) {
       onViewLocation?.({
-        locationId: mappedId,
+        locationId: chosen.id,
         mapped: true,
-        floorId: loc.floorId,
-        roomId: loc.roomId,
-        label: loc.label,
+        floorId: chosen.floorId,
+        roomId: chosen.roomId,
+        label: chosen.label,
       });
       return;
     }

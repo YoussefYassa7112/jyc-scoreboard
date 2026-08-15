@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
+  announceDueReminders,
   useEventReminders,
   useReminderOptIn,
   type DueReminder,
@@ -101,6 +102,8 @@ export function Scoreboard() {
     blockId: string;
     group: "all" | "red" | "green";
     scrollNonce: number;
+    fromFloorId?: string;
+    fromRoomId?: string;
   } | null>(null);
   const isDark = theme === "dark";
 
@@ -190,18 +193,29 @@ export function Scoreboard() {
 
   const pushReminderToast = useCallback((reminder: DueReminder) => {
     const id = `reminder-${reminder.key}`;
+    const kind =
+      reminder.phase === "started"
+        ? "started"
+        : reminder.phase === "ended"
+          ? "ended"
+          : "reminder";
     setToasts((current) => [
-      ...current.filter((toast) => toast.id !== id).slice(-2),
+      ...current.filter(
+        (toast) =>
+          toast.kind !== "reminder" &&
+          toast.kind !== "started" &&
+          toast.kind !== "ended",
+      ),
       {
         id,
-        kind: "reminder",
+        kind,
         title: reminder.title,
         detail: reminder.body,
       },
     ]);
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 12_000);
+    }, 5_600);
   }, []);
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast);
@@ -597,12 +611,14 @@ export function Scoreboard() {
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
             focusArrivalNonce={mapFocus?.arrivalNonce}
-            onOpenScheduleEvent={(dayId, blockId, group) => {
+            onOpenScheduleEvent={(dayId, blockId, group, from) => {
               setScheduleFocus({
                 dayId,
                 blockId,
                 group,
                 scrollNonce: Date.now(),
+                fromFloorId: from.floorId,
+                fromRoomId: from.roomId,
               });
               goToTab("schedule");
             }}
@@ -614,9 +630,14 @@ export function Scoreboard() {
             teams={data?.standings ?? []}
             remindersOn={remindersOn}
             onRemindersChange={setRemindersOn}
+            onTeamSwitch={(group) => {
+              announceDueReminders(group, pushReminderToast);
+            }}
             focusDayId={scheduleFocus?.dayId}
             focusBlockId={scheduleFocus?.blockId}
             focusGroup={scheduleFocus?.group}
+            focusFloorId={scheduleFocus?.fromFloorId}
+            focusRoomId={scheduleFocus?.fromRoomId}
             scrollNonce={scheduleFocus?.scrollNonce}
             onScheduleFocusConsumed={() => setScheduleFocus(null)}
             onViewLocation={(payload) => {

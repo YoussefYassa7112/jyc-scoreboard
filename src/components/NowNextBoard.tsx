@@ -249,65 +249,76 @@ export function NowNextBoard({
     upcoming.length > 0 && upcoming.every((lane) => lane.result.kind === "after");
 
   return (
-    <div className="space-y-4">
-      <div>
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-2xl border-2 border-woody/35 bg-chip/50">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-woody px-3.5 py-2.5">
+          <h3 className="display-font text-lg font-bold text-on-strong sm:text-xl">
             Happening now
-          </p>
+          </h3>
           {live.length > 1 ? (
-            <p className="text-[11px] font-extrabold text-woody">
+            <p className="text-[11px] font-extrabold text-on-strong/90">
               {live.length} events at the same time
             </p>
           ) : null}
         </div>
-        {live.length === 0 ? (
-          <p className="mt-2 text-sm font-semibold text-muted">
-            Nothing is happening right now.
-          </p>
-        ) : (
-          <div
-            className={`mt-2 grid gap-2.5 ${
-              live.length > 1 ? "sm:grid-cols-2" : ""
-            }`}
-          >
-            {live.map((item) => (
-              <LiveCard
-                key={`${item.day.id}-${item.block.id}`}
-                item={item}
-                now={now}
-                onJump={onJump}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+        <div className="p-3 sm:p-3.5">
+          {live.length === 0 ? (
+            <p className="text-sm font-bold text-muted">
+              Nothing is happening right now.
+            </p>
+          ) : (
+            <div
+              className={`grid gap-2.5 ${
+                live.length > 1 ? "sm:grid-cols-2" : ""
+              }`}
+            >
+              {live.map((item) => (
+                <LiveCard
+                  key={`${item.day.id}-${item.block.id}`}
+                  item={item}
+                  now={now}
+                  onJump={onJump}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
-          {grouped ? "Next up · Everyone, Red, Green" : "Next up"}
-        </p>
-        {campOver ? (
-          <p className="mt-2 text-sm font-semibold text-muted">
-            Camp is over — thanks for an amazing weekend!
-          </p>
-        ) : (
-          <div
-            className={`mt-2 grid gap-2.5 ${
-              grouped ? "lg:grid-cols-3" : ""
-            }`}
-          >
-            {upcoming.map((lane) => (
-              <NextCard
-                key={lane.track}
-                lane={lane}
-                now={now}
-                onJump={onJump}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <section className="overflow-hidden rounded-2xl border-2 border-[#1E6BB8]/40 bg-[#1E6BB8]/10">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#1E6BB8] px-3.5 py-2.5">
+          <h3 className="display-font text-lg font-bold text-on-strong sm:text-xl">
+            Coming up next
+          </h3>
+          {grouped ? (
+            <p className="text-[11px] font-extrabold text-on-strong/90">
+              Everyone · Red · Green
+            </p>
+          ) : null}
+        </div>
+        <div className="p-3 sm:p-3.5">
+          {campOver ? (
+            <p className="text-sm font-bold text-muted">
+              Camp is over — thanks for an amazing weekend!
+            </p>
+          ) : (
+            <div
+              className={`grid gap-2.5 ${
+                grouped ? "lg:grid-cols-3" : ""
+              }`}
+            >
+              {upcoming.map((lane) => (
+                <NextCard
+                  key={lane.track}
+                  lane={lane}
+                  now={now}
+                  onJump={onJump}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
