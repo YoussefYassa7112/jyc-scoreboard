@@ -23,6 +23,7 @@ import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { BoardAlerts } from "./BoardAlerts";
+import { useIntroReady } from "./IntroSplash";
 import { BuildingMap } from "./BuildingMap";
 import { CampPhotosButton } from "./CampPhotosButton";
 import { CampSchedule } from "./CampSchedule";
@@ -119,9 +120,13 @@ export function Scoreboard() {
   const lastLiveStandings = useRef<StandingRow[] | null>(null);
   const myTeamIdRef = useRef<number | null>(null);
   const pendingReveal = useRef<StandingsResponse | null>(null);
+  const queuedAlerts = useRef<BoardAlert[]>([]);
   const lastEtag = useRef<string | null>(null);
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  const introReady = useIntroReady();
+  const introReadyRef = useRef(introReady);
+  introReadyRef.current = introReady;
 
   useEffect(() => {
     const sync = () => {
@@ -154,8 +159,16 @@ export function Scoreboard() {
   }, []);
 
   useEffect(() => {
+    if (!introReady || queuedAlerts.current.length === 0) return;
+    const incoming = queuedAlerts.current;
+    queuedAlerts.current = [];
+    pushAlerts(incoming);
+  }, [introReady, pushAlerts]);
+
+  useEffect(() => {
+    if (!introReady || queuedAlerts.current.length > 0) return;
     if (alerts.length === 0) revealPending();
-  }, [alerts.length, revealPending]);
+  }, [alerts.length, introReady, revealPending]);
 
   /** Diff each live snapshot against the last one this phone already showed. */
   const trackStandings = useCallback(
@@ -180,7 +193,10 @@ export function Scoreboard() {
 
       if (holdForMessage || alreadyHolding) {
         pendingReveal.current = json;
-        if (holdForMessage && !alreadyHolding) pushAlerts(incoming);
+        if (holdForMessage && !alreadyHolding) {
+          if (introReadyRef.current) pushAlerts(incoming);
+          else queuedAlerts.current = incoming;
+        }
         return;
       }
 
