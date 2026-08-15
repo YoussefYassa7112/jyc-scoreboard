@@ -1,5 +1,6 @@
 import { campDays, type CampDay, type ScheduleBlock } from "@/data/schedule";
 import { isoDateKey } from "@/lib/schedule-time";
+import { LIVE_CAMP_SIM, shiftCampToNow } from "@/lib/schedule-sim";
 
 export const DEMO_DAY_ID = "demo-today";
 const ORIGIN_KEY = "camp-demo-schedule-origin";
@@ -220,6 +221,10 @@ function demoWanted(now: Date, allowDemo: boolean) {
 
 /** Real camp days, plus a test day before camp starts (local dev only). */
 export function getScheduleDays(now = new Date(), allowDemo = demoUnlocked()): CampDay[] {
+  if (LIVE_CAMP_SIM) {
+    if (typeof window === "undefined") return campDays;
+    return shiftCampToNow();
+  }
   if (!demoWanted(now, allowDemo)) return campDays;
   return [buildDemoDay(now), ...campDays];
 }

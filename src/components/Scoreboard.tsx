@@ -19,6 +19,7 @@ import {
 } from "@/lib/offline";
 import { diffStandings, type BoardAlert } from "@/lib/rank-alerts";
 import type { StandingRow } from "@/lib/standings";
+import { LIVE_CAMP_SIM } from "@/lib/schedule-sim";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
@@ -388,6 +389,11 @@ export function Scoreboard() {
           <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
             Camp Scoreboard
           </h1>
+          {LIVE_CAMP_SIM ? (
+            <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
+              Simulation preview — not the public camp site
+            </p>
+          ) : null}
 
           <ReachForTheSkyMarquee />
 

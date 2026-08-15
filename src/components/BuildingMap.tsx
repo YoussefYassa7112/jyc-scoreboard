@@ -21,6 +21,7 @@ import {
   type MapRoom,
   type RoomKind,
 } from "@/data/floors";
+import { getScheduleDays } from "@/lib/schedule-demo";
 import { blocksAtRoom } from "@/lib/schedule-time";
 
 type BuildingMapProps = {
@@ -453,7 +454,7 @@ export function BuildingMap({
     [floor.rooms, selectedId],
   );
   const roomEvents = useMemo(
-    () => (selected ? blocksAtRoom(selected.id, floorId) : []),
+    () => (selected ? blocksAtRoom(selected.id, floorId, getScheduleDays()) : []),
     [selected, floorId],
   );
 

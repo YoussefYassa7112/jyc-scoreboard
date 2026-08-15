@@ -166,14 +166,12 @@ export function findLiveEvents(
   now = new Date(),
   days: CampDay[] = campDays,
 ): TimedEvent[] {
-  const todayKey = isoDateKey(now);
-  const day = days.find((d) => d.dateISO === todayKey);
-  if (!day) return [];
-
   const live: TimedEvent[] = [];
-  for (const block of blocksForGroup(day, group)) {
-    if (blockStatus(day, block, now) === "live") {
-      live.push({ day, block });
+  for (const day of days) {
+    for (const block of blocksForGroup(day, group)) {
+      if (blockStatus(day, block, now) === "live") {
+        live.push({ day, block });
+      }
     }
   }
   return live;
@@ -212,50 +210,51 @@ function findTimedEvent(
   edge: "start" | "end",
   exclusive = false,
 ): NextEventResult {
-  const todayKey = isoDateKey(now);
-  const firstDay = days[0];
-  const lastDay = days[days.length - 1];
-  if (!firstDay || !lastDay) return { kind: "none" };
+  const nowMs = now.getTime();
+  const timed: Array<{
+    day: CampDay;
+    block: ScheduleBlock;
+    start: number;
+    end: number;
+  }> = [];
 
-  if (todayKey < firstDay.dateISO) {
-    const blocks = blocksForTrack(firstDay, group, exclusive);
-    const firstTimed = blocks.find((b) => parseTimeRange(b.time));
-    if (firstTimed) return { kind: "before", day: firstDay, block: firstTimed };
-    return { kind: "before", day: firstDay, block: blocks[0] ?? firstDay.blocks[0] };
-  }
-
-  if (todayKey > lastDay.dateISO) {
-    return { kind: "after" };
-  }
-
-  const startIdx = days.findIndex((d) => d.dateISO >= todayKey);
-  for (let i = Math.max(0, startIdx); i < days.length; i++) {
-    const day = days[i];
-    const blocks = blocksForTrack(day, group, exclusive);
-    const nowMin = day.dateISO === todayKey ? minutesSinceMidnight(now) : -1;
-
-    for (const block of blocks) {
-      const range = parseTimeRange(block.time);
-      if (!range) continue;
-      const edgeMin = edge === "start" ? range.startMin : range.endMin;
-      if (day.dateISO > todayKey || edgeMin > nowMin) {
-        return { kind: "next", day, block };
-      }
+  for (const day of days) {
+    for (const block of blocksForTrack(day, group, exclusive)) {
+      const times = eventDateTimes(day, block);
+      if (!times) continue;
+      timed.push({
+        day,
+        block,
+        start: times.start.getTime(),
+        end: times.end.getTime(),
+      });
     }
   }
+  timed.sort((a, b) => a.start - b.start || a.end - b.end);
+  if (timed.length === 0) return { kind: "none" };
 
-  return { kind: "after" };
+  const first = timed[0]!;
+  if (nowMs < first.start) {
+    return { kind: "before", day: first.day, block: first.block };
+  }
+
+  const next = timed.find((item) =>
+    edge === "start" ? item.start > nowMs : item.end > nowMs,
+  );
+  if (!next) return { kind: "after" };
+  return { kind: "next", day: next.day, block: next.block };
 }
 
 export function blocksAtRoom(
   roomId: string,
   floorId?: string,
+  days: CampDay[] = campDays,
 ): Array<{
   day: CampDay;
   block: ScheduleBlock;
 }> {
   const out: Array<{ day: CampDay; block: ScheduleBlock }> = [];
-  for (const day of campDays) {
+  for (const day of days) {
     for (const block of day.blocks) {
       const hit = block.locationIds?.some((id) => {
         const loc = getLocation(id);
@@ -274,6 +273,9 @@ export function eventDateTimes(
   day: CampDay,
   block: ScheduleBlock,
 ): { start: Date; end: Date } | null {
+  if (block.startMs != null && block.endMs != null) {
+    return { start: new Date(block.startMs), end: new Date(block.endMs) };
+  }
   const range = parseTimeRange(block.time);
   if (!range) return null;
   const [y, m, d] = day.dateISO.split("-").map(Number);

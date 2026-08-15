@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getLocation, mappedLocations } from "@/data/locations";
 import {
+  campDays,
   greenCabins,
   redCabins,
   type CampDay,
@@ -18,6 +19,7 @@ import {
   resetDemoScheduleClock,
   setDemoScheduleEnabled,
 } from "@/lib/schedule-demo";
+import { LIVE_CAMP_SIM, resetLiveSimClock } from "@/lib/schedule-sim";
 import {
   readMyTeamSnapshot,
   writeMyTeamSnapshot,
@@ -342,6 +344,7 @@ export function CampSchedule({
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [localScrollNonce, setLocalScrollNonce] = useState(0);
   const [demoEpoch, setDemoEpoch] = useState(0);
+  const [simReady, setSimReady] = useState(!LIVE_CAMP_SIM);
   const teamTrackReady = useRef(false);
   const pendingScroll = useRef<{
     blockId: string;
@@ -360,6 +363,7 @@ export function CampSchedule({
   useEffect(() => {
     setDemoScheduleEnabled(true);
     setAllowDemo(process.env.NODE_ENV === "development");
+    setSimReady(true);
     const days = getScheduleDays(new Date(), true);
     if (days[0]?.id === DEMO_DAY_ID) setDayId(DEMO_DAY_ID);
   }, []);
@@ -526,8 +530,9 @@ export function CampSchedule({
   const calendarKey = isoDateKey(new Date(nowTick));
   const days = useMemo(() => {
     void demoEpoch;
+    if (LIVE_CAMP_SIM && !simReady) return campDays;
     return getScheduleDays(new Date(), allowDemo);
-  }, [allowDemo, calendarKey, demoEpoch]);
+  }, [allowDemo, calendarKey, demoEpoch, simReady]);
   const day = useMemo(() => {
     return days.find((d) => d.id === dayId) ?? days[0]!;
   }, [days, dayId]);
@@ -639,7 +644,28 @@ export function CampSchedule({
         </p>
       </div>
 
-      {day.id === DEMO_DAY_ID ? (
+      {LIVE_CAMP_SIM ? (
+        <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
+          <p className="text-sm font-bold text-star">
+            Simulation preview — the real 3-day camp, shifted so Arrival starts
+            when you opened this page. Not the public site. Gaps and lengths
+            stay the same.
+          </p>
+          <button
+            type="button"
+            className="btn-soft mt-2 min-h-11 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+            onClick={() => {
+              resetLiveSimClock();
+              for (const d of days) clearRemindersForDay(d.id);
+              setDemoEpoch((n) => n + 1);
+              setNowTick(Date.now());
+              setDayId("day-1");
+            }}
+          >
+            Restart from Arrival
+          </button>
+        </div>
+      ) : day.id === DEMO_DAY_ID ? (
         <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
           <p className="text-sm font-bold text-star">
             Test day — overlapping Red/Green events, timers, faded Done cards,

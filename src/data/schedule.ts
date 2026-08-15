@@ -13,6 +13,9 @@ export type ScheduleBlock = {
   note?: string;
   group: ScheduleGroup;
   section: ScheduleSection;
+  /** Optional absolute times — used by the live-camp simulation preview */
+  startMs?: number;
+  endMs?: number;
   details?: string[];
 };
 
