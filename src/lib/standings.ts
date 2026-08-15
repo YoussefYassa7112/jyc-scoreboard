@@ -16,12 +16,37 @@ type StandingsPayload = {
   asOf: string;
 };
 
-/** Short in-memory TTL so ~100 polling phones share one Neon query per isolate. */
-const STANDINGS_TTL_MS = 4_000;
+/**
+ * ~1s in-memory TTL: 100 phones can poll every second and still share one
+ * Neon query per isolate. Pair with a 1s CDN cache and 304s on unchanged rev.
+ */
+const STANDINGS_TTL_MS = 800;
 let standingsCache: { at: number; data: StandingsPayload } | null = null;
+let revisionCache: { at: number; rev: string } | null = null;
 
 export function invalidateStandingsCache() {
   standingsCache = null;
+  revisionCache = null;
+}
+
+export async function getStandingsRevision(): Promise<string> {
+  if (revisionCache && Date.now() - revisionCache.at < STANDINGS_TTL_MS) {
+    return revisionCache.rev;
+  }
+  const db = getDb();
+  const [row] = await db
+    .select({
+      maxEventId: sql<number>`coalesce(max(${pointEvents.id}), 0)`.mapWith(
+        Number,
+      ),
+      teamCount: sql<number>`count(distinct ${teams.id})`.mapWith(Number),
+    })
+    .from(teams)
+    .leftJoin(pointEvents, eq(pointEvents.teamId, teams.id));
+
+  const rev = `${row?.maxEventId ?? 0}:${row?.teamCount ?? 0}`;
+  revisionCache = { at: Date.now(), rev };
+  return rev;
 }
 
 export async function getStandingsCached(): Promise<StandingsPayload> {

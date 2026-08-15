@@ -1,17 +1,35 @@
 import { NextResponse } from "next/server";
-import { getStandingsCached } from "@/lib/standings";
+import { getStandingsCached, getStandingsRevision } from "@/lib/standings";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+const CACHE_CONTROL =
+  "public, max-age=0, s-maxage=1, stale-while-revalidate=3";
+
+export async function GET(request: Request) {
   try {
+    const rev = await getStandingsRevision();
+    const etag = `"${rev}"`;
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          ETag: etag,
+          "Cache-Control": CACHE_CONTROL,
+        },
+      });
+    }
+
     const data = await getStandingsCached();
-    return NextResponse.json(data, {
-      headers: {
-        // Edge + browser reuse: 100 campers should not each hit Neon.
-        "Cache-Control": "public, max-age=4, s-maxage=5, stale-while-revalidate=30",
+    return NextResponse.json(
+      { ...data, rev },
+      {
+        headers: {
+          ETag: etag,
+          "Cache-Control": CACHE_CONTROL,
+        },
       },
-    });
+    );
   } catch (error) {
     console.error("standings error", error);
     return NextResponse.json(

@@ -55,7 +55,11 @@ const panelVariants = {
 type StandingsResponse = {
   standings: StandingRow[];
   asOf: string;
+  rev?: string;
 };
+
+const POLL_STANDINGS_MS = 1_000;
+const POLL_OTHER_TAB_MS = 4_000;
 
 function formatAsOf(iso: string) {
   try {
@@ -109,6 +113,10 @@ export function Scoreboard() {
   // cache never fires a stale "new leader" alert.
   const lastLiveStandings = useRef<StandingRow[] | null>(null);
   const myTeamIdRef = useRef<number | null>(null);
+  const pendingReveal = useRef<StandingsResponse | null>(null);
+  const lastEtag = useRef<string | null>(null);
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
 
   useEffect(() => {
     const sync = () => {
@@ -119,6 +127,14 @@ export function Scoreboard() {
     sync();
     window.addEventListener(TEAM_CHANGED_EVENT, sync);
     return () => window.removeEventListener(TEAM_CHANGED_EVENT, sync);
+  }, []);
+
+  const revealPending = useCallback(() => {
+    const pending = pendingReveal.current;
+    if (!pending) return;
+    pendingReveal.current = null;
+    setData(pending);
+    writeStandingsCache(pending);
   }, []);
 
   const pushAlerts = useCallback((incoming: BoardAlert[]) => {
@@ -132,13 +148,37 @@ export function Scoreboard() {
     }
   }, []);
 
+  useEffect(() => {
+    if (alerts.length === 0) revealPending();
+  }, [alerts.length, revealPending]);
+
   /** Diff each live snapshot against the previous one, never per point event. */
   const trackStandings = useCallback(
-    (next: StandingRow[]) => {
+    (json: StandingsResponse) => {
       const previous = lastLiveStandings.current;
-      lastLiveStandings.current = next;
-      if (!previous) return;
-      pushAlerts(diffStandings(previous, next, myTeamIdRef.current));
+      lastLiveStandings.current = json.standings;
+      if (!previous) {
+        setData(json);
+        return;
+      }
+
+      const incoming = diffStandings(
+        previous,
+        json.standings,
+        myTeamIdRef.current,
+      );
+      const holdForMessage = incoming.some(
+        (alert) => alert.kind === "leader" || alert.kind === "team",
+      );
+      const alreadyHolding = pendingReveal.current != null;
+
+      if (holdForMessage || alreadyHolding) {
+        pendingReveal.current = json;
+        if (holdForMessage && !alreadyHolding) pushAlerts(incoming);
+        return;
+      }
+
+      setData(json);
     },
     [pushAlerts],
   );
@@ -202,13 +242,25 @@ export function Scoreboard() {
       }
 
       try {
-        const res = await fetch("/api/standings");
+        const headers: HeadersInit = {};
+        if (lastEtag.current) headers["If-None-Match"] = lastEtag.current;
+        const res = await fetch("/api/standings", { headers });
+        if (res.status === 304) {
+          if (!cancelled) {
+            setStaleCache(false);
+            setError(null);
+            setLoading(false);
+          }
+          return;
+        }
         if (!res.ok) throw new Error("Failed to load");
         const json = (await res.json()) as StandingsResponse;
+        const etag = res.headers.get("etag");
+        if (etag) lastEtag.current = etag;
+        else if (json.rev) lastEtag.current = `"${json.rev}"`;
         if (!cancelled) {
-          trackStandings(json.standings);
-          setData(json);
-          writeStandingsCache(json);
+          trackStandings(json);
+          if (!pendingReveal.current) writeStandingsCache(json);
           setStaleCache(false);
           setError(null);
           setLoading(false);
@@ -238,7 +290,9 @@ export function Scoreboard() {
     let id = 0;
     const startPolling = () => {
       window.clearInterval(id);
-      id = window.setInterval(load, 8_000);
+      const ms =
+        tabRef.current === "standings" ? POLL_STANDINGS_MS : POLL_OTHER_TAB_MS;
+      id = window.setInterval(load, ms);
     };
     const onVis = () => {
       if (document.hidden) {
@@ -258,7 +312,7 @@ export function Scoreboard() {
     };
     // `data` intentionally omitted — only gate polling on connectivity
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [online]);
+  }, [online, tab]);
 
   return (
     <main className="relative min-h-dvh overflow-x-hidden px-4 py-6 sm:px-6 md:px-10 md:py-10">

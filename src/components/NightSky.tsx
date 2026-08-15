@@ -5,15 +5,15 @@ import * as d3 from "d3";
 import { useTheme } from "@/lib/theme";
 
 type Star = {
-  x: number;
-  y: number;
+  nx: number;
+  ny: number;
   r: number;
   twinkle: number;
   phase: number;
 };
 
 type Laser = {
-  y: number;
+  ny: number;
   speed: number;
   width: number;
   delay: number;
@@ -29,6 +29,26 @@ type Shooter = {
   maxLife: number;
 };
 
+function seedStars(count: number): Star[] {
+  return d3.range(count).map(() => ({
+    nx: Math.random(),
+    ny: Math.random() * 0.78,
+    r: Math.random() * 1.6 + 0.4,
+    twinkle: 0.6 + Math.random() * 2.2,
+    phase: Math.random() * Math.PI * 2,
+  }));
+}
+
+function seedLasers(): Laser[] {
+  return d3.range(4).map((_, i) => ({
+    ny: 0.12 + i * 0.12,
+    speed: 280 + Math.random() * 180,
+    width: 90 + Math.random() * 70,
+    delay: i * 2.2,
+    t: -i * 2.2,
+  }));
+}
+
 export function NightSky() {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,37 +63,48 @@ export function NightSky() {
 
     let width = 0;
     let height = 0;
-    let stars: Star[] = [];
-    let lasers: Laser[] = [];
+    const mobile = window.matchMedia("(max-width: 640px)").matches;
+    const stars = seedStars(mobile ? 70 : 120);
+    const lasers = seedLasers();
     let shooters: Shooter[] = [];
     let raf = 0;
     let lastSpawn = 0;
+    let running = true;
 
-    const resize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
+    const measure = () => {
+      // Prefer the large viewport so iOS URL-bar show/hide does not
+      // constantly resize (and jump) the sky.
+      const nextW = window.innerWidth;
+      const lvh = window.visualViewport
+        ? Math.max(window.innerHeight, window.visualViewport.height)
+        : window.innerHeight;
+      const nextH = Math.max(lvh, document.documentElement.clientHeight || 0);
+      return { nextW, nextH };
+    };
+
+    const applySize = (nextW: number, nextH: number) => {
+      width = nextW;
+      height = nextH;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
 
-      stars = d3.range(140).map(() => ({
-        x: Math.random() * width,
-        y: Math.random() * height * 0.78,
-        r: Math.random() * 1.6 + 0.4,
-        twinkle: 0.6 + Math.random() * 2.2,
-        phase: Math.random() * Math.PI * 2,
-      }));
-
-      lasers = d3.range(4).map((_, i) => ({
-        y: height * (0.12 + i * 0.12),
-        speed: 280 + Math.random() * 180,
-        width: 90 + Math.random() * 70,
-        delay: i * 2.2,
-        t: -i * 2.2,
-      }));
+    const resize = () => {
+      const { nextW, nextH } = measure();
+      const widthChanged = Math.abs(nextW - width) > 8;
+      const heightGrew = nextH > height + 80;
+      // Ignore the small height jitter from mobile browser chrome.
+      if (width === 0 || height === 0) {
+        applySize(nextW, nextH);
+        return;
+      }
+      if (widthChanged || heightGrew) {
+        applySize(widthChanged ? nextW : width, heightGrew ? nextH : height);
+      }
     };
 
     const spawnShooter = () => {
@@ -88,10 +119,10 @@ export function NightSky() {
     };
 
     const draw = (now: number) => {
+      if (!running) return;
       const t = now / 1000;
       ctx.clearRect(0, 0, width, height);
 
-      // Deep night wash
       const grad = ctx.createLinearGradient(0, 0, 0, height);
       grad.addColorStop(0, "#070b18");
       grad.addColorStop(0.45, "#101b36");
@@ -100,7 +131,6 @@ export function NightSky() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Soft moon
       ctx.beginPath();
       ctx.fillStyle = "rgba(226, 232, 255, 0.16)";
       ctx.arc(width * 0.82, height * 0.14, 42, 0, Math.PI * 2);
@@ -112,20 +142,19 @@ export function NightSky() {
 
       for (const star of stars) {
         const alpha =
-          0.35 +
-          0.65 * (0.5 + 0.5 * Math.sin(t * star.twinkle + star.phase));
+          0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * star.twinkle + star.phase));
         ctx.beginPath();
         ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.arc(star.nx * width, star.ny * height, star.r, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Lasers
       for (const laser of lasers) {
         laser.t += 1 / 60;
+        const y = laser.ny * height;
         const cycle = ((laser.t - laser.delay) * laser.speed) % (width + 200);
         const x = cycle - 100;
-        const g = ctx.createLinearGradient(x, laser.y, x + laser.width, laser.y);
+        const g = ctx.createLinearGradient(x, y, x + laser.width, y);
         g.addColorStop(0, "rgba(56,189,248,0)");
         g.addColorStop(0.5, "rgba(125,211,252,0.85)");
         g.addColorStop(1, "rgba(56,189,248,0)");
@@ -134,8 +163,8 @@ export function NightSky() {
         ctx.shadowColor = "#38bdf8";
         ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.moveTo(x, laser.y);
-        ctx.lineTo(x + laser.width, laser.y);
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + laser.width, y);
         ctx.stroke();
         ctx.shadowBlur = 0;
       }
@@ -166,13 +195,28 @@ export function NightSky() {
       raf = requestAnimationFrame(draw);
     };
 
-    resize();
+    const onVis = () => {
+      if (document.hidden) {
+        running = false;
+        cancelAnimationFrame(raf);
+        return;
+      }
+      if (!running) {
+        running = true;
+        raf = requestAnimationFrame(draw);
+      }
+    };
+
+    applySize(measure().nextW, measure().nextH);
     window.addEventListener("resize", resize);
+    document.addEventListener("visibilitychange", onVis);
     raf = requestAnimationFrame(draw);
 
     return () => {
+      running = false;
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [theme]);
 
@@ -182,7 +226,7 @@ export function NightSky() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-700"
+      className="pointer-events-none fixed inset-0 z-0 h-lvh w-screen"
     />
   );
 }
