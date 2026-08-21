@@ -131,8 +131,9 @@ function LiveCard({
           {item.block.location ? ` · ${item.block.location}` : ""}
         </p>
         {count ? (
-          <p className="mt-2 text-sm font-extrabold tabular-nums text-red-600">
-            Ends in {formatCountdown(count.endsIn)}
+          <p className="mt-2 flex items-center gap-2 text-sm font-extrabold text-red-600">
+            Ends in
+            <span className="countdown">{formatCountdown(count.endsIn)}</span>
           </p>
         ) : null}
         <div className="mt-2 flex flex-wrap gap-2">
@@ -243,7 +244,7 @@ function NextCard({
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
                 Starts in
               </p>
-              <p className="display-font text-base font-bold tabular-nums text-card-ink">
+              <p className="countdown display-font mt-0.5 text-base font-bold text-card-ink">
                 {formatCountdown(count.startsIn)}
               </p>
             </div>
@@ -251,7 +252,7 @@ function NextCard({
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
                 Ends in
               </p>
-              <p className="display-font text-base font-bold tabular-nums text-card-ink">
+              <p className="countdown display-font mt-0.5 text-base font-bold text-card-ink">
                 {formatCountdown(count.endsIn)}
               </p>
             </div>

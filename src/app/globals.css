@@ -390,3 +390,13 @@ html.dark .sheriff-glow {
     0 0 0 2px rgba(56, 189, 248, 0.45),
     0 10px 28px rgba(14, 165, 233, 0.28);
 }
+
+/* Fixed-width clock so 09 → 10 does not shove the layout. */
+.countdown {
+  display: inline-block;
+  min-width: 8ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.04em;
+}

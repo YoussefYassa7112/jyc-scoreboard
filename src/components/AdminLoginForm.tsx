@@ -20,7 +20,7 @@ export function AdminLoginForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!online) {
-      setError("You're offline — connect to WiFi to sign in.");
+      setError("Needs WiFi — connect to sign in.");
       return;
     }
     setLoading(true);
@@ -67,7 +67,7 @@ export function AdminLoginForm() {
         <div className="mt-4">
           <OfflineBanner
             online={online}
-            detail="Admin login needs WiFi. Campers can still use Map & Schedule offline after caching the app."
+            detail="Needs WiFi to sign in. Campers can still use Map & Schedule after the app is cached."
           />
         </div>
 
@@ -107,7 +107,7 @@ export function AdminLoginForm() {
           className="btn-cta mt-5 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold transition hover:brightness-110 disabled:opacity-60"
         >
           <BusyLabel busy={loading} busyLabel="Signing in…">
-            Enter admin
+            {online ? "Enter admin" : "Needs WiFi"}
           </BusyLabel>
         </button>
 

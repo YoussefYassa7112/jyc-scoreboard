@@ -19,9 +19,12 @@ export function CampPhotosButton({ online }: Props) {
   }, [hint]);
 
   const label = (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex flex-wrap items-center justify-center gap-2">
       <span aria-hidden>📸</span>
       Camp photos
+      {!online ? (
+        <span className="text-xs font-bold opacity-80">· Needs WiFi</span>
+      ) : null}
     </span>
   );
 
@@ -46,7 +49,7 @@ export function CampPhotosButton({ online }: Props) {
             setHint(
               !ready
                 ? "Add the Google Drive link first."
-                : "Photos need WiFi — the album lives on Google Drive.",
+                : "Needs WiFi — the album lives on Google Drive.",
             )
           }
           className={shell}

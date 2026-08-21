@@ -12,13 +12,22 @@ export function OfflineBanner({ online, detail }: Props) {
   return (
     <div
       role="status"
-      className="rounded-2xl border-2 border-star/40 bg-chip/90 px-4 py-3 text-left shadow-sm"
+      className="flex items-start gap-3 rounded-2xl border-2 border-star/45 bg-chip/95 px-3.5 py-3 text-left shadow-sm sm:px-4"
     >
-      <p className="text-sm font-extrabold text-star">You&apos;re offline</p>
-      <p className="mt-1 text-sm font-semibold text-muted">
-        {detail ??
-          "Map and Schedule still work. Live scores need WiFi."}
+      <span className="inline-flex shrink-0 items-center self-center rounded-xl bg-star px-2.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-on-star sm:text-xs">
+        Needs WiFi
+      </span>
+      <p className="min-w-0 text-sm font-semibold leading-snug text-muted">
+        {detail ?? "Map and Schedule still work. Live scores need WiFi."}
       </p>
     </div>
+  );
+}
+
+export function NeedsWifiNotice({ children }: { children: string }) {
+  return (
+    <p className="rounded-xl border border-star/30 bg-chip/80 px-3 py-2 text-xs font-extrabold text-star">
+      Needs WiFi · {children}
+    </p>
   );
 }

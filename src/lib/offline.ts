@@ -1,4 +1,10 @@
 import type { StandingRow } from "@/lib/standings";
+import {
+  readAdminTeamsCache,
+  readFieldNotes,
+  writeAdminTeamsCache,
+  writeFieldNotes,
+} from "@/lib/field-notes";
 
 export const STANDINGS_CACHE_KEY = "camp-standings-cache";
 export const TEAM_STORAGE_KEY = "camp-my-team";
@@ -78,6 +84,33 @@ export function writeMyTeamSnapshot(snapshot: MyTeamSnapshot | null) {
   queueMicrotask(() => {
     window.dispatchEvent(new CustomEvent(TEAM_CHANGED_EVENT));
   });
+}
+
+/** Drop a saved "my team" if that team is no longer on the live roster. */
+export function dropMissingMyTeam(standings: StandingRow[]) {
+  const snap = readMyTeamSnapshot();
+  if (!snap) return;
+  if (standings.some((row) => row.id === snap.teamId)) return;
+  writeMyTeamSnapshot(null);
+}
+
+/** Wipe every local trace of a deleted team on this device. */
+export function forgetTeamEverywhere(teamId: number) {
+  const snap = readMyTeamSnapshot();
+  if (snap?.teamId === teamId) writeMyTeamSnapshot(null);
+
+  const cache = readStandingsCache();
+  if (cache) {
+    writeStandingsCache({
+      standings: cache.standings.filter((row) => row.id !== teamId),
+      asOf: cache.asOf,
+    });
+  }
+
+  writeFieldNotes(readFieldNotes().filter((note) => note.teamId !== teamId));
+  writeAdminTeamsCache(
+    readAdminTeamsCache().filter((team) => team.id !== teamId),
+  );
 }
 
 export function isBrowserOnline() {

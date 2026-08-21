@@ -1,5 +1,5 @@
 import { asc, desc, eq, sql } from "drizzle-orm";
-import { getDb } from "@/db";
+import { getDb, ensureCabinColumn } from "@/db";
 import { pointEvents, teams } from "@/db/schema";
 
 export type StandingRow = {
@@ -9,6 +9,7 @@ export type StandingRow = {
   score: number;
   rank: number;
   campGroup: "red" | "green" | null;
+  cabinId?: number | null;
 };
 
 type StandingsPayload = {
@@ -33,6 +34,7 @@ export async function getStandingsRevision(): Promise<string> {
   if (revisionCache && Date.now() - revisionCache.at < STANDINGS_TTL_MS) {
     return revisionCache.rev;
   }
+  await ensureCabinColumn();
   const db = getDb();
   const [row] = await db
     .select({
@@ -40,11 +42,13 @@ export async function getStandingsRevision(): Promise<string> {
         Number,
       ),
       teamCount: sql<number>`count(distinct ${teams.id})`.mapWith(Number),
+      maxTeamId: sql<number>`coalesce(max(${teams.id}), 0)`.mapWith(Number),
+      cabinSum: sql<number>`coalesce(sum(${teams.cabinId}), 0)`.mapWith(Number),
     })
     .from(teams)
     .leftJoin(pointEvents, eq(pointEvents.teamId, teams.id));
 
-  const rev = `${row?.maxEventId ?? 0}:${row?.teamCount ?? 0}`;
+  const rev = `${row?.maxEventId ?? 0}:${row?.teamCount ?? 0}:${row?.maxTeamId ?? 0}:${row?.cabinSum ?? 0}`;
   revisionCache = { at: Date.now(), rev };
   return rev;
 }
@@ -59,6 +63,7 @@ export async function getStandingsCached(): Promise<StandingsPayload> {
 }
 
 export async function getStandings(): Promise<StandingsPayload> {
+  await ensureCabinColumn();
   const db = getDb();
 
   const rows = await db
@@ -67,6 +72,7 @@ export async function getStandings(): Promise<StandingsPayload> {
       name: teams.name,
       color: teams.color,
       campGroup: teams.campGroup,
+      cabinId: teams.cabinId,
       score: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`.mapWith(Number),
     })
     .from(teams)
@@ -76,6 +82,7 @@ export async function getStandings(): Promise<StandingsPayload> {
       teams.name,
       teams.color,
       teams.campGroup,
+      teams.cabinId,
       teams.createdAt,
     )
     .orderBy(
@@ -91,6 +98,7 @@ export async function getStandings(): Promise<StandingsPayload> {
     score: row.score,
     rank: index + 1,
     campGroup: row.campGroup ?? null,
+    cabinId: row.cabinId ?? null,
   }));
 
   return {

@@ -82,6 +82,26 @@ export function SkyDecor() {
         </motion.span>
       ))}
 
+      {/* Tail trails behind so the ball leads to the right — sits in this blur layer. */}
+      <motion.div
+        className="absolute text-2xl sm:text-3xl"
+        initial={{ top: "10%", left: "-12%", opacity: 0 }}
+        animate={{
+          top: ["10%", "36%"],
+          left: ["-12%", "112%"],
+          opacity: [0, 0.9, 0.9, 0],
+          rotate: 40,
+        }}
+        transition={{
+          duration: 2.4,
+          repeat: Infinity,
+          repeatDelay: 8,
+          ease: "easeIn",
+        }}
+      >
+        ☄️
+      </motion.div>
+
       <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[rgba(61,139,90,0.45)] via-[rgba(61,139,90,0.18)] to-transparent" />
       </div>
     </div>

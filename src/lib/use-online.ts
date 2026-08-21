@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { isBrowserOnline } from "@/lib/offline";
+import { useSyncExternalStore } from "react";
 
-/** Tracks browser online/offline; starts optimistic then syncs on mount. */
+function subscribe(onStoreChange: () => void) {
+  window.addEventListener("online", onStoreChange);
+  window.addEventListener("offline", onStoreChange);
+  return () => {
+    window.removeEventListener("online", onStoreChange);
+    window.removeEventListener("offline", onStoreChange);
+  };
+}
+
+/** Live network status. Server/SSR assumes online; the client uses navigator.onLine. */
 export function useOnline() {
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => {
-    const sync = () => setOnline(isBrowserOnline());
-    sync();
-    window.addEventListener("online", sync);
-    window.addEventListener("offline", sync);
-    return () => {
-      window.removeEventListener("online", sync);
-      window.removeEventListener("offline", sync);
-    };
-  }, []);
-
-  return online;
+  return useSyncExternalStore(
+    subscribe,
+    () => navigator.onLine,
+    () => true,
+  );
 }
