@@ -19,6 +19,7 @@ import {
 } from "@/lib/offline";
 import { diffStandings, type BoardAlert } from "@/lib/rank-alerts";
 import type { StandingRow } from "@/lib/standings";
+import { LIVE_CAMP_SIM } from "@/lib/schedule-sim";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
@@ -209,24 +210,24 @@ export function Scoreboard() {
     myTeam?.campGroup === "red" || myTeam?.campGroup === "green"
       ? myTeam.campGroup
       : "overview";
+  const reminderCabinId =
+    typeof myTeam?.cabinId === "number" ? myTeam.cabinId : null;
 
   const pushReminderToast = useCallback((reminder: DueReminder) => {
-    const id = `reminder-${reminder.key}`;
-    const kind = reminder.phase === "started" ? "started" : "reminder";
-    setToasts((current) => [
-      ...current.filter(
-        (toast) =>
-          toast.kind !== "reminder" &&
-          toast.kind !== "started" &&
-          toast.kind !== "ended",
-      ),
-      {
-        id,
-        kind,
-        title: reminder.title,
-        detail: reminder.body,
-      },
-    ]);
+    const id = `reminder-${reminder.key}-${Date.now()}`;
+    const kind: AdminToast["kind"] =
+      reminder.phase === "started" ? "started" : "reminder";
+    setToasts((current) =>
+      [
+        ...current.filter((toast) => toast.id !== id),
+        {
+          id,
+          kind,
+          title: reminder.title,
+          detail: reminder.body,
+        },
+      ].slice(-4),
+    );
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 14_000);
@@ -241,7 +242,7 @@ export function Scoreboard() {
     );
   }, []);
 
-  useEventReminders(reminderGroup, remindersOn, pushReminderToast);
+  useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
 
   function goToTab(next: BoardTab) {
     const from = TABS.findIndex((t) => t.id === tab);
@@ -384,7 +385,7 @@ export function Scoreboard() {
               animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             >
-              {isDark ? "🌙" : "🤠"}
+              {isDark ? "⭐" : "🤠"}
             </motion.span>
             <motion.span
               animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
@@ -411,6 +412,11 @@ export function Scoreboard() {
           <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
             Camp Scoreboard
           </h1>
+          {LIVE_CAMP_SIM ? (
+            <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
+              Simulation preview — not the public camp site
+            </p>
+          ) : null}
 
           <ReachForTheSkyMarquee />
 
@@ -670,8 +676,11 @@ export function Scoreboard() {
             teams={data?.standings ?? []}
             remindersOn={remindersOn}
             onRemindersChange={setRemindersOn}
-            onTeamSwitch={(group) => {
-              announceDueReminders(group, pushReminderToast);
+            onTeamSwitch={(group, cabin) => {
+              announceDueReminders(group, pushReminderToast, new Date(), {
+                cabinId: cabin ?? reminderCabinId,
+                forceLive: true,
+              });
             }}
             focusDayId={scheduleFocus?.dayId}
             focusBlockId={scheduleFocus?.blockId}

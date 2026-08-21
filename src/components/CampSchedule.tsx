@@ -4,11 +4,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { getLocation, mappedLocations } from "@/data/locations";
 import {
+  campDays,
   greenCabins,
   redCabins,
   type CampDay,
   type ScheduleBlock,
 } from "@/data/schedule";
+import {
+  blockVisibleToCabin,
+  cabinsForGroup,
+  detailsForCabin,
+  getCabin,
+} from "@/lib/cabins";
 import {
   clearRemindersForDay,
 } from "@/lib/event-reminders";
@@ -18,6 +25,7 @@ import {
   resetDemoScheduleClock,
   setDemoScheduleEnabled,
 } from "@/lib/schedule-demo";
+import { LIVE_CAMP_SIM, resetLiveSimClock } from "@/lib/schedule-sim";
 import {
   readMyTeamSnapshot,
   writeMyTeamSnapshot,
@@ -27,10 +35,11 @@ import type { StandingRow } from "@/lib/standings";
 import {
   blockStatus,
   eventCountdown,
-  findCampDayForDate,
   findLiveEvents,
   findUpcomingEvent,
   findUpcomingExclusive,
+  firstOpenDay,
+  dayIsComplete,
   formatCountdown,
   isoDateKey,
   type BlockStatus,
@@ -47,8 +56,11 @@ type Props = {
   /** 15-minutes-before reminder opt-in, owned by the board */
   remindersOn?: boolean;
   onRemindersChange?: (on: boolean) => void;
-  /** Fired when the camper picks a team — announce events in the next 15 minutes */
-  onTeamSwitch?: (group: "overview" | "red" | "green") => void;
+  /** Fired when the camper picks a cabin — announce what's live for that cabin */
+  onTeamSwitch?: (
+    group: "overview" | "red" | "green",
+    cabinId?: number | null,
+  ) => void;
   focusDayId?: string | null;
   focusBlockId?: string | null;
   focusGroup?: "all" | "red" | "green" | null;
@@ -196,6 +208,30 @@ function BlockCard({
       {block.note ? (
         <p className="mt-1 text-sm font-semibold text-muted-soft">{block.note}</p>
       ) : null}
+      {onViewMap && (block.locationIds?.length || block.location) ? (
+        <div className="relative z-10 mt-3 flex flex-wrap gap-2">
+          {mapSpots && mapSpots.length > 1 ? (
+            mapSpots.map((spot) => (
+              <button
+                key={spot.id}
+                type="button"
+                onClick={() => onViewMap(spot.id)}
+                className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
+              >
+                See {spot.label} on the map →
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              onClick={() => onViewMap(mapSpots?.[0]?.id)}
+              className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
+            >
+              See where this is on the map →
+            </button>
+          )}
+        </div>
+      ) : null}
       {block.details?.length ? (
         <ul className="mt-2 space-y-1.5">
           {block.details.map((line) => (
@@ -207,30 +243,6 @@ function BlockCard({
             </li>
           ))}
         </ul>
-      ) : null}
-      {onViewMap && (block.locationIds?.length || block.location) ? (
-        <div className="relative z-10 mt-3 flex flex-wrap gap-2">
-          {mapSpots && mapSpots.length > 1 ? (
-            mapSpots.map((spot) => (
-              <button
-                key={spot.id}
-                type="button"
-                onClick={() => onViewMap(spot.id)}
-                className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
-              >
-                View {spot.label} →
-              </button>
-            ))
-          ) : (
-            <button
-              type="button"
-              onClick={() => onViewMap(mapSpots?.[0]?.id)}
-              className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
-            >
-              View on map →
-            </button>
-          )}
-        </div>
       ) : null}
     </motion.article>
   );
@@ -331,6 +343,7 @@ export function CampSchedule({
   const [allowDemo, setAllowDemo] = useState(false);
   const [track, setTrack] = useState<TrackFilter>("overview");
   const [myTeamId, setMyTeamId] = useState<number | "">("");
+  const [cabinId, setCabinId] = useState<number | "">("");
   const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -342,7 +355,10 @@ export function CampSchedule({
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [localScrollNonce, setLocalScrollNonce] = useState(0);
   const [demoEpoch, setDemoEpoch] = useState(0);
+  const [simReady, setSimReady] = useState(!LIVE_CAMP_SIM);
   const teamTrackReady = useRef(false);
+  const followLiveDay = useRef(true);
+  const openDayIdRef = useRef<string | null>(null);
   const pendingScroll = useRef<{
     blockId: string;
     token: number;
@@ -355,28 +371,69 @@ export function CampSchedule({
     if (!snap) return;
     setMyTeamId(snap.teamId);
     setTeamSnapshot(snap);
+    const savedCabin = getCabin(snap.cabinId);
+    if (
+      savedCabin &&
+      (!snap.campGroup || savedCabin.group === snap.campGroup)
+    ) {
+      setCabinId(savedCabin.id);
+    }
   }, []);
 
   useEffect(() => {
     setDemoScheduleEnabled(true);
     setAllowDemo(process.env.NODE_ENV === "development");
+    setSimReady(true);
     const days = getScheduleDays(new Date(), true);
     if (days[0]?.id === DEMO_DAY_ID) setDayId(DEMO_DAY_ID);
   }, []);
 
   // Keep localStorage snapshot in sync when live standings include the team.
+  // Preserve a saved cabin unless this team's camp group actually changed.
   useEffect(() => {
     if (myTeamId === "") return;
     const live = teams.find((t) => t.id === myTeamId);
     if (!live) return;
+
+    const candidate =
+      typeof cabinId === "number"
+        ? cabinId
+        : teamSnapshot?.teamId === live.id
+          ? (teamSnapshot.cabinId ?? null)
+          : null;
+    const cabin = getCabin(candidate);
+    const groupChanged = Boolean(
+      teamSnapshot?.teamId === live.id &&
+        teamSnapshot.campGroup &&
+        live.campGroup &&
+        teamSnapshot.campGroup !== live.campGroup,
+    );
+    const validCabin =
+      groupChanged || !cabin
+        ? null
+        : !live.campGroup || cabin.group === live.campGroup
+          ? candidate
+          : null;
     const next: MyTeamSnapshot = {
       teamId: live.id,
       campGroup: live.campGroup,
       teamName: live.name,
+      cabinId: validCabin,
     };
-    setTeamSnapshot(next);
-    writeMyTeamSnapshot(next);
-  }, [teams, myTeamId]);
+    const unchanged =
+      teamSnapshot?.teamId === next.teamId &&
+      teamSnapshot.campGroup === next.campGroup &&
+      teamSnapshot.teamName === next.teamName &&
+      teamSnapshot.cabinId === next.cabinId;
+    if (!unchanged) {
+      setTeamSnapshot(next);
+      writeMyTeamSnapshot(next);
+    }
+
+    if (live.campGroup && cabin && cabin.group !== live.campGroup) {
+      setCabinId("");
+    }
+  }, [teams, myTeamId, cabinId, teamSnapshot]);
 
   const myTeam = useMemo(() => {
     const live = teams.find((t) => t.id === myTeamId);
@@ -428,6 +485,7 @@ export function CampSchedule({
     setHighlightId(focusBlockId);
     pendingScroll.current = { blockId: focusBlockId, token };
     setLocalScrollNonce(token);
+    followLiveDay.current = !focusDayId || focusDayId === openDayIdRef.current;
     if (focusFloorId && focusRoomId) {
       setPreferredMap({
         blockId: focusBlockId,
@@ -481,6 +539,7 @@ export function CampSchedule({
     setMyTeamId(id);
     setHighlightId(null);
     if (id === "") {
+      setCabinId("");
       writeMyTeamSnapshot(null);
       setTeamSnapshot(null);
       setTrack("overview");
@@ -488,10 +547,22 @@ export function CampSchedule({
       return;
     }
     const team = teams.find((t) => t.id === id);
+    const prevGroup = myTeam?.campGroup ?? teamSnapshot?.campGroup ?? null;
+    const nextGroup = team?.campGroup ?? null;
+    const groupChanged = prevGroup !== nextGroup;
+    if (groupChanged) setCabinId("");
+    const cabin = groupChanged
+      ? null
+      : typeof cabinId === "number"
+        ? getCabin(cabinId)
+        : null;
+    const keepCabin =
+      cabin && nextGroup && cabin.group === nextGroup ? cabin.id : null;
     const next: MyTeamSnapshot = {
       teamId: id,
-      campGroup: team?.campGroup ?? teamSnapshot?.campGroup ?? null,
+      campGroup: nextGroup,
       teamName: team?.name ?? teamSnapshot?.teamName,
+      cabinId: keepCabin,
     };
     setTeamSnapshot(next);
     writeMyTeamSnapshot(next);
@@ -499,8 +570,29 @@ export function CampSchedule({
       setTrack(next.campGroup);
     }
     teamTrackReady.current = true;
-    if (next.campGroup === "red" || next.campGroup === "green") {
-      onTeamSwitch?.(next.campGroup);
+  }
+
+  function selectCabin(nextId: number | "") {
+    cancelPendingScroll();
+    setCabinId(nextId);
+    setHighlightId(null);
+    const cabin = typeof nextId === "number" ? getCabin(nextId) : null;
+    if (cabin) setTrack(cabin.group);
+    const snap: MyTeamSnapshot | null =
+      myTeamId === ""
+        ? null
+        : {
+            teamId: typeof myTeamId === "number" ? myTeamId : teamSnapshot?.teamId ?? 0,
+            campGroup: myTeam?.campGroup ?? teamSnapshot?.campGroup ?? cabin?.group ?? null,
+            teamName: myTeam?.name ?? teamSnapshot?.teamName,
+            cabinId: typeof nextId === "number" ? nextId : null,
+          };
+    if (snap && snap.teamId) {
+      setTeamSnapshot(snap);
+      writeMyTeamSnapshot(snap);
+    }
+    if (cabin) {
+      onTeamSwitch?.(cabin.group, cabin.id);
     }
   }
 
@@ -521,17 +613,29 @@ export function CampSchedule({
     const token = Date.now();
     pendingScroll.current = { blockId: targetBlockId, token };
     setLocalScrollNonce(token);
+    followLiveDay.current = targetDayId === openDayIdRef.current;
   }
 
   const calendarKey = isoDateKey(new Date(nowTick));
   const days = useMemo(() => {
     void demoEpoch;
+    if (LIVE_CAMP_SIM && !simReady) return campDays;
     return getScheduleDays(new Date(), allowDemo);
-  }, [allowDemo, calendarKey, demoEpoch]);
+  }, [allowDemo, calendarKey, demoEpoch, simReady]);
+  const activeCabinId = typeof cabinId === "number" ? cabinId : null;
+  const daysForYou = useMemo(
+    () =>
+      days.map((d) => ({
+        ...d,
+        blocks: d.blocks
+          .filter((b) => blockVisibleToCabin(b, activeCabinId))
+          .map((b) => ({ ...b, details: detailsForCabin(b, activeCabinId) })),
+      })),
+    [days, activeCabinId],
+  );
   const day = useMemo(() => {
-    return days.find((d) => d.id === dayId) ?? days[0]!;
-  }, [days, dayId]);
-  const todayDay = findCampDayForDate(new Date(nowTick), days);
+    return daysForYou.find((d) => d.id === dayId) ?? daysForYou[0]!;
+  }, [daysForYou, dayId]);
   const clock = new Date(nowTick);
   const isSplit = day.mode === "split";
   const viewingEveryone = !isSplit || track === "overview";
@@ -540,30 +644,50 @@ export function CampSchedule({
     : track === "red" || track === "green"
       ? track
       : "overview";
+  const progressTrack: ScheduleTrack =
+    myTeam?.campGroup === "red" || myTeam?.campGroup === "green"
+      ? myTeam.campGroup
+      : activeTrack;
+  const openDay = firstOpenDay(daysForYou, clock, progressTrack);
+  openDayIdRef.current = openDay?.id ?? null;
+
+  useEffect(() => {
+    if (!openDay || !followLiveDay.current) return;
+    if (dayId === openDay.id) return;
+    const viewing = daysForYou.find((d) => d.id === dayId);
+    if (!viewing) {
+      setDayId(openDay.id);
+      return;
+    }
+    if (!dayIsComplete(viewing, clock, progressTrack)) return;
+    const index = daysForYou.findIndex((d) => d.id === dayId);
+    const next = daysForYou[index + 1];
+    if (next) setDayId(next.id);
+  }, [clock, dayId, daysForYou, openDay, progressTrack]);
   const showGroupedNowNext = isSplit && track === "overview";
 
   const liveEvents = useMemo(
-    () => findLiveEvents(activeTrack, clock, days),
+    () => findLiveEvents(activeTrack, clock, daysForYou),
     // clock is derived from nowTick; days is stable for the session
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeTrack, nowTick, days],
+    [activeTrack, nowTick, daysForYou],
   );
 
   const upcomingLanes = useMemo((): UpcomingLane[] => {
     if (showGroupedNowNext) {
       return [
-        { track: "all", result: findUpcomingEvent("all", clock, days) },
-        { track: "red", result: findUpcomingExclusive("red", clock, days) },
-        { track: "green", result: findUpcomingExclusive("green", clock, days) },
+        { track: "all", result: findUpcomingEvent("all", clock, daysForYou) },
+        { track: "red", result: findUpcomingExclusive("red", clock, daysForYou) },
+        { track: "green", result: findUpcomingExclusive("green", clock, daysForYou) },
       ];
     }
     const laneTrack =
       activeTrack === "red" || activeTrack === "green" ? activeTrack : "all";
     return [
-      { track: laneTrack, result: findUpcomingEvent(activeTrack, clock, days) },
+      { track: laneTrack, result: findUpcomingEvent(activeTrack, clock, daysForYou) },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showGroupedNowNext, activeTrack, nowTick, days]);
+  }, [showGroupedNowNext, activeTrack, nowTick, daysForYou]);
 
   const chrome: "all" | "red" | "green" =
     track === "red" || track === "green" ? track : "all";
@@ -635,11 +759,32 @@ export function CampSchedule({
         <p className="mt-1 text-sm font-semibold text-muted">
           {day.dateLabel}
           {!isSplit ? " · Everyone together" : ""}
-          {todayDay ? ` · Today is ${todayDay.label}` : ""}
         </p>
       </div>
 
-      {day.id === DEMO_DAY_ID ? (
+      {LIVE_CAMP_SIM ? (
+        <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
+          <p className="text-sm font-bold text-star">
+            Simulation preview — the real 3-day camp, shifted so Arrival starts
+            when you opened this page (or when you tap Restart from now). Not the
+            public site. Gaps and lengths stay the same.
+          </p>
+          <button
+            type="button"
+            className="btn-soft mt-2 min-h-11 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+            onClick={() => {
+              resetLiveSimClock();
+              for (const d of days) clearRemindersForDay(d.id);
+              setDemoEpoch((n) => n + 1);
+              setNowTick(Date.now());
+              followLiveDay.current = true;
+              setDayId("day-1");
+            }}
+          >
+            Restart from now
+          </button>
+        </div>
+      ) : day.id === DEMO_DAY_ID ? (
         <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
           <p className="text-sm font-bold text-star">
             Test day — overlapping Red/Green events, timers, faded Done cards,
@@ -691,6 +836,26 @@ export function CampSchedule({
         </label>
 
         {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
+          <label className="mt-3 block text-sm font-bold text-muted">
+            My cabin
+            <select
+              value={cabinId}
+              onChange={(e) =>
+                selectCabin(e.target.value ? Number(e.target.value) : "")
+              }
+              className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+            >
+              <option value="">Pick your cabin</option>
+              {cabinsForGroup(myTeam.campGroup).map((cabin) => (
+                <option key={cabin.id} value={cabin.id}>
+                  Cabin {cabin.id} · {cabin.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
           <div
             className={`mt-3 overflow-hidden rounded-2xl border-2 px-4 py-3.5 text-white shadow-sm sm:px-5 sm:py-4 ${
               myTeam.campGroup === "green"
@@ -710,7 +875,19 @@ export function CampSchedule({
               <span className="underline decoration-2 underline-offset-2">
                 {myTeam.campGroup === "green" ? "Green" : "Red"}
               </span>{" "}
-              schedule all weekend — ignore the other color.
+              schedule
+              {activeCabinId ? (
+                <>
+                  {" "}
+                  · Cabin {activeCabinId}
+                  {getCabin(activeCabinId)
+                    ? ` (${getCabin(activeCabinId)!.label})`
+                    : ""}
+                </>
+              ) : (
+                " all weekend — pick your cabin to hide the other pair"
+              )}
+              .
             </p>
           </div>
         ) : myTeamId ? (
@@ -728,6 +905,7 @@ export function CampSchedule({
           upcoming={upcomingLanes}
           grouped={showGroupedNowNext}
           onJump={jumpToBlock}
+          onViewMap={handleViewMap}
         />
         <p className="mt-3 text-[11px] font-semibold text-muted-soft">
           As of {clock.toLocaleString()} · {isoDateKey(clock)}
@@ -738,7 +916,9 @@ export function CampSchedule({
             enabled={Boolean(remindersOn)}
             onChange={onRemindersChange}
             trackLabel={
-              myTeam?.campGroup === "red"
+              activeCabinId
+                ? `Cabin ${activeCabinId}`
+                : myTeam?.campGroup === "red"
                 ? "Red group"
                 : myTeam?.campGroup === "green"
                   ? "Green group"
@@ -755,7 +935,7 @@ export function CampSchedule({
       ) : null}
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {days.map((d) => {
+        {daysForYou.map((d) => {
           const active = d.id === dayId;
           return (
             <button
@@ -763,6 +943,7 @@ export function CampSchedule({
               type="button"
               onClick={() => {
                 cancelPendingScroll();
+                followLiveDay.current = d.id === openDay?.id;
                 setDayId(d.id);
                 setHighlightId(null);
               }}
@@ -850,13 +1031,36 @@ export function CampSchedule({
               />
 
               {track === "overview" ? (
+                activeCabinId && getCabin(activeCabinId)?.group === "red" ? (
+                  <Section
+                    title="Red group"
+                    tint="red"
+                    day={day}
+                    now={new Date(nowTick)}
+                    blocks={redBlocks}
+                    cabins={[`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]}
+                    highlightBlockId={highlightId}
+                    onViewMapFor={handleViewMap}
+                  />
+                ) : activeCabinId && getCabin(activeCabinId)?.group === "green" ? (
+                  <Section
+                    title="Green group"
+                    tint="green"
+                    day={day}
+                    now={new Date(nowTick)}
+                    blocks={greenBlocks}
+                    cabins={[`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]}
+                    highlightBlockId={highlightId}
+                    onViewMapFor={handleViewMap}
+                  />
+                ) : (
                 <div className="grid gap-5 lg:grid-cols-2">
                   <Section
                     title="Red group"
                     tint="red"
                     day={day}
-              now={new Date(nowTick)}
-              blocks={redBlocks}
+                    now={new Date(nowTick)}
+                    blocks={redBlocks}
                     cabins={redCabins}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
@@ -865,13 +1069,14 @@ export function CampSchedule({
                     title="Green group"
                     tint="green"
                     day={day}
-              now={new Date(nowTick)}
-              blocks={greenBlocks}
+                    now={new Date(nowTick)}
+                    blocks={greenBlocks}
                     cabins={greenCabins}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
                   />
                 </div>
+                )
               ) : null}
 
               {track === "red" ? (
@@ -879,9 +1084,13 @@ export function CampSchedule({
                   title="Red group"
                   tint="red"
                   day={day}
-              now={new Date(nowTick)}
-              blocks={redBlocks}
-                  cabins={redCabins}
+                  now={new Date(nowTick)}
+                  blocks={redBlocks}
+                  cabins={
+                    activeCabinId && getCabin(activeCabinId)?.group === "red"
+                      ? [`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]
+                      : redCabins
+                  }
                   highlightBlockId={highlightId}
                   onViewMapFor={handleViewMap}
                 />
@@ -892,9 +1101,13 @@ export function CampSchedule({
                   title="Green group"
                   tint="green"
                   day={day}
-              now={new Date(nowTick)}
-              blocks={greenBlocks}
-                  cabins={greenCabins}
+                  now={new Date(nowTick)}
+                  blocks={greenBlocks}
+                  cabins={
+                    activeCabinId && getCabin(activeCabinId)?.group === "green"
+                      ? [`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]
+                      : greenCabins
+                  }
                   highlightBlockId={highlightId}
                   onViewMapFor={handleViewMap}
                 />

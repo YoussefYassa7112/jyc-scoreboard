@@ -134,6 +134,35 @@ export function blockStatus(
   return "upcoming";
 }
 
+/** Timed blocks on this track are all finished. TBD / untimed items don't block. */
+export function dayIsComplete(
+  day: CampDay,
+  now = new Date(),
+  group: ScheduleTrack = "overview",
+): boolean {
+  let timed = 0;
+  for (const block of blocksForGroup(day, group)) {
+    const status = blockStatus(day, block, now);
+    if (status === "untimed") continue;
+    timed += 1;
+    if (status !== "done") return false;
+  }
+  return timed > 0;
+}
+
+/** First day that still has a live or upcoming timed event. Last day if camp is over. */
+export function firstOpenDay(
+  days: CampDay[],
+  now = new Date(),
+  group: ScheduleTrack = "overview",
+): CampDay | null {
+  if (days.length === 0) return null;
+  for (const day of days) {
+    if (!dayIsComplete(day, now, group)) return day;
+  }
+  return days[days.length - 1] ?? null;
+}
+
 export function findNextEvent(
   group: ScheduleTrack,
   now = new Date(),
@@ -166,14 +195,12 @@ export function findLiveEvents(
   now = new Date(),
   days: CampDay[] = campDays,
 ): TimedEvent[] {
-  const todayKey = isoDateKey(now);
-  const day = days.find((d) => d.dateISO === todayKey);
-  if (!day) return [];
-
   const live: TimedEvent[] = [];
-  for (const block of blocksForGroup(day, group)) {
-    if (blockStatus(day, block, now) === "live") {
-      live.push({ day, block });
+  for (const day of days) {
+    for (const block of blocksForGroup(day, group)) {
+      if (blockStatus(day, block, now) === "live") {
+        live.push({ day, block });
+      }
     }
   }
   return live;
@@ -212,50 +239,51 @@ function findTimedEvent(
   edge: "start" | "end",
   exclusive = false,
 ): NextEventResult {
-  const todayKey = isoDateKey(now);
-  const firstDay = days[0];
-  const lastDay = days[days.length - 1];
-  if (!firstDay || !lastDay) return { kind: "none" };
+  const nowMs = now.getTime();
+  const timed: Array<{
+    day: CampDay;
+    block: ScheduleBlock;
+    start: number;
+    end: number;
+  }> = [];
 
-  if (todayKey < firstDay.dateISO) {
-    const blocks = blocksForTrack(firstDay, group, exclusive);
-    const firstTimed = blocks.find((b) => parseTimeRange(b.time));
-    if (firstTimed) return { kind: "before", day: firstDay, block: firstTimed };
-    return { kind: "before", day: firstDay, block: blocks[0] ?? firstDay.blocks[0] };
-  }
-
-  if (todayKey > lastDay.dateISO) {
-    return { kind: "after" };
-  }
-
-  const startIdx = days.findIndex((d) => d.dateISO >= todayKey);
-  for (let i = Math.max(0, startIdx); i < days.length; i++) {
-    const day = days[i];
-    const blocks = blocksForTrack(day, group, exclusive);
-    const nowMin = day.dateISO === todayKey ? minutesSinceMidnight(now) : -1;
-
-    for (const block of blocks) {
-      const range = parseTimeRange(block.time);
-      if (!range) continue;
-      const edgeMin = edge === "start" ? range.startMin : range.endMin;
-      if (day.dateISO > todayKey || edgeMin > nowMin) {
-        return { kind: "next", day, block };
-      }
+  for (const day of days) {
+    for (const block of blocksForTrack(day, group, exclusive)) {
+      const times = eventDateTimes(day, block);
+      if (!times) continue;
+      timed.push({
+        day,
+        block,
+        start: times.start.getTime(),
+        end: times.end.getTime(),
+      });
     }
   }
+  timed.sort((a, b) => a.start - b.start || a.end - b.end);
+  if (timed.length === 0) return { kind: "none" };
 
-  return { kind: "after" };
+  const first = timed[0]!;
+  if (nowMs < first.start) {
+    return { kind: "before", day: first.day, block: first.block };
+  }
+
+  const next = timed.find((item) =>
+    edge === "start" ? item.start > nowMs : item.end > nowMs,
+  );
+  if (!next) return { kind: "after" };
+  return { kind: "next", day: next.day, block: next.block };
 }
 
 export function blocksAtRoom(
   roomId: string,
   floorId?: string,
+  days: CampDay[] = campDays,
 ): Array<{
   day: CampDay;
   block: ScheduleBlock;
 }> {
   const out: Array<{ day: CampDay; block: ScheduleBlock }> = [];
-  for (const day of campDays) {
+  for (const day of days) {
     for (const block of day.blocks) {
       const hit = block.locationIds?.some((id) => {
         const loc = getLocation(id);
@@ -274,13 +302,24 @@ export function eventDateTimes(
   day: CampDay,
   block: ScheduleBlock,
 ): { start: Date; end: Date } | null {
+  if (block.startMs != null && block.endMs != null) {
+    return { start: new Date(block.startMs), end: new Date(block.endMs) };
+  }
   const range = parseTimeRange(block.time);
   if (!range) return null;
+  let startMin = range.startMin;
+  let endMin = range.endMin;
+  // "12:00 AM" on an evening block is midnight at the *end* of that camp day,
+  // not 00:00 at the start (which would land 10 hours before Arrival).
+  if (block.section === "evening" && startMin < 4 * 60) {
+    startMin += 24 * 60;
+    endMin += 24 * 60;
+  }
   const [y, m, d] = day.dateISO.split("-").map(Number);
   const start = new Date(y, m - 1, d, 0, 0, 0, 0);
-  start.setMinutes(range.startMin);
+  start.setMinutes(startMin);
   const end = new Date(y, m - 1, d, 0, 0, 0, 0);
-  end.setMinutes(range.endMin);
+  end.setMinutes(endMin);
   return { start, end };
 }
 

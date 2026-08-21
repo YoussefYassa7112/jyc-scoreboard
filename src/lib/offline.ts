@@ -13,6 +13,7 @@ export type MyTeamSnapshot = {
   teamId: number;
   campGroup?: "red" | "green" | null;
   teamName?: string;
+  cabinId?: number | null;
 };
 
 export function readStandingsCache(): StandingsCache | null {
@@ -73,7 +74,10 @@ export function writeMyTeamSnapshot(snapshot: MyTeamSnapshot | null) {
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new CustomEvent(TEAM_CHANGED_EVENT));
+  // Defer so CampSchedule never updates Scoreboard during render.
+  queueMicrotask(() => {
+    window.dispatchEvent(new CustomEvent(TEAM_CHANGED_EVENT));
+  });
 }
 
 export function isBrowserOnline() {

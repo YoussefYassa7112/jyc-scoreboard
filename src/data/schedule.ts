@@ -13,6 +13,11 @@ export type ScheduleBlock = {
   note?: string;
   group: ScheduleGroup;
   section: ScheduleSection;
+  /** Optional absolute times — used by the live-camp simulation preview */
+  startMs?: number;
+  endMs?: number;
+  /** When set, only these cabin numbers follow this parallel block. */
+  cabinIds?: number[];
   details?: string[];
 };
 
@@ -81,9 +86,9 @@ export const campDays: CampDay[] = [
         locationIds: ["nordet"],
         group: "red",
         section: "midday",
+        cabinIds: [1, 2],
         details: [
           "Cabins 1–2: Topic 1 first, then Lunch",
-          "Cabins 3–4: Lunch first, then Topic 1",
         ],
       },
       {
@@ -94,9 +99,9 @@ export const campDays: CampDay[] = [
         locationIds: ["caf"],
         group: "red",
         section: "midday",
+        cabinIds: [3, 4],
         details: [
           "Cabins 3–4: Lunch first, then Topic 1",
-          "Cabins 1–2: Topic 1 first, then Lunch",
         ],
       },
       {
@@ -120,9 +125,9 @@ export const campDays: CampDay[] = [
         locationIds: ["nordet"],
         group: "red",
         section: "midday",
+        cabinIds: [1, 2],
         details: [
           "Cabins 1–2: Topic 2 first, then Snack",
-          "Cabins 3–4: Snack first, then Topic 2",
         ],
       },
       {
@@ -133,9 +138,9 @@ export const campDays: CampDay[] = [
         locationIds: ["on-the-go"],
         group: "red",
         section: "midday",
+        cabinIds: [3, 4],
         details: [
           "Cabins 3–4: Snack first, then Topic 2",
-          "Cabins 1–2: Topic 2 first, then Snack",
         ],
       },
       {
@@ -175,9 +180,9 @@ export const campDays: CampDay[] = [
         locationIds: ["caf"],
         group: "green",
         section: "midday",
+        cabinIds: [5, 6],
         details: [
           "Cabins 5–6: Lunch first, then Topic 1",
-          "Cabins 7–8: Topic 1 first, then Lunch",
         ],
       },
       {
@@ -188,9 +193,9 @@ export const campDays: CampDay[] = [
         locationIds: ["b4-common"],
         group: "green",
         section: "midday",
+        cabinIds: [7, 8],
         details: [
           "Cabins 7–8: Topic 1 first, then Lunch",
-          "Cabins 5–6: Lunch first, then Topic 1",
         ],
       },
       {
@@ -210,9 +215,9 @@ export const campDays: CampDay[] = [
         locationIds: ["on-the-go"],
         group: "green",
         section: "midday",
+        cabinIds: [5, 6],
         details: [
           "Cabins 5–6: Snack first, then Topic 2",
-          "Cabins 7–8: Topic 2 first, then Snack",
         ],
       },
       {
@@ -223,9 +228,9 @@ export const campDays: CampDay[] = [
         locationIds: ["b4-common"],
         group: "green",
         section: "midday",
+        cabinIds: [7, 8],
         details: [
           "Cabins 7–8: Topic 2 first, then Snack",
-          "Cabins 5–6: Snack first, then Topic 2",
         ],
       },
       {
@@ -394,9 +399,10 @@ export const campDays: CampDay[] = [
         locationIds: ["nordet"],
         group: "red",
         section: "midday",
+        cabinIds: [1, 2],
         details: [
-          "4:00 – 4:45 — Cabins 1–2: Topic 4 · Cabins 3–4: Snack",
-          "4:45 – 5:15 — Cabins 1–2: Snack · Cabins 3–4: Topic 4",
+          "4:00 – 4:45 — Cabins 1–2: Topic 4",
+          "4:45 – 5:15 — Cabins 1–2: Snack",
         ],
       },
       {
@@ -407,6 +413,11 @@ export const campDays: CampDay[] = [
         locationIds: ["caf"],
         group: "red",
         section: "midday",
+        cabinIds: [3, 4],
+        details: [
+          "4:00 – 4:45 — Cabins 3–4: Snack",
+          "4:45 – 5:15 — Cabins 3–4: Topic 4",
+        ],
       },
       {
         id: "d2-red-bible",
@@ -488,9 +499,10 @@ export const campDays: CampDay[] = [
         locationIds: ["b4-common"],
         group: "green",
         section: "midday",
+        cabinIds: [7, 8],
         details: [
-          "4:00 – 4:45 — Cabins 5–6: Snack · Cabins 7–8: Topic 4",
-          "4:45 – 5:15 — Cabins 5–6: Topic 4 · Cabins 7–8: Snack",
+          "4:00 – 4:45 — Cabins 7–8: Topic 4",
+          "4:45 – 5:15 — Cabins 7–8: Snack",
         ],
       },
       {
@@ -501,6 +513,11 @@ export const campDays: CampDay[] = [
         locationIds: ["caf"],
         group: "green",
         section: "midday",
+        cabinIds: [5, 6],
+        details: [
+          "4:00 – 4:45 — Cabins 5–6: Snack",
+          "4:45 – 5:15 — Cabins 5–6: Topic 4",
+        ],
       },
       {
         id: "d2-green-supper",
@@ -649,15 +666,15 @@ export const campDays: CampDay[] = [
 ];
 
 export const redCabins = [
-  "Mina N. + Christina F.",
-  "Valerie G. + Youssef",
-  "Karine A. + Mickel S.",
-  "Robert M. + Imy S.",
+  "Cabin 1 · Mina N. + Christina F.",
+  "Cabin 2 · Valerie G. + Youssef",
+  "Cabin 3 · Karine A. + Mickel S.",
+  "Cabin 4 · Robert M. + Imy S.",
 ];
 
 export const greenCabins = [
-  "Carol H. + Fady",
-  "Mark T. + Yoanna S.",
-  "Jean N. + Carole Y.",
-  "Maria E. + Gab N.",
+  "Cabin 5 · Carol H. + Fady",
+  "Cabin 6 · Mark T. + Yoanna S.",
+  "Cabin 7 · Jean N. + Carole Y.",
+  "Cabin 8 · Maria E. + Gab N.",
 ];
