@@ -72,8 +72,6 @@ export function NightSky() {
     let running = true;
 
     const measure = () => {
-      // Prefer the large viewport so iOS URL-bar show/hide does not
-      // constantly resize (and jump) the sky.
       const nextW = window.innerWidth;
       const lvh = window.visualViewport
         ? Math.max(window.innerHeight, window.visualViewport.height)
@@ -97,7 +95,6 @@ export function NightSky() {
       const { nextW, nextH } = measure();
       const widthChanged = Math.abs(nextW - width) > 8;
       const heightGrew = nextH > height + 80;
-      // Ignore the small height jitter from mobile browser chrome.
       if (width === 0 || height === 0) {
         applySize(nextW, nextH);
         return;
@@ -130,15 +127,6 @@ export function NightSky() {
       grad.addColorStop(1, "#13261c");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
-
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(226, 232, 255, 0.16)";
-      ctx.arc(width * 0.82, height * 0.14, 42, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(248, 250, 255, 0.55)";
-      ctx.arc(width * 0.82, height * 0.14, 26, 0, Math.PI * 2);
-      ctx.fill();
 
       for (const star of stars) {
         const alpha =

@@ -14,12 +14,13 @@ let originMs: number | null = null;
 
 export function resetLiveSimClock() {
   originMs = Date.now();
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return originMs;
   try {
     window.localStorage.setItem(ORIGIN_KEY, String(originMs));
   } catch {
     /* private mode */
   }
+  return originMs;
 }
 
 function simOrigin(): Date {
@@ -27,12 +28,14 @@ function simOrigin(): Date {
   if (originMs == null) {
     try {
       const stored = window.localStorage.getItem(ORIGIN_KEY);
-      originMs = stored ? Number(stored) : Date.now();
+      const parsed = stored ? Number(stored) : NaN;
+      originMs = Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
       window.localStorage.setItem(ORIGIN_KEY, String(originMs));
     } catch {
       originMs = Date.now();
     }
   }
+  if (!Number.isFinite(originMs) || originMs <= 0) originMs = Date.now();
   return new Date(originMs);
 }
 
@@ -60,19 +63,16 @@ function rewriteTime(start: Date, end: Date): string {
 
 /** Real camp days, with every timed block shifted so Arrival = origin. */
 export function shiftCampToNow(origin = simOrigin()): CampDay[] {
-  let earliest: Date | null = null;
-  for (const day of campDays) {
-    for (const block of day.blocks) {
-      const times = eventDateTimes(day, block);
-      if (!times) continue;
-      if (!earliest || times.start < earliest) earliest = times.start;
-    }
-  }
-  if (!earliest) return campDays;
+  const firstDay = campDays[0];
+  const arrival =
+    firstDay?.blocks.find((block) => block.id === "d1-arrival") ?? null;
+  const anchor =
+    firstDay && arrival ? eventDateTimes(firstDay, arrival) : null;
+  if (!anchor) return campDays;
 
-  const offset = origin.getTime() - earliest.getTime();
+  const offset = origin.getTime() - anchor.start.getTime();
 
-  return campDays.map((day) => {
+  return campDays.map((day, index) => {
     const blocks: ScheduleBlock[] = day.blocks.map((block) => {
       const times = eventDateTimes(day, block);
       if (!times) return block;
@@ -91,10 +91,11 @@ export function shiftCampToNow(origin = simOrigin()): CampDay[] {
     const dayStart = starts.length
       ? new Date(Math.min(...starts))
       : new Date(origin);
+    const labelDate = index === 0 ? origin : dayStart;
     return {
       ...day,
-      dateISO: isoDateKey(dayStart),
-      dateLabel: `${formatDateLabel(dayStart)} (sim)`,
+      dateISO: isoDateKey(labelDate),
+      dateLabel: `${formatDateLabel(labelDate)} (sim)`,
       blocks,
     };
   });

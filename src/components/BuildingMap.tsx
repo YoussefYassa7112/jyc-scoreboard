@@ -506,8 +506,8 @@ export function BuildingMap({
           <h2 className="display-font text-xl font-bold text-ink sm:text-3xl">
             {floor.siteTitle ?? "CENTRAL"} · {floor.label}
           </h2>
-          <p className="mt-1 text-sm font-semibold text-muted">
-            Tap a room for details
+          <p className="mt-1 text-sm font-extrabold text-star">
+            This map is tappable — tap any room
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -588,7 +588,19 @@ export function BuildingMap({
         ))}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border-2 border-saddle/15 bg-chip/40">
+      <div className={`mt-4 overflow-hidden rounded-2xl border-2 bg-chip/40 ${
+        selectedId ? "border-saddle/15" : "border-star/70"
+      }`}>
+        {!selectedId ? (
+          <div className="flex items-center justify-center gap-2 bg-star px-3 py-2.5">
+            <span className="text-lg" aria-hidden>
+              👆
+            </span>
+            <p className="display-font text-sm font-extrabold text-on-star sm:text-base">
+              Tap a colored room on the map
+            </p>
+          </div>
+        ) : null}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={floor.id}
@@ -687,13 +699,26 @@ export function BuildingMap({
               whileHover: {
                 strokeWidth: active ? 3.6 : 2.8,
               },
+              whileTap: { scale: 0.97 },
               animate: {
+                strokeWidth: active
+                  ? 3.2
+                  : selectedId
+                    ? 1.4
+                    : [1.7, 2.8, 1.7],
                 filter: active
                   ? dark
                     ? "drop-shadow(0 0 14px rgba(184,224,98,0.7))"
                     : "drop-shadow(0 0 12px rgba(196,146,90,0.55))"
-                  : "drop-shadow(0 0 0 rgba(0,0,0,0))",
+                  : selectedId
+                    ? "drop-shadow(0 0 0 rgba(0,0,0,0))"
+                    : dark
+                      ? "drop-shadow(0 0 8px rgba(184,224,98,0.28))"
+                      : "drop-shadow(0 0 8px rgba(196,146,90,0.28))",
               },
+              transition: selectedId
+                ? { duration: 0.2 }
+                : { duration: 2.2, repeat: Infinity, ease: "easeInOut" as const },
               onClick: (e: MouseEvent) => {
                 e.stopPropagation();
                 onRoomActivate(room);
@@ -1028,7 +1053,7 @@ export function BuildingMap({
             animate={{ opacity: 1 }}
             className="mt-4 text-center text-sm font-extrabold text-star"
           >
-            Tap a room on the map
+            Tap a room — rooms light up and open details
           </motion.p>
         )}
       </AnimatePresence>

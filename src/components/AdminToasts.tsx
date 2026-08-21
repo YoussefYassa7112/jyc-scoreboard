@@ -19,7 +19,7 @@ type Props = {
 export function AdminToasts({ toasts, onDismiss }: Props) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-3 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.75rem))] z-[80] flex flex-col gap-2 sm:inset-x-auto sm:top-auto sm:bottom-6 sm:right-6 sm:w-[22rem]"
+      className="pointer-events-none fixed inset-x-3 top-[max(0.5rem,env(safe-area-inset-top))] z-[95] flex flex-col gap-2 pr-[4.75rem] sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[22rem] sm:pr-0 sm:top-[max(0.75rem,env(safe-area-inset-top))]"
       aria-live="polite"
     >
       <AnimatePresence>
@@ -51,14 +51,14 @@ export function AdminToasts({ toasts, onDismiss }: Props) {
               key={toast.id}
               type="button"
               onClick={() => onDismiss(toast.id)}
-              initial={{ opacity: 0, y: 22, scale: 0.92, rotate: -3 }}
+              initial={{ opacity: 0, y: -18, scale: 0.92, rotate: -3 }}
               animate={{
                 opacity: 1,
                 y: 0,
                 scale: 1,
                 rotate: success ? 1.2 : started ? 0.4 : ended ? -0.4 : reminder ? 0.6 : -1.2,
               }}
-              exit={{ opacity: 0, y: 14, scale: 0.9 }}
+              exit={{ opacity: 0, y: -12, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 420, damping: 24 }}
               className={`pointer-events-auto w-full rounded-2xl border-2 px-4 py-3 text-left shadow-[0_16px_40px_rgba(42,31,20,0.22)] ${
                 success

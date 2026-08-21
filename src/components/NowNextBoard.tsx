@@ -1,6 +1,7 @@
 "use client";
 
-import type { ScheduleGroup } from "@/data/schedule";
+import type { ScheduleBlock, ScheduleGroup } from "@/data/schedule";
+import { mappedLocations } from "@/data/locations";
 import {
   eventCountdown,
   formatCountdown,
@@ -19,6 +20,7 @@ type Props = {
   upcoming: UpcomingLane[];
   grouped: boolean;
   onJump: (dayId: string, blockId: string, group: ScheduleGroup) => void;
+  onViewMap?: (block: ScheduleBlock, locationId?: string) => void;
 };
 
 function trackTheme(track: ScheduleGroup) {
@@ -59,10 +61,30 @@ function JumpButton({
   return (
     <button
       type="button"
-      className="btn-cta mt-2 min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2 text-[11px] font-extrabold"
+      className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2 text-[11px] font-extrabold"
       onClick={onClick}
     >
       {label} →
+    </button>
+  );
+}
+
+function MapButton({
+  block,
+  onViewMap,
+}: {
+  block: ScheduleBlock;
+  onViewMap?: (block: ScheduleBlock, locationId?: string) => void;
+}) {
+  if (!onViewMap || !(block.locationIds?.length || block.location)) return null;
+  const spots = mappedLocations(block.locationIds);
+  return (
+    <button
+      type="button"
+      className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2 text-[11px] font-extrabold"
+      onClick={() => onViewMap(block, spots[0]?.id)}
+    >
+      See where this is on the map →
     </button>
   );
 }
@@ -71,10 +93,12 @@ function LiveCard({
   item,
   now,
   onJump,
+  onViewMap,
 }: {
   item: TimedEvent;
   now: Date;
   onJump: Props["onJump"];
+  onViewMap?: Props["onViewMap"];
 }) {
   const theme = trackTheme(item.block.group);
   const count = eventCountdown(item.day, item.block, now);
@@ -111,10 +135,13 @@ function LiveCard({
             Ends in {formatCountdown(count.endsIn)}
           </p>
         ) : null}
-        <JumpButton
-          label="Jump to this event"
-          onClick={() => onJump(item.day.id, item.block.id, item.block.group)}
-        />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <JumpButton
+            label="Jump to this event"
+            onClick={() => onJump(item.day.id, item.block.id, item.block.group)}
+          />
+          <MapButton block={item.block} onViewMap={onViewMap} />
+        </div>
       </div>
     </article>
   );
@@ -124,10 +151,12 @@ function NextCard({
   lane,
   now,
   onJump,
+  onViewMap,
 }: {
   lane: UpcomingLane;
   now: Date;
   onJump: Props["onJump"];
+  onViewMap?: Props["onViewMap"];
 }) {
   const theme = trackTheme(lane.track);
   const result = lane.result;
@@ -228,12 +257,15 @@ function NextCard({
             </div>
           </div>
         ) : null}
-        <JumpButton
-          label="Jump to this day"
-          onClick={() =>
-            onJump(result.day.id, result.block.id, result.block.group)
-          }
-        />
+        <div className="mt-2 flex flex-wrap gap-2">
+          <JumpButton
+            label="Jump to this day"
+            onClick={() =>
+              onJump(result.day.id, result.block.id, result.block.group)
+            }
+          />
+          <MapButton block={result.block} onViewMap={onViewMap} />
+        </div>
       </div>
     </article>
   );
@@ -245,6 +277,7 @@ export function NowNextBoard({
   upcoming,
   grouped,
   onJump,
+  onViewMap,
 }: Props) {
   const campOver =
     upcoming.length > 0 && upcoming.every((lane) => lane.result.kind === "after");
@@ -279,6 +312,7 @@ export function NowNextBoard({
                   item={item}
                   now={now}
                   onJump={onJump}
+                  onViewMap={onViewMap}
                 />
               ))}
             </div>
@@ -314,6 +348,7 @@ export function NowNextBoard({
                   lane={lane}
                   now={now}
                   onJump={onJump}
+                  onViewMap={onViewMap}
                 />
               ))}
             </div>

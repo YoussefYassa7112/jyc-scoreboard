@@ -134,6 +134,35 @@ export function blockStatus(
   return "upcoming";
 }
 
+/** Timed blocks on this track are all finished. TBD / untimed items don't block. */
+export function dayIsComplete(
+  day: CampDay,
+  now = new Date(),
+  group: ScheduleTrack = "overview",
+): boolean {
+  let timed = 0;
+  for (const block of blocksForGroup(day, group)) {
+    const status = blockStatus(day, block, now);
+    if (status === "untimed") continue;
+    timed += 1;
+    if (status !== "done") return false;
+  }
+  return timed > 0;
+}
+
+/** First day that still has a live or upcoming timed event. Last day if camp is over. */
+export function firstOpenDay(
+  days: CampDay[],
+  now = new Date(),
+  group: ScheduleTrack = "overview",
+): CampDay | null {
+  if (days.length === 0) return null;
+  for (const day of days) {
+    if (!dayIsComplete(day, now, group)) return day;
+  }
+  return days[days.length - 1] ?? null;
+}
+
 export function findNextEvent(
   group: ScheduleTrack,
   now = new Date(),
@@ -278,11 +307,19 @@ export function eventDateTimes(
   }
   const range = parseTimeRange(block.time);
   if (!range) return null;
+  let startMin = range.startMin;
+  let endMin = range.endMin;
+  // "12:00 AM" on an evening block is midnight at the *end* of that camp day,
+  // not 00:00 at the start (which would land 10 hours before Arrival).
+  if (block.section === "evening" && startMin < 4 * 60) {
+    startMin += 24 * 60;
+    endMin += 24 * 60;
+  }
   const [y, m, d] = day.dateISO.split("-").map(Number);
   const start = new Date(y, m - 1, d, 0, 0, 0, 0);
-  start.setMinutes(range.startMin);
+  start.setMinutes(startMin);
   const end = new Date(y, m - 1, d, 0, 0, 0, 0);
-  end.setMinutes(range.endMin);
+  end.setMinutes(endMin);
   return { start, end };
 }
 

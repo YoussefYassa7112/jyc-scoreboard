@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { blockVisibleToCabin } from "@/lib/cabins";
 import {
   blocksForGroup,
   eventDateTimes,
@@ -114,10 +115,15 @@ function phaseKey(dayId: string, blockId: string, phase: ReminderPhase) {
   return `${dayId}:${blockId}:${phase}`;
 }
 
-function timedEvents(group: ReminderGroup, now: Date): TimedItem[] {
+function timedEvents(
+  group: ReminderGroup,
+  now: Date,
+  cabinId?: number | null,
+): TimedItem[] {
   const timed: TimedItem[] = [];
   for (const day of getScheduleDays(now)) {
     for (const block of blocksForGroup(day, group)) {
+      if (!blockVisibleToCabin(block, cabinId)) continue;
       const times = eventDateTimes(day, block);
       if (!times) continue;
       timed.push({
@@ -172,40 +178,64 @@ function isLive(item: TimedItem, nowMs: number) {
   return item.start <= nowMs && nowMs < item.end;
 }
 
+export type ScheduleAlertOptions = {
+  cabinId?: number | null;
+  /** Re-announce live events even if this device already saw them. */
+  forceLive?: boolean;
+};
+
 /**
- * One alert at a time: “it's starting” first, then “time to walk over”
- * 15 minutes before the next thing — even if something else is still live.
- * Opening the board with `previousNow` null catch-up announces a live event
- * (late campers) or the next close one. Ended events stay quiet.
+ * Every live event plus every event starting within 15 minutes.
+ * Catch-up (`previousNow` null) still fires if you open 9 minutes out.
  */
+export function findScheduleAlerts(
+  group: ReminderGroup,
+  now: Date,
+  alreadySent: string[] = [],
+  previousNow: Date | null = null,
+  options: ScheduleAlertOptions = {},
+): DueReminder[] {
+  const nowMs = now.getTime();
+  const prevMs = previousNow?.getTime() ?? null;
+  const timed = timedEvents(group, now, options.cabinId);
+  const sent = new Set(alreadySent);
+  const due: DueReminder[] = [];
+  const seen = new Set<string>();
+
+  function push(reminder: DueReminder) {
+    if (seen.has(reminder.key)) return;
+    seen.add(reminder.key);
+    due.push(reminder);
+  }
+
+  for (const item of timed) {
+    if (!isLive(item, nowMs)) continue;
+    const key = phaseKey(item.dayId, item.block.id, "started");
+    if (!options.forceLive && sent.has(key)) continue;
+    if (!options.forceLive && prevMs != null && prevMs >= item.start) continue;
+    push(reminderFromBlock(item, "started", nowMs));
+  }
+
+  for (const item of timed) {
+    if (item.start <= nowMs) continue;
+    const msUntil = item.start - nowMs;
+    if (msUntil > REMINDER_LEAD_MS) continue;
+    const key = phaseKey(item.dayId, item.block.id, "upcoming");
+    if (sent.has(key)) continue;
+    push(reminderFromBlock(item, "upcoming", nowMs));
+  }
+
+  return due;
+}
+
 export function findScheduleAlert(
   group: ReminderGroup,
   now: Date,
   alreadySent: string[] = [],
   previousNow: Date | null = null,
+  options: ScheduleAlertOptions = {},
 ): DueReminder | null {
-  const nowMs = now.getTime();
-  const prevMs = previousNow?.getTime() ?? null;
-  const timed = timedEvents(group, now);
-  const sent = new Set(alreadySent);
-
-  const started = timed.filter((item) => {
-    if (sent.has(phaseKey(item.dayId, item.block.id, "started"))) return false;
-    if (!isLive(item, nowMs)) return false;
-    if (prevMs == null) return true;
-    return prevMs < item.start;
-  });
-  if (started.length) {
-    started.sort((a, b) => a.start - b.start);
-    return reminderFromBlock(started[0]!, "started", nowMs);
-  }
-
-  const next = timed.find((item) => item.start > nowMs);
-  if (!next) return null;
-  const msUntil = next.start - nowMs;
-  if (msUntil > REMINDER_LEAD_MS) return null;
-  if (sent.has(phaseKey(next.dayId, next.block.id, "upcoming"))) return null;
-  return reminderFromBlock(next, "upcoming", nowMs);
+  return findScheduleAlerts(group, now, alreadySent, previousNow, options)[0] ?? null;
 }
 
 /**
@@ -215,8 +245,9 @@ export function findDueReminder(
   group: ReminderGroup,
   now: Date,
   alreadySent: string[] = [],
+  cabinId?: number | null,
 ): DueReminder | null {
-  const alert = findScheduleAlert(group, now, alreadySent, now);
+  const alert = findScheduleAlert(group, now, alreadySent, now, { cabinId });
   return alert?.phase === "upcoming" ? alert : null;
 }
 
@@ -224,21 +255,28 @@ export function findDueReminders(
   group: ReminderGroup,
   now: Date,
   alreadySent: string[] = [],
+  cabinId?: number | null,
 ): DueReminder[] {
-  const found = findDueReminder(group, now, alreadySent);
-  return found ? [found] : [];
+  return findScheduleAlerts(group, now, alreadySent, now, { cabinId }).filter(
+    (alert) => alert.phase === "upcoming",
+  );
 }
 
-/** Catch-up when a camper opens the board or switches teams. */
+/** Catch-up when a camper opens the board or switches teams / cabins. */
 export function announceDueReminders(
   group: ReminderGroup,
   onDue: (reminder: DueReminder) => void,
   now = new Date(),
+  options: ScheduleAlertOptions = {},
 ) {
-  const due = findScheduleAlert(group, now, readSent(), null);
-  if (!due) return;
-  markSent(due.key);
-  onDue(due);
+  const due = findScheduleAlerts(group, now, readSent(), null, {
+    ...options,
+    forceLive: options.forceLive ?? true,
+  });
+  for (const reminder of due) {
+    markSent(reminder.key);
+    onDue(reminder);
+  }
 }
 
 export function clearRemindersForDay(dayId: string) {
@@ -259,6 +297,7 @@ export function useEventReminders(
   group: ReminderGroup,
   enabled: boolean,
   onDue?: (reminder: DueReminder) => void,
+  cabinId?: number | null,
 ) {
   const onDueRef = useRef(onDue);
   onDueRef.current = onDue;
@@ -270,23 +309,25 @@ export function useEventReminders(
 
   useEffect(() => {
     previousNowRef.current = null;
-  }, [group]);
+  }, [group, cabinId]);
 
   useEffect(() => {
     if (!enabled) return;
 
     function check() {
       const now = new Date();
-      const reminder = findScheduleAlert(
+      const due = findScheduleAlerts(
         group,
         now,
         readSent(),
         previousNowRef.current,
+        { cabinId },
       );
       previousNowRef.current = now;
-      if (!reminder) return;
-      markSent(reminder.key);
-      onDueRef.current?.(reminder);
+      for (const reminder of due) {
+        markSent(reminder.key);
+        onDueRef.current?.(reminder);
+      }
     }
 
     check();
@@ -306,5 +347,5 @@ export function useEventReminders(
       window.removeEventListener("pageshow", onVis);
       window.removeEventListener("focus", onVis);
     };
-  }, [group, enabled]);
+  }, [group, cabinId, enabled]);
 }
