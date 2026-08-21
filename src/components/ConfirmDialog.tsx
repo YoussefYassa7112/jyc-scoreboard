@@ -11,6 +11,7 @@ type Props = {
   busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  danger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   busyLabel = "Deleting…",
   cancelLabel = "Cancel",
   busy = false,
+  danger = false,
   onConfirm,
   onCancel,
 }: Props) {
@@ -64,7 +66,7 @@ export function ConfirmDialog({
                 type="button"
                 onClick={onCancel}
                 disabled={busy}
-                className="btn-soft rounded-xl border px-4 py-3 text-sm font-extrabold disabled:opacity-60"
+                className="btn-chip rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-60"
               >
                 {cancelLabel}
               </button>
@@ -72,7 +74,9 @@ export function ConfirmDialog({
                 type="button"
                 onClick={onConfirm}
                 disabled={busy}
-                className="btn-cta rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-60"
+                className={`${
+                  danger ? "btn-danger" : "btn-cta bg-star"
+                } rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-60`}
               >
                 <BusyLabel busy={busy} busyLabel={busyLabel}>
                   {confirmLabel}

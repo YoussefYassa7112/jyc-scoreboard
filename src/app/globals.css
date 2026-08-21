@@ -209,9 +209,23 @@ html.dark body {
 }
 
 .btn-soft {
-  background: var(--chip);
-  color: var(--chip-ink);
-  border-color: var(--ring);
+  background: var(--star);
+  color: var(--on-star);
+  border: 2px solid color-mix(in srgb, var(--star) 78%, #1a120c);
+}
+
+html.dark .btn-soft {
+  border-color: color-mix(in srgb, var(--star) 55%, #ffffff);
+}
+
+.btn-chip {
+  background: color-mix(in srgb, var(--star) 16%, var(--card));
+  color: var(--star);
+  border: 2px solid color-mix(in srgb, var(--star) 50%, transparent);
+}
+
+.btn-chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--star) 24%, var(--card));
 }
 
 button,
@@ -228,7 +242,9 @@ textarea {
 }
 
 .btn-cta,
-.btn-soft {
+.btn-soft,
+.btn-chip,
+.btn-danger {
   transition:
     background-color 200ms ease,
     border-color 200ms ease,
@@ -239,13 +255,37 @@ textarea {
 }
 
 .btn-cta:hover:not(:disabled),
-.btn-soft:hover:not(:disabled) {
+.btn-soft:hover:not(:disabled),
+.btn-chip:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
 .btn-cta:active:not(:disabled),
-.btn-soft:active:not(:disabled) {
+.btn-soft:active:not(:disabled),
+.btn-chip:active:not(:disabled),
+.btn-danger:active:not(:disabled) {
   transform: translateY(1px) scale(0.985);
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid #b91c1c;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+html.dark .btn-danger {
+  background: #ef4444;
+  border-color: #fca5a5;
+  color: #fff;
+}
+
+html.dark .btn-danger:hover:not(:disabled) {
+  background: #dc2626;
 }
 
 .field:focus-visible {
@@ -264,7 +304,8 @@ textarea {
 }
 
 /* Text on filled camp-chrome buttons */
-.btn-cta {
+.btn-cta,
+.btn-soft {
   color: var(--on-star);
 }
 

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const history = await getPointHistory(100);
+    const history = await getPointHistory(250);
     return NextResponse.json({
       history: history.map((row) => ({
         ...row,
