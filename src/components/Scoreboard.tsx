@@ -14,6 +14,7 @@ import {
   readMyTeamSnapshot,
   readStandingsCache,
   writeStandingsCache,
+  dropMissingMyTeam,
   TEAM_CHANGED_EVENT,
   type MyTeamSnapshot,
 } from "@/lib/offline";
@@ -32,7 +33,7 @@ import { CampSchedule } from "./CampSchedule";
 import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
 import { SkyDecor } from "./SkyDecor";
-import { ReachForTheSkyMarquee, SurpriseFX } from "./SurpriseFX";
+import { ReachForTheSkyMarquee } from "./SurpriseFX";
 
 type BoardTab = "standings" | "map" | "schedule";
 
@@ -137,6 +138,7 @@ export function Scoreboard() {
     pendingReveal.current = null;
     setData(pending);
     writeStandingsCache(pending);
+    dropMissingMyTeam(pending.standings);
   }, []);
 
   const pushAlerts = useCallback((incoming: BoardAlert[]) => {
@@ -165,11 +167,13 @@ export function Scoreboard() {
   /** Diff each live snapshot against the last one this phone already showed. */
   const trackStandings = useCallback(
     (json: StandingsResponse) => {
+      dropMissingMyTeam(json.standings);
       const previous =
         lastLiveStandings.current ?? readStandingsCache()?.standings ?? null;
       lastLiveStandings.current = json.standings;
       if (!previous) {
         setData(json);
+        dropMissingMyTeam(json.standings);
         return;
       }
 
@@ -193,6 +197,7 @@ export function Scoreboard() {
       }
 
       setData(json);
+      dropMissingMyTeam(json.standings);
     },
     [pushAlerts],
   );
@@ -363,7 +368,6 @@ export function Scoreboard() {
   return (
     <main className="relative min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10">
       {!isDark ? <SkyDecor /> : null}
-      {!isDark ? <SurpriseFX /> : null}
 
       <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-5 md:max-w-5xl md:gap-7">
         <header className="text-center">
@@ -440,8 +444,8 @@ export function Scoreboard() {
           online={online}
           detail={
             tab === "standings"
-              ? "Showing the last scores saved on this phone. Go online for live updates. Map & Schedule still work."
-              : "Map and Schedule still work. Live scores need WiFi."
+              ? "Needs WiFi for live scores. Showing the last standings saved on this device. Map & Schedule still work."
+              : "Needs WiFi for live scores. Map & Schedule still work on this device."
           }
         />
 
@@ -665,6 +669,7 @@ export function Scoreboard() {
         {tab === "schedule" ? (
           <CampSchedule
             teams={data?.standings ?? []}
+            rosterAuthoritative={!staleCache && data != null}
             remindersOn={remindersOn}
             onRemindersChange={setRemindersOn}
             onTeamSwitch={(group, cabin) => {

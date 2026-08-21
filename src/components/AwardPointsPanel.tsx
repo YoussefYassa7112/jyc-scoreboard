@@ -13,6 +13,7 @@ import {
   type ScoringActivity,
 } from "@/lib/scoring";
 import { BusyLabel } from "./Spinner";
+import { NeedsWifiNotice } from "./OfflineBanner";
 import { teamChipStyle } from "@/lib/utils";
 
 type TeamOption = {
@@ -50,6 +51,7 @@ export function AwardPointsPanel({
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
+  const [setupDraft, setSetupDraft] = useState<ScoringActivity[] | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newMin, setNewMin] = useState("0");
   const [newMax, setNewMax] = useState("10");
@@ -84,6 +86,11 @@ export function AwardPointsPanel({
     0,
   );
 
+  const setupList = setupDraft ?? activities;
+  const setupDirty =
+    setupDraft !== null &&
+    JSON.stringify(setupDraft) !== JSON.stringify(activities);
+
   function persist(next: ScoringActivity[]) {
     setActivities(next);
     writeScoringActivities(next);
@@ -101,6 +108,29 @@ export function AwardPointsPanel({
       return updated;
     });
     setScoreDrafts({});
+    setSetupDraft(next.map((row) => ({ ...row })));
+  }
+
+  function patchSetup(next: ScoringActivity[]) {
+    setSetupDraft(next);
+  }
+
+  function openSetup() {
+    setSetupDraft(activities.map((row) => ({ ...row })));
+    setSetupOpen(true);
+  }
+
+  function closeSetup() {
+    setSetupDraft(null);
+    setSetupOpen(false);
+  }
+
+  function saveSetup() {
+    if (setupDraft) persist(setupDraft);
+  }
+
+  function cancelSetup() {
+    setSetupDraft(activities.map((row) => ({ ...row })));
   }
 
   function toggleActivity(row: ScoringActivity) {
@@ -200,18 +230,17 @@ export function AwardPointsPanel({
       enabled: true,
     });
     if (!row) return;
-    if (
-      activities.some((item) => item.title.toLowerCase() === row.title.toLowerCase())
-    ) {
-      persist(
-        activities.map((item) =>
+    const list = setupList;
+    if (list.some((item) => item.title.toLowerCase() === row.title.toLowerCase())) {
+      patchSetup(
+        list.map((item) =>
           item.title.toLowerCase() === row.title.toLowerCase()
             ? { ...item, ...row, id: item.id }
             : item,
         ),
       );
     } else {
-      persist([...activities, row]);
+      patchSetup([...list, row]);
     }
     setNewTitle("");
     setNewMin("0");
@@ -227,13 +256,20 @@ export function AwardPointsPanel({
     <motion.section
       layout
       variants={panelIn}
-      className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-1"
+      className="panel rounded-3xl p-4 sm:p-5 lg:col-start-1 lg:row-start-1"
     >
       <h2 className="display-font text-xl font-bold">Award points</h2>
       <p className="mt-1 text-sm font-semibold text-muted-soft">
         Pick a team, then score the events you turned on. Each event stays inside
         its min–max cap. Use Extra for one-off bonuses or deductions.
       </p>
+      {!online ? (
+        <div className="mt-3">
+          <NeedsWifiNotice>
+            Live posting is blocked. You can still save field notes on this device.
+          </NeedsWifiNotice>
+        </div>
+      ) : null}
 
       <p className="mt-4 text-sm font-bold text-muted">Team</p>
       {teams.length === 0 ? (
@@ -249,7 +285,7 @@ export function AwardPointsPanel({
                 key={team.id}
                 type="button"
                 onClick={() => setTeamId(team.id)}
-                className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                className={`max-w-full break-words rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
                   active ? "ring-2 ring-white/85 dark:ring-white/80" : ""
                 }`}
                 style={teamChipStyle(team.color, active)}
@@ -322,7 +358,6 @@ export function AwardPointsPanel({
                     const isOn = row.id in selected;
                     const score = selected[row.id] ?? row.maxPoints;
                     const scoreText = scoreDrafts[row.id] ?? String(score);
-                    const extraDigits = Math.max(0, scoreText.length - 2);
                     return (
                       <li
                         key={row.id}
@@ -356,76 +391,76 @@ export function AwardPointsPanel({
                           </span>
                         </button>
                         {isOn ? (
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setActivityScore(row, score - 1)}
-                              disabled={score <= row.minPoints}
-                              className="btn-soft h-10 w-10 rounded-xl border text-lg font-black disabled:opacity-40"
-                            >
-                              −
-                            </button>
-                            <label className="sr-only" htmlFor={`score-${row.id}`}>
-                              Custom points for {row.title}
-                            </label>
-                            <input
-                              id={`score-${row.id}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={row.minPoints}
-                              max={row.maxPoints}
-                              value={scoreText}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                setScoreDrafts((current) => ({
-                                  ...current,
-                                  [row.id]: raw,
-                                }));
-                                const n = Number(raw);
-                                if (!Number.isInteger(n)) return;
-                                setSelected((current) => ({
-                                  ...current,
-                                  [row.id]: clampScore(
-                                    n,
-                                    row.minPoints,
-                                    row.maxPoints,
-                                  ),
-                                }));
-                              }}
-                              onBlur={(e) => commitCustomScore(row, e.target.value)}
-                              style={{
-                                width:
-                                  extraDigits === 0
-                                    ? "5.25rem"
-                                    : `calc(5.25rem + ${extraDigits}ch)`,
-                              }}
-                              className="field display-font h-10 min-w-[5.25rem] max-w-full rounded-xl border-2 px-2 text-center text-2xl font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setActivityScore(row, score + 1)}
-                              disabled={score >= row.maxPoints}
-                              className="btn-soft h-10 w-10 rounded-xl border text-lg font-black disabled:opacity-40"
-                            >
-                              +
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActivityScore(row, row.minPoints)}
-                              className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
-                            >
-                              Min
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActivityScore(row, row.maxPoints)}
-                              className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
-                            >
-                              Max
-                            </button>
-                            <span className="w-full text-xs font-semibold text-muted-soft">
+                          <div className="mt-3 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setActivityScore(row, score - 1)}
+                                  disabled={score <= row.minPoints}
+                                  className="btn-soft h-10 w-10 shrink-0 rounded-xl border text-lg font-black disabled:opacity-40"
+                                >
+                                  −
+                                </button>
+                                <label className="sr-only" htmlFor={`score-${row.id}`}>
+                                  Custom points for {row.title}
+                                </label>
+                                <input
+                                  id={`score-${row.id}`}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={row.minPoints}
+                                  max={row.maxPoints}
+                                  value={scoreText}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    setScoreDrafts((current) => ({
+                                      ...current,
+                                      [row.id]: raw,
+                                    }));
+                                    const n = Number(raw);
+                                    if (!Number.isInteger(n)) return;
+                                    setSelected((current) => ({
+                                      ...current,
+                                      [row.id]: clampScore(
+                                        n,
+                                        row.minPoints,
+                                        row.maxPoints,
+                                      ),
+                                    }));
+                                  }}
+                                  onBlur={(e) => commitCustomScore(row, e.target.value)}
+                                  className="field display-font h-10 w-[5.25rem] shrink-0 rounded-xl border-2 px-2 text-center text-2xl font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setActivityScore(row, score + 1)}
+                                  disabled={score >= row.maxPoints}
+                                  className="btn-soft h-10 w-10 shrink-0 rounded-xl border text-lg font-black disabled:opacity-40"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setActivityScore(row, row.minPoints)}
+                                  className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
+                                >
+                                  Min
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActivityScore(row, row.maxPoints)}
+                                  className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
+                                >
+                                  Max
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs font-semibold text-muted-soft">
                               Type any amount in the {row.minPoints}–{row.maxPoints} cap.
-                            </span>
+                            </p>
                           </div>
                         ) : null}
                       </li>
@@ -475,6 +510,9 @@ export function AwardPointsPanel({
                   className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50 sm:col-span-2"
                 >
                   Save to field notes
+                  <span className="mt-0.5 block text-[11px] font-bold opacity-80">
+                    Needs WiFi to post live
+                  </span>
                 </button>
               )}
             </div>
@@ -595,6 +633,9 @@ export function AwardPointsPanel({
                   className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50 sm:col-span-2"
                 >
                   Save to field notes
+                  <span className="mt-0.5 block text-[11px] font-bold opacity-80">
+                    Needs WiFi to post live
+                  </span>
                 </button>
               )}
             </div>
@@ -605,7 +646,7 @@ export function AwardPointsPanel({
       <div className="mt-5 border-t border-saddle/15 pt-4 dark:border-white/10">
         <button
           type="button"
-          onClick={() => setSetupOpen((open) => !open)}
+          onClick={() => (setupOpen ? closeSetup() : openSetup())}
           className="flex w-full items-center justify-between text-left"
         >
           <span>
@@ -614,7 +655,7 @@ export function AwardPointsPanel({
             </span>
             <span className="text-xs font-semibold text-muted-soft">
               Turn events on, then set the min and max points for each one.
-              This list stays on this device while we try it locally.
+              Save when you are done.
             </span>
           </span>
           <span className="text-lg font-black text-muted-soft">
@@ -627,28 +668,34 @@ export function AwardPointsPanel({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => persist(mergeScheduleActivities(activities))}
+                onClick={() =>
+                  patchSetup(mergeScheduleActivities(setupList))
+                }
                 className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
               >
                 Add missing camp events
               </button>
               <button
                 type="button"
-                onClick={() => persist(activities.map((row) => ({ ...row, enabled: true })))}
+                onClick={() =>
+                  patchSetup(setupList.map((row) => ({ ...row, enabled: true })))
+                }
                 className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
               >
                 Enable all
               </button>
               <button
                 type="button"
-                onClick={() => persist(activities.map((row) => ({ ...row, enabled: false })))}
+                onClick={() =>
+                  patchSetup(setupList.map((row) => ({ ...row, enabled: false })))
+                }
                 className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
               >
                 Disable all
               </button>
             </div>
             <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
-              {activities.map((row) => (
+              {setupList.map((row) => (
                 <li
                   key={row.id}
                   className="grid gap-2 rounded-2xl border border-field-border px-3 py-2 sm:grid-cols-[auto_1fr_4.5rem_4.5rem_auto] sm:items-center"
@@ -658,8 +705,8 @@ export function AwardPointsPanel({
                       type="checkbox"
                       checked={row.enabled}
                       onChange={(e) =>
-                        persist(
-                          activities.map((item) =>
+                        patchSetup(
+                          setupList.map((item) =>
                             item.id === row.id
                               ? { ...item, enabled: e.target.checked }
                               : item,
@@ -677,8 +724,8 @@ export function AwardPointsPanel({
                       type="number"
                       value={row.minPoints}
                       onChange={(e) =>
-                        persist(
-                          activities.map((item) =>
+                        patchSetup(
+                          setupList.map((item) =>
                             item.id === row.id
                               ? sanitizeActivity({
                                   ...item,
@@ -697,8 +744,8 @@ export function AwardPointsPanel({
                       type="number"
                       value={row.maxPoints}
                       onChange={(e) =>
-                        persist(
-                          activities.map((item) =>
+                        patchSetup(
+                          setupList.map((item) =>
                             item.id === row.id
                               ? sanitizeActivity({
                                   ...item,
@@ -714,7 +761,7 @@ export function AwardPointsPanel({
                   <button
                     type="button"
                     onClick={() =>
-                      persist(activities.filter((item) => item.id !== row.id))
+                      patchSetup(setupList.filter((item) => item.id !== row.id))
                     }
                     className="btn-danger rounded-xl px-3 py-2 text-xs font-extrabold"
                   >
@@ -763,6 +810,24 @@ export function AwardPointsPanel({
                 Add
               </button>
             </form>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={cancelSetup}
+                disabled={!setupDirty}
+                className="btn-chip rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveSetup}
+                disabled={!setupDirty}
+                className="btn-cta rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-40"
+              >
+                Save
+              </button>
+            </div>
           </div>
         ) : null}
       </div>

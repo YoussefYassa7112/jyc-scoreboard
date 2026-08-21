@@ -12,7 +12,6 @@ import {
 } from "@/data/schedule";
 import {
   blockVisibleToCabin,
-  cabinsForGroup,
   detailsForCabin,
   getCabin,
 } from "@/lib/cabins";
@@ -53,6 +52,8 @@ type TrackFilter = "overview" | "red" | "green";
 
 type Props = {
   teams: StandingRow[];
+  /** True after a live standings fetch — missing teams were deleted, not offline. */
+  rosterAuthoritative?: boolean;
   /** 15-minutes-before reminder opt-in, owned by the board */
   remindersOn?: boolean;
   onRemindersChange?: (on: boolean) => void;
@@ -191,8 +192,9 @@ function BlockCard({
         ) : null}
       </div>
       {live && endsInMs != null ? (
-        <p className="mt-1 text-sm font-extrabold tabular-nums text-red-600">
-          Ends in {formatCountdown(endsInMs)}
+        <p className="mt-1 flex items-center gap-2 text-sm font-extrabold text-red-600">
+          Ends in
+          <span className="countdown">{formatCountdown(endsInMs)}</span>
         </p>
       ) : null}
       {block.location ? (
@@ -327,6 +329,7 @@ function Section({
 
 export function CampSchedule({
   teams,
+  rosterAuthoritative = false,
   remindersOn,
   onRemindersChange,
   onTeamSwitch,
@@ -343,7 +346,7 @@ export function CampSchedule({
   const [allowDemo, setAllowDemo] = useState(false);
   const [track, setTrack] = useState<TrackFilter>("overview");
   const [myTeamId, setMyTeamId] = useState<number | "">("");
-  const [cabinId, setCabinId] = useState<number | "">("");
+  const [peekFullGroup, setPeekFullGroup] = useState(false);
   const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -371,13 +374,6 @@ export function CampSchedule({
     if (!snap) return;
     setMyTeamId(snap.teamId);
     setTeamSnapshot(snap);
-    const savedCabin = getCabin(snap.cabinId);
-    if (
-      savedCabin &&
-      (!snap.campGroup || savedCabin.group === snap.campGroup)
-    ) {
-      setCabinId(savedCabin.id);
-    }
   }, []);
 
   useEffect(() => {
@@ -388,32 +384,27 @@ export function CampSchedule({
     if (days[0]?.id === DEMO_DAY_ID) setDayId(DEMO_DAY_ID);
   }, []);
 
-  // Keep localStorage snapshot in sync when live standings include the team.
-  // Preserve a saved cabin unless this team's camp group actually changed.
+  // Keep localStorage snapshot in sync with the live roster (group + cabin).
   useEffect(() => {
     if (myTeamId === "") return;
     const live = teams.find((t) => t.id === myTeamId);
-    if (!live) return;
+    if (!live) {
+      if (rosterAuthoritative) {
+        setMyTeamId("");
+        setTeamSnapshot(null);
+        writeMyTeamSnapshot(null);
+        setTrack("overview");
+        setPeekFullGroup(false);
+        teamTrackReady.current = true;
+      }
+      return;
+    }
 
-    const candidate =
-      typeof cabinId === "number"
-        ? cabinId
-        : teamSnapshot?.teamId === live.id
-          ? (teamSnapshot.cabinId ?? null)
-          : null;
-    const cabin = getCabin(candidate);
-    const groupChanged = Boolean(
-      teamSnapshot?.teamId === live.id &&
-        teamSnapshot.campGroup &&
-        live.campGroup &&
-        teamSnapshot.campGroup !== live.campGroup,
-    );
+    const cabin = getCabin(live.cabinId);
     const validCabin =
-      groupChanged || !cabin
-        ? null
-        : !live.campGroup || cabin.group === live.campGroup
-          ? candidate
-          : null;
+      cabin && (!live.campGroup || cabin.group === live.campGroup)
+        ? live.cabinId
+        : null;
     const next: MyTeamSnapshot = {
       teamId: live.id,
       campGroup: live.campGroup,
@@ -429,15 +420,12 @@ export function CampSchedule({
       setTeamSnapshot(next);
       writeMyTeamSnapshot(next);
     }
-
-    if (live.campGroup && cabin && cabin.group !== live.campGroup) {
-      setCabinId("");
-    }
-  }, [teams, myTeamId, cabinId, teamSnapshot]);
+  }, [teams, myTeamId, teamSnapshot, rosterAuthoritative]);
 
   const myTeam = useMemo(() => {
     const live = teams.find((t) => t.id === myTeamId);
     if (live) return live;
+    if (rosterAuthoritative) return null;
     // Offline / empty roster: synthesize from last saved snapshot
     if (
       teamSnapshot &&
@@ -452,10 +440,11 @@ export function CampSchedule({
         score: 0,
         rank: 0,
         campGroup: teamSnapshot.campGroup,
+        cabinId: teamSnapshot.cabinId ?? null,
       } satisfies StandingRow;
     }
     return null;
-  }, [teams, myTeamId, teamSnapshot]);
+  }, [teams, myTeamId, teamSnapshot, rosterAuthoritative]);
 
   // Apply saved team's track once when teams load — never override map navigation
   useEffect(() => {
@@ -538,8 +527,8 @@ export function CampSchedule({
     cancelPendingScroll();
     setMyTeamId(id);
     setHighlightId(null);
+    setPeekFullGroup(false);
     if (id === "") {
-      setCabinId("");
       writeMyTeamSnapshot(null);
       setTeamSnapshot(null);
       setTrack("overview");
@@ -547,15 +536,8 @@ export function CampSchedule({
       return;
     }
     const team = teams.find((t) => t.id === id);
-    const prevGroup = myTeam?.campGroup ?? teamSnapshot?.campGroup ?? null;
     const nextGroup = team?.campGroup ?? null;
-    const groupChanged = prevGroup !== nextGroup;
-    if (groupChanged) setCabinId("");
-    const cabin = groupChanged
-      ? null
-      : typeof cabinId === "number"
-        ? getCabin(cabinId)
-        : null;
+    const cabin = getCabin(team?.cabinId);
     const keepCabin =
       cabin && nextGroup && cabin.group === nextGroup ? cabin.id : null;
     const next: MyTeamSnapshot = {
@@ -570,29 +552,8 @@ export function CampSchedule({
       setTrack(next.campGroup);
     }
     teamTrackReady.current = true;
-  }
-
-  function selectCabin(nextId: number | "") {
-    cancelPendingScroll();
-    setCabinId(nextId);
-    setHighlightId(null);
-    const cabin = typeof nextId === "number" ? getCabin(nextId) : null;
-    if (cabin) setTrack(cabin.group);
-    const snap: MyTeamSnapshot | null =
-      myTeamId === ""
-        ? null
-        : {
-            teamId: typeof myTeamId === "number" ? myTeamId : teamSnapshot?.teamId ?? 0,
-            campGroup: myTeam?.campGroup ?? teamSnapshot?.campGroup ?? cabin?.group ?? null,
-            teamName: myTeam?.name ?? teamSnapshot?.teamName,
-            cabinId: typeof nextId === "number" ? nextId : null,
-          };
-    if (snap && snap.teamId) {
-      setTeamSnapshot(snap);
-      writeMyTeamSnapshot(snap);
-    }
-    if (cabin) {
-      onTeamSwitch?.(cabin.group, cabin.id);
+    if (next.campGroup === "red" || next.campGroup === "green") {
+      onTeamSwitch?.(next.campGroup, keepCabin);
     }
   }
 
@@ -622,16 +583,28 @@ export function CampSchedule({
     if (LIVE_CAMP_SIM && !simReady) return campDays;
     return getScheduleDays(new Date(), allowDemo);
   }, [allowDemo, calendarKey, demoEpoch, simReady]);
-  const activeCabinId = typeof cabinId === "number" ? cabinId : null;
+  const activeCabinId =
+    typeof myTeam?.cabinId === "number"
+      ? myTeam.cabinId
+      : typeof teamSnapshot?.cabinId === "number"
+        ? teamSnapshot.cabinId
+        : null;
+  const filterCabinId =
+    !peekFullGroup &&
+    activeCabinId != null &&
+    myTeam?.campGroup != null &&
+    track === myTeam.campGroup
+      ? activeCabinId
+      : null;
   const daysForYou = useMemo(
     () =>
       days.map((d) => ({
         ...d,
         blocks: d.blocks
-          .filter((b) => blockVisibleToCabin(b, activeCabinId))
-          .map((b) => ({ ...b, details: detailsForCabin(b, activeCabinId) })),
+          .filter((b) => blockVisibleToCabin(b, filterCabinId))
+          .map((b) => ({ ...b, details: detailsForCabin(b, filterCabinId) })),
       })),
-    [days, activeCabinId],
+    [days, filterCabinId],
   );
   const day = useMemo(() => {
     return daysForYou.find((d) => d.id === dayId) ?? daysForYou[0]!;
@@ -836,26 +809,6 @@ export function CampSchedule({
         </label>
 
         {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
-          <label className="mt-3 block text-sm font-bold text-muted">
-            My cabin
-            <select
-              value={cabinId}
-              onChange={(e) =>
-                selectCabin(e.target.value ? Number(e.target.value) : "")
-              }
-              className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-            >
-              <option value="">Pick your cabin</option>
-              {cabinsForGroup(myTeam.campGroup).map((cabin) => (
-                <option key={cabin.id} value={cabin.id}>
-                  Cabin {cabin.id} · {cabin.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
           <div
             className={`mt-3 overflow-hidden rounded-2xl border-2 px-4 py-3.5 text-white shadow-sm sm:px-5 sm:py-4 ${
               myTeam.campGroup === "green"
@@ -885,10 +838,39 @@ export function CampSchedule({
                     : ""}
                 </>
               ) : (
-                " all weekend — pick your cabin to hide the other pair"
+                " — ask an admin to assign a cabin"
               )}
               .
             </p>
+            {activeCabinId ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {peekFullGroup || track !== myTeam.campGroup ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPeekFullGroup(false);
+                      setTrack(myTeam.campGroup!);
+                      setHighlightId(null);
+                    }}
+                    className="rounded-xl bg-white/20 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/40"
+                  >
+                    Back to my cabin
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPeekFullGroup(true);
+                      setHighlightId(null);
+                    }}
+                    className="rounded-xl bg-white/20 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/40"
+                  >
+                    See full {myTeam.campGroup === "green" ? "Green" : "Red"}{" "}
+                    schedule
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : myTeamId ? (
           <p className="mt-3 rounded-2xl border-2 border-star/30 bg-chip/80 px-4 py-3 text-sm font-bold text-star">
@@ -988,6 +970,7 @@ export function CampSchedule({
                 onClick={() => {
                   cancelPendingScroll();
                   setTrack(id);
+                  setPeekFullGroup(id !== myTeam?.campGroup);
                   setHighlightId(null);
                 }}
                 className={`min-h-11 cursor-pointer rounded-xl border px-2 py-2 text-center text-xs font-extrabold transition sm:px-3.5 sm:text-sm ${color}`}
@@ -1031,25 +1014,25 @@ export function CampSchedule({
               />
 
               {track === "overview" ? (
-                activeCabinId && getCabin(activeCabinId)?.group === "red" ? (
+                filterCabinId && getCabin(filterCabinId)?.group === "red" ? (
                   <Section
                     title="Red group"
                     tint="red"
                     day={day}
                     now={new Date(nowTick)}
                     blocks={redBlocks}
-                    cabins={[`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]}
+                    cabins={[`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
                   />
-                ) : activeCabinId && getCabin(activeCabinId)?.group === "green" ? (
+                ) : filterCabinId && getCabin(filterCabinId)?.group === "green" ? (
                   <Section
                     title="Green group"
                     tint="green"
                     day={day}
                     now={new Date(nowTick)}
                     blocks={greenBlocks}
-                    cabins={[`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]}
+                    cabins={[`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
                   />
@@ -1087,8 +1070,8 @@ export function CampSchedule({
                   now={new Date(nowTick)}
                   blocks={redBlocks}
                   cabins={
-                    activeCabinId && getCabin(activeCabinId)?.group === "red"
-                      ? [`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]
+                    filterCabinId && getCabin(filterCabinId)?.group === "red"
+                      ? [`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]
                       : redCabins
                   }
                   highlightBlockId={highlightId}
@@ -1104,8 +1087,8 @@ export function CampSchedule({
                   now={new Date(nowTick)}
                   blocks={greenBlocks}
                   cabins={
-                    activeCabinId && getCabin(activeCabinId)?.group === "green"
-                      ? [`Cabin ${activeCabinId} · ${getCabin(activeCabinId)!.label}`]
+                    filterCabinId && getCabin(filterCabinId)?.group === "green"
+                      ? [`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]
                       : greenCabins
                   }
                   highlightBlockId={highlightId}

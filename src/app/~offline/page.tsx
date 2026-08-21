@@ -7,12 +7,16 @@ export default function OfflinePage() {
         <p className="display-font text-sm font-semibold uppercase tracking-[0.22em] text-muted-soft">
           Offline
         </p>
-        <h1 className="display-font mt-2 text-3xl font-bold text-ink">
-          You&apos;re offline
+        <p className="inline-flex items-center rounded-xl bg-star px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-on-star">
+          Needs WiFi
+        </p>
+        <h1 className="display-font mt-3 text-3xl font-bold text-ink">
+          Connect to continue
         </h1>
         <p className="mt-3 text-sm font-semibold text-muted">
           Open Camp Scoreboard once while on WiFi to cache Map and Schedule.
-          Then you can use those tabs without a connection.
+          Then you can use those tabs without a connection. Live scores, photos,
+          and admin edits need WiFi.
         </p>
         <Link
           href="/"

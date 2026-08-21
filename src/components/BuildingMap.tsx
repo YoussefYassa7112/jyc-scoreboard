@@ -392,6 +392,7 @@ export function BuildingMap({
   const { theme } = useTheme();
   const dark = theme === "dark";
   const wrapRef = useRef<HTMLElement>(null);
+  const mapScrollRef = useRef<HTMLDivElement>(null);
   const onFocusClearedRef = useRef(onFocusCleared);
   onFocusClearedRef.current = onFocusCleared;
   const mountedRef = useRef(true);
@@ -510,11 +511,11 @@ export function BuildingMap({
             This map is tappable — tap any room
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <button
             type="button"
             aria-label="Zoom out"
-            onClick={() => setZoom((z) => Math.max(0.85, +(z - 0.15).toFixed(2)))}
+            onClick={() => setZoom((z) => Math.max(0.9, +(z - 0.25).toFixed(2)))}
             className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
           >
             −
@@ -522,7 +523,7 @@ export function BuildingMap({
           <button
             type="button"
             aria-label="Zoom in"
-            onClick={() => setZoom((z) => Math.min(1.6, +(z + 0.15).toFixed(2)))}
+            onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
             className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
           >
             +
@@ -532,6 +533,7 @@ export function BuildingMap({
             onClick={() => {
               setZoom(1);
               clearSelection();
+              mapScrollRef.current?.scrollTo({ top: 0, left: 0 });
             }}
             className="btn-soft cursor-pointer rounded-xl border px-3 text-xs font-extrabold min-h-11"
           >
@@ -608,18 +610,18 @@ export function BuildingMap({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -36 * floorDir }}
             transition={{ duration: 0.34, ease: easeSoft }}
-            className="overflow-auto p-1.5 sm:p-3"
+            className="max-h-[min(70dvh,36rem)] overflow-auto overscroll-contain p-1.5 sm:p-3 [touch-action:pan-x_pan-y]"
+            ref={mapScrollRef}
           >
-        <motion.svg
-          viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
-          className="mx-auto block h-auto w-full max-w-4xl touch-pan-x touch-pan-y"
-          style={{ originX: 0.5, originY: 0 }}
+        <motion.div
           initial={false}
-          animate={{
-            scale: zoom,
-            minWidth: `${Math.round(320 * zoom)}px`,
-          }}
+          animate={{ width: `${zoom * 100}%` }}
           transition={{ duration: 0.38, ease: easeSoft }}
+          className="mx-auto origin-top"
+        >
+        <svg
+          viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
+          className="mx-auto block h-auto w-full"
           role="img"
           aria-label={`${floor.label} map of ${floor.siteTitle ?? "CENTRAL"}`}
           onClick={(e) => {
@@ -922,7 +924,8 @@ export function BuildingMap({
             strokeLinejoin="round"
             className="pointer-events-none"
           />
-        </motion.svg>
+        </svg>
+        </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>

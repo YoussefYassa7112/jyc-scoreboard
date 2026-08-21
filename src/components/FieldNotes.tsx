@@ -5,6 +5,7 @@ import { panelIn, springSnappy } from "@/lib/motion";
 import type { FieldNote } from "@/lib/field-notes";
 import { parsePointNote } from "@/lib/scoring";
 import { BusyLabel } from "./Spinner";
+import { NeedsWifiNotice } from "./OfflineBanner";
 
 type Props = {
   notes: FieldNote[];
@@ -52,8 +53,7 @@ export function FieldNotes({
             Field notes
           </h2>
           <p className="mt-1 text-sm font-semibold text-muted-soft">
-            Jot awards outside with no WiFi. They stay on this device until you
-            post them.
+            Jot awards on this device, then post them when you have WiFi.
           </p>
         </div>
         <AnimatePresence initial={false}>
@@ -77,6 +77,14 @@ export function FieldNotes({
           ) : null}
         </AnimatePresence>
       </div>
+
+      {!online ? (
+        <div className="mt-3">
+          <NeedsWifiNotice>
+            Posting is blocked until you reconnect.
+          </NeedsWifiNotice>
+        </div>
+      ) : null}
 
       {notes.length === 0 ? (
         <div className="mt-4 flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-saddle/25 bg-chip/50 px-4 py-10 text-center">

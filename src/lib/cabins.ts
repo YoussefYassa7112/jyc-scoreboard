@@ -21,9 +21,63 @@ export function cabinsForGroup(group: "red" | "green"): CabinInfo[] {
   return campCabins.filter((cabin) => cabin.group === group);
 }
 
+export function cabinHolder(
+  teams: { id: number; name?: string; cabinId?: number | null }[],
+  cabinId: number,
+  exceptTeamId?: number | null,
+): { teamId: number; teamName: string } | null {
+  const team = teams.find(
+    (row) =>
+      row.cabinId === cabinId &&
+      (exceptTeamId == null || row.id !== exceptTeamId),
+  );
+  if (!team) return null;
+  return { teamId: team.id, teamName: team.name?.trim() || `Team ${team.id}` };
+}
+
+export function cabinChoicesForGroup(
+  group: "red" | "green",
+  teams: { id: number; name?: string; cabinId?: number | null }[],
+  exceptTeamId?: number | null,
+): { cabin: CabinInfo; takenBy: string | null }[] {
+  return cabinsForGroup(group).map((cabin) => {
+    const holder = cabinHolder(teams, cabin.id, exceptTeamId);
+    return { cabin, takenBy: holder?.teamName ?? null };
+  });
+}
+
+export function takenCabinIds(
+  teams: { id: number; cabinId?: number | null }[],
+  exceptTeamId?: number | null,
+): Set<number> {
+  const taken = new Set<number>();
+  for (const team of teams) {
+    if (exceptTeamId != null && team.id === exceptTeamId) continue;
+    if (typeof team.cabinId === "number") taken.add(team.cabinId);
+  }
+  return taken;
+}
+
+export function availableCabinsForGroup(
+  group: "red" | "green",
+  teams: { id: number; cabinId?: number | null }[],
+  exceptTeamId?: number | null,
+): CabinInfo[] {
+  const taken = takenCabinIds(teams, exceptTeamId);
+  return cabinsForGroup(group).filter((cabin) => !taken.has(cabin.id));
+}
+
 export function getCabin(id: number | null | undefined): CabinInfo | null {
   if (id == null) return null;
   return campCabins.find((cabin) => cabin.id === id) ?? null;
+}
+
+export function parseCabinId(value: unknown): number | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || !getCabin(n)) return Number.NaN;
+  return n;
 }
 
 export function cabinFitsGroup(

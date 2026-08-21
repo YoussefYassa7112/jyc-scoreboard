@@ -18,6 +18,7 @@ export type CachedAdminTeam = {
   score: number;
   eventCount: number;
   campGroup: "red" | "green" | null;
+  cabinId?: number | null;
 };
 
 export function readFieldNotes(): FieldNote[] {

@@ -34,12 +34,14 @@ import {
 import { TEAM_COLORS } from "@/lib/standings";
 import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
 import { teamChipStyle } from "@/lib/utils";
+import { availableCabinsForGroup, cabinChoicesForGroup, getCabin } from "@/lib/cabins";
+import { forgetTeamEverywhere } from "@/lib/offline";
 import { useOnline } from "@/lib/use-online";
 import { FieldNotes } from "./FieldNotes";
 import { AwardPointsPanel } from "./AwardPointsPanel";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { OfflineBanner } from "./OfflineBanner";
+import { OfflineBanner, NeedsWifiNotice } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
 import { SpiderChart } from "./SpiderChart";
 import { BusyLabel, Spinner } from "./Spinner";
@@ -54,6 +56,7 @@ type TeamRow = {
   score: number;
   eventCount: number;
   campGroup: CampGroup | null;
+  cabinId?: number | null;
 };
 
 type HistoryRow = {
@@ -83,6 +86,7 @@ export function AdminDashboard() {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(TEAM_COLORS[0]);
   const [newCampGroup, setNewCampGroup] = useState<CampGroup>("red");
+  const [newCabinId, setNewCabinId] = useState<number | "">("");
 
   const [historyTeamId, setHistoryTeamId] = useState<number | "all">("all");
 
@@ -90,6 +94,7 @@ export function AdminDashboard() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const [editCampGroup, setEditCampGroup] = useState<CampGroup>("red");
+  const [editCabinId, setEditCabinId] = useState<number | "">("");
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [publicUrl, setPublicUrl] = useState("");
@@ -199,6 +204,11 @@ export function AdminDashboard() {
   }, [refresh, fail]);
 
   useEffect(() => {
+    if (online) return;
+    setPendingDelete(null);
+  }, [online]);
+
+  useEffect(() => {
     const url = window.location.origin + "/";
     setPublicUrl(url);
     QRCode.toDataURL(url, {
@@ -213,6 +223,22 @@ export function AdminDashboard() {
     [teams],
   );
 
+  const newCabinChoices = useMemo(
+    () => cabinChoicesForGroup(newCampGroup, teams),
+    [newCampGroup, teams],
+  );
+  const newCabinOptions = useMemo(
+    () => availableCabinsForGroup(newCampGroup, teams),
+    [newCampGroup, teams],
+  );
+  const editCabinChoices = useMemo(
+    () =>
+      editingId == null
+        ? []
+        : cabinChoicesForGroup(editCampGroup, teams, editingId),
+    [editCampGroup, teams, editingId],
+  );
+
   const filteredHistory = useMemo(() => {
     if (historyTeamId === "all") return history;
     return history.filter((row) => row.teamId === historyTeamId);
@@ -224,7 +250,7 @@ export function AdminDashboard() {
 
   function requireOnline() {
     if (online) return true;
-    fail("You're offline", "Connect to WiFi to change teams or post points.");
+    fail("Needs WiFi", "Connect to add teams, change cabins, or post points.");
     return false;
   }
 
@@ -247,6 +273,14 @@ export function AdminDashboard() {
   function createTeam(e: FormEvent) {
     e.preventDefault();
     if (!requireOnline()) return;
+    if (!newName.trim()) {
+      fail("Name is required");
+      return;
+    }
+    if (newCabinOptions.length > 0 && newCabinId === "") {
+      fail("Pick a cabin", "Each team needs a cabin in its group.");
+      return;
+    }
     void run("create-team", async () => {
       const res = await fetch("/api/teams", {
         method: "POST",
@@ -255,6 +289,7 @@ export function AdminDashboard() {
           name: newName,
           color: newColor,
           campGroup: newCampGroup,
+          cabinId: newCabinId === "" ? null : newCabinId,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -264,15 +299,19 @@ export function AdminDashboard() {
       }
       const createdName = newName.trim();
       const createdGroup = newCampGroup;
+      const createdCabin = newCabinId;
       setNewName("");
       setNewColor(
         TEAM_COLORS[teams.length % TEAM_COLORS.length] || TEAM_COLORS[0],
       );
       setNewCampGroup("red");
+      setNewCabinId("");
       await refresh();
       flash(
         `${createdName} is on the board`,
-        `Added to the ${createdGroup} group.`,
+        `Added to the ${createdGroup} group${
+          typeof createdCabin === "number" ? ` · Cabin ${createdCabin}` : ""
+        }.`,
       );
     });
   }
@@ -287,6 +326,7 @@ export function AdminDashboard() {
           name: editName,
           color: editColor,
           campGroup: editCampGroup,
+          cabinId: editCabinId === "" ? null : editCabinId,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -338,9 +378,19 @@ export function AdminDashboard() {
         fail(data.error || "Could not delete team");
         return;
       }
+      forgetTeamEverywhere(id);
+      setTeams((current) => current.filter((team) => team.id !== id));
+      setHistory((current) => current.filter((row) => row.teamId !== id));
+      setFieldNotes((current) => {
+        const next = current.filter((note) => note.teamId !== id);
+        writeFieldNotes(next);
+        return next;
+      });
+      if (historyTeamId === id) setHistoryTeamId("all");
+      if (editingId === id) setEditingId(null);
       await refresh();
       setPendingDelete(null);
-      flash(`${name} deleted`, "Their point history was removed too.");
+      flash(`${name} deleted`, "Removed from standings, history, and schedule.");
     });
   }
 
@@ -496,6 +546,7 @@ export function AdminDashboard() {
     setEditName(team.name);
     setEditColor(team.color);
     setEditCampGroup(team.campGroup ?? "red");
+    setEditCabinId(typeof team.cabinId === "number" ? team.cabinId : "");
   }
 
   function downloadQr() {
@@ -508,7 +559,7 @@ export function AdminDashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <main className="relative min-h-dvh px-4 py-6 sm:px-6 md:px-8 md:py-8">
+    <main className="relative min-h-dvh px-4 pb-6 pt-16 sm:px-6 sm:pb-8 sm:pt-8 md:px-8">
       {theme !== "dark" ? <SkyDecor /> : null}
 
       <motion.div
@@ -529,13 +580,13 @@ export function AdminDashboard() {
               Admin dashboard
             </h1>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <Link
               href="/"
               prefetch
               onClick={goToScoreboard}
               aria-busy={leavingToBoard}
-              className="btn-soft rounded-xl border-2 px-4 py-2 text-sm font-extrabold"
+              className="btn-soft min-h-11 flex-1 rounded-xl border-2 px-4 py-2 text-sm font-extrabold sm:flex-none"
             >
               <BusyLabel busy={leavingToBoard} busyLabel="Opening board…">
                 View scoreboard
@@ -544,11 +595,11 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={logout}
-              disabled={isBusy("logout")}
-              className="btn-cta rounded-xl bg-star px-4 py-2 text-sm font-extrabold disabled:opacity-60"
+              disabled={!online || isBusy("logout")}
+              className="btn-cta min-h-11 flex-1 rounded-xl bg-star px-4 py-2 text-sm font-extrabold disabled:opacity-60 sm:flex-none"
             >
               <BusyLabel busy={isBusy("logout")} busyLabel="Logging out…">
-                Log out
+                {online ? "Log out" : "Needs WiFi"}
               </BusyLabel>
             </button>
           </div>
@@ -556,7 +607,7 @@ export function AdminDashboard() {
 
         <OfflineBanner
           online={online}
-          detail="Live scores and team edits need WiFi. You can still jot awards on Field notes, then post them when you're back online."
+          detail="Needs WiFi to add teams, change cabins, or post live points. You can still jot field notes on this phone, then post them when you're back."
         />
 
         <AnimatePresence mode="wait" initial={false}>
@@ -603,12 +654,24 @@ export function AdminDashboard() {
                 layout
                 variants={panelIn}
                 onSubmit={createTeam}
-                className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-2"
+                className="panel rounded-3xl p-4 sm:p-5 lg:col-start-1 lg:row-start-2"
               >
                 <h2 className="display-font text-xl font-bold">Create team</h2>
                 <p className="mt-1 text-sm font-semibold text-muted-soft">
                   Add as many teams as you need — names are fully dynamic.
                 </p>
+                {!online ? (
+                  <div className="mt-3">
+                    <NeedsWifiNotice>
+                      Connect to create a team with its group and cabin.
+                    </NeedsWifiNotice>
+                  </div>
+                ) : null}
+
+                <fieldset
+                  disabled={!online}
+                  className="min-w-0 border-0 p-0 disabled:opacity-55"
+                >
 
                 <label className="mt-4 block text-sm font-bold text-muted">
                   Team name
@@ -626,9 +689,11 @@ export function AdminDashboard() {
                   Camp group
                   <select
                     value={newCampGroup}
-                    onChange={(e) =>
-                      setNewCampGroup(e.target.value as CampGroup)
-                    }
+                    onChange={(e) => {
+                      const group = e.target.value as CampGroup;
+                      setNewCampGroup(group);
+                      setNewCabinId("");
+                    }}
                     className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
                     required
                   >
@@ -636,6 +701,48 @@ export function AdminDashboard() {
                     <option value="green">Green group</option>
                   </select>
                 </label>
+
+                <label className="mt-3 block text-sm font-bold text-muted">
+                  Cabin
+                  <select
+                    value={newCabinId}
+                    onChange={(e) =>
+                      setNewCabinId(e.target.value ? Number(e.target.value) : "")
+                    }
+                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                    required={newCabinOptions.length > 0}
+                  >
+                    <option value="" disabled={newCabinOptions.length > 0}>
+                      {newCabinOptions.length > 0
+                        ? "Pick a cabin"
+                        : "No cabin left in this group"}
+                    </option>
+                    {newCabinChoices.map(({ cabin, takenBy }) => (
+                      <option
+                        key={cabin.id}
+                        value={cabin.id}
+                        disabled={Boolean(takenBy)}
+                      >
+                        Cabin {cabin.id} · {cabin.label}
+                        {takenBy ? ` · taken by ${takenBy}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {newCabinChoices.length > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-muted-soft">
+                    {newCampGroup === "green" ? "Green" : "Red"} cabins:{" "}
+                    {newCabinChoices
+                      .map(
+                        ({ cabin, takenBy }) =>
+                          `${cabin.id}${takenBy ? ` (taken)` : ""}`,
+                      )
+                      .join(" · ")}
+                    {newCabinOptions.length === 0
+                      ? ". All of them are already assigned."
+                      : ""}
+                  </p>
+                ) : null}
 
                 <label className="mt-3 block text-sm font-bold text-muted">
                   Color
@@ -672,16 +779,22 @@ export function AdminDashboard() {
 
                 <button
                   type="submit"
-                  disabled={!online || isBusy("create-team")}
+                  disabled={
+                    !online ||
+                    isBusy("create-team") ||
+                    !newName.trim() ||
+                    (newCabinOptions.length > 0 && newCabinId === "")
+                  }
                   className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
                 >
                   <BusyLabel
                     busy={isBusy("create-team")}
                     busyLabel="Adding team…"
                   >
-                    Add team
+                    {online ? "Add team" : "Needs WiFi"}
                   </BusyLabel>
                 </button>
+                </fieldset>
               </motion.form>
             </section>
 
@@ -689,8 +802,15 @@ export function AdminDashboard() {
               <SpiderChart teams={sortedTeams} />
             </motion.div>
 
-            <motion.section layout variants={panelIn} className="panel rounded-3xl p-5">
+            <motion.section layout variants={panelIn} className="panel rounded-3xl p-4 sm:p-5">
               <h2 className="display-font text-xl font-bold">Teams</h2>
+              {!online ? (
+                <div className="mt-3">
+                  <NeedsWifiNotice>
+                    Connect to edit, assign a cabin, or delete a team.
+                  </NeedsWifiNotice>
+                </div>
+              ) : null}
               {sortedTeams.length === 0 ? (
                 <p className="mt-3 font-semibold text-muted-soft">
                   No teams yet. Create your first team above.
@@ -721,9 +841,9 @@ export function AdminDashboard() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 8 }}
                           transition={springSoft}
-                          className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                          className="grid grid-cols-1 gap-2 min-[520px]:grid-cols-2"
                         >
-                          <label className="flex-1 text-sm font-bold text-muted">
+                          <label className="text-sm font-bold text-muted min-[520px]:col-span-2">
                             Name
                             <input
                               value={editName}
@@ -735,13 +855,44 @@ export function AdminDashboard() {
                             Group
                             <select
                               value={editCampGroup}
-                              onChange={(e) =>
-                                setEditCampGroup(e.target.value as CampGroup)
-                              }
+                              onChange={(e) => {
+                                const group = e.target.value as CampGroup;
+                                setEditCampGroup(group);
+                                const cabin = getCabin(
+                                  typeof editCabinId === "number" ? editCabinId : null,
+                                );
+                                if (!cabin || cabin.group !== group) {
+                                  setEditCabinId("");
+                                }
+                              }}
                               className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
                             >
                               <option value="red">Red</option>
                               <option value="green">Green</option>
+                            </select>
+                          </label>
+                          <label className="text-sm font-bold text-muted">
+                            Cabin
+                            <select
+                              value={editCabinId}
+                              onChange={(e) =>
+                                setEditCabinId(
+                                  e.target.value ? Number(e.target.value) : "",
+                                )
+                              }
+                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
+                            >
+                              <option value="">No cabin</option>
+                              {editCabinChoices.map(({ cabin, takenBy }) => (
+                                <option
+                                  key={cabin.id}
+                                  value={cabin.id}
+                                  disabled={Boolean(takenBy)}
+                                >
+                                  Cabin {cabin.id} · {cabin.label}
+                                  {takenBy ? ` · taken by ${takenBy}` : ""}
+                                </option>
+                              ))}
                             </select>
                           </label>
                           <label className="text-sm font-bold text-muted">
@@ -753,18 +904,18 @@ export function AdminDashboard() {
                               className="field mt-1 block h-10 w-14 rounded border-2"
                             />
                           </label>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-2 gap-2 min-[520px]:col-span-2">
                             <button
                               type="button"
                               onClick={() => saveEdit(team.id)}
-                              disabled={isBusy(`team-${team.id}`)}
+                              disabled={!online || isBusy(`team-${team.id}`)}
                               className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               <BusyLabel
                                 busy={isBusy(`team-${team.id}`)}
                                 busyLabel="Saving…"
                               >
-                                Save
+                                {online ? "Save" : "Needs WiFi"}
                               </BusyLabel>
                             </button>
                             <button
@@ -811,8 +962,15 @@ export function AdminDashboard() {
                                   {team.campGroup ?? "unassigned"}
                                 </span>
                               </div>
-                              <p className="text-sm font-bold text-muted-soft">
+                              <p className="break-words text-sm font-bold text-muted-soft">
                                 {team.score} pts · {team.eventCount} events
+                                {typeof team.cabinId === "number"
+                                  ? ` · Cabin ${team.cabinId}${
+                                      getCabin(team.cabinId)
+                                        ? ` (${getCabin(team.cabinId)!.label})`
+                                        : ""
+                                    }`
+                                  : " · no cabin"}
                               </p>
                             </div>
                           </div>
@@ -820,7 +978,7 @@ export function AdminDashboard() {
                             <select
                               aria-label={`Camp group for ${team.name}`}
                               value={team.campGroup ?? ""}
-                              disabled={teamBusy}
+                              disabled={!online || teamBusy}
                               onChange={(e) => {
                                 const value = e.target.value as CampGroup;
                                 if (value === "red" || value === "green") {
@@ -837,10 +995,58 @@ export function AdminDashboard() {
                               <option value="red">Red</option>
                               <option value="green">Green</option>
                             </select>
+                            <select
+                              aria-label={`Cabin for ${team.name}`}
+                              value={team.cabinId ?? ""}
+                              disabled={!online || teamBusy || !team.campGroup}
+                              onChange={(e) => {
+                                if (!requireOnline()) return;
+                                const value = e.target.value;
+                                void run(`team-${team.id}`, async () => {
+                                  const res = await fetch(`/api/teams/${team.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      cabinId: value ? Number(value) : null,
+                                    }),
+                                  });
+                                  const data = (await res.json().catch(() => ({}))) as {
+                                    error?: string;
+                                  };
+                                  if (!res.ok) {
+                                    fail(data.error || "Could not update cabin");
+                                    return;
+                                  }
+                                  await refresh();
+                                  flash(
+                                    value
+                                      ? `${team.name} → Cabin ${value}`
+                                      : `${team.name} cabin cleared`,
+                                  );
+                                });
+                              }}
+                              className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
+                            >
+                              <option value="">No cabin</option>
+                              {cabinChoicesForGroup(
+                                team.campGroup ?? "red",
+                                teams,
+                                team.id,
+                              ).map(({ cabin, takenBy }) => (
+                                <option
+                                  key={cabin.id}
+                                  value={cabin.id}
+                                  disabled={Boolean(takenBy)}
+                                >
+                                  Cabin {cabin.id} · {cabin.label}
+                                  {takenBy ? ` · ${takenBy}` : ""}
+                                </option>
+                              ))}
+                            </select>
                             <button
                               type="button"
                               onClick={() => startEdit(team)}
-                              disabled={teamBusy}
+                              disabled={!online || teamBusy}
                               className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               Edit
@@ -848,7 +1054,7 @@ export function AdminDashboard() {
                             <button
                               type="button"
                               onClick={() => requestDeleteTeam(team.id, team.name)}
-                              disabled={teamBusy}
+                              disabled={!online || teamBusy}
                               className="btn-danger rounded-xl px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               Delete
