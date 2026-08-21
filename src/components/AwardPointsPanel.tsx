@@ -1,0 +1,771 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { panelIn, springSoft } from "@/lib/motion";
+import {
+  clampScore,
+  mergeScheduleActivities,
+  readScoringActivities,
+  sanitizeActivity,
+  writeScoringActivities,
+  type AwardDraft,
+  type ScoringActivity,
+} from "@/lib/scoring";
+import { BusyLabel } from "./Spinner";
+import { teamChipStyle } from "@/lib/utils";
+
+type TeamOption = {
+  id: number;
+  name: string;
+  color: string;
+  score: number;
+};
+
+type Props = {
+  teams: TeamOption[];
+  online: boolean;
+  busy: boolean;
+  onAward: (drafts: AwardDraft[]) => void;
+  onSaveForLater: (drafts: AwardDraft[]) => void;
+};
+
+type Tab = "activities" | "extra";
+
+export function AwardPointsPanel({
+  teams,
+  online,
+  busy,
+  onAward,
+  onSaveForLater,
+}: Props) {
+  const [activities, setActivities] = useState<ScoringActivity[]>(() =>
+    readScoringActivities(),
+  );
+  const [teamId, setTeamId] = useState<number | "">(
+    () => teams[0]?.id ?? "",
+  );
+  const [tab, setTab] = useState<Tab>("activities");
+  const [selected, setSelected] = useState<Record<string, number>>({});
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMin, setNewMin] = useState("0");
+  const [newMax, setNewMax] = useState("10");
+  const [extraAmount, setExtraAmount] = useState("5");
+  const [extraSign, setExtraSign] = useState<1 | -1>(1);
+  const [extraReason, setExtraReason] = useState("");
+
+  useEffect(() => {
+    if (teams.length === 0) {
+      setTeamId("");
+      return;
+    }
+    if (teamId === "" || !teams.some((team) => team.id === teamId)) {
+      setTeamId(teams[0].id);
+    }
+  }, [teams, teamId]);
+
+  const enabled = useMemo(
+    () => activities.filter((row) => row.enabled),
+    [activities],
+  );
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return enabled;
+    return enabled.filter((row) => row.title.toLowerCase().includes(q));
+  }, [enabled, query]);
+
+  const selectedRows = enabled.filter((row) => row.id in selected);
+  const selectedTotal = selectedRows.reduce(
+    (sum, row) => sum + (selected[row.id] ?? 0),
+    0,
+  );
+
+  function persist(next: ScoringActivity[]) {
+    setActivities(next);
+    writeScoringActivities(next);
+    setSelected((current) => {
+      const allowed = new Set(
+        next.filter((row) => row.enabled).map((row) => row.id),
+      );
+      const updated: Record<string, number> = {};
+      for (const [id, value] of Object.entries(current)) {
+        if (!allowed.has(id)) continue;
+        const row = next.find((item) => item.id === id);
+        if (!row) continue;
+        updated[id] = clampScore(value, row.minPoints, row.maxPoints);
+      }
+      return updated;
+    });
+    setScoreDrafts({});
+  }
+
+  function toggleActivity(row: ScoringActivity) {
+    setSelected((current) => {
+      if (row.id in current) {
+        const next = { ...current };
+        delete next[row.id];
+        return next;
+      }
+      return {
+        ...current,
+        [row.id]: clampScore(row.maxPoints, row.minPoints, row.maxPoints),
+      };
+    });
+    setScoreDrafts((current) => {
+      if (!(row.id in current)) return current;
+      const next = { ...current };
+      delete next[row.id];
+      return next;
+    });
+  }
+
+  function setActivityScore(row: ScoringActivity, value: number) {
+    setSelected((current) => ({
+      ...current,
+      [row.id]: clampScore(value, row.minPoints, row.maxPoints),
+    }));
+    setScoreDrafts((current) => {
+      if (!(row.id in current)) return current;
+      const next = { ...current };
+      delete next[row.id];
+      return next;
+    });
+  }
+
+  function commitCustomScore(row: ScoringActivity, raw: string) {
+    const n = Number(raw);
+    setActivityScore(row, Number.isFinite(n) ? n : row.minPoints);
+  }
+
+  function activityDrafts(): AwardDraft[] | null {
+    if (!teamId) return null;
+    if (selectedRows.length === 0) return null;
+    return selectedRows.map((row) => ({
+      teamId,
+      delta: clampScore(
+        selected[row.id] ?? row.maxPoints,
+        row.minPoints,
+        row.maxPoints,
+      ),
+      kind: "activity" as const,
+      title: row.title,
+      minPoints: row.minPoints,
+      maxPoints: row.maxPoints,
+    }));
+  }
+
+  function extraDraft(): AwardDraft | null {
+    if (!teamId) return null;
+    const amount = Number(extraAmount);
+    if (!Number.isInteger(amount) || amount === 0) return null;
+    const delta = extraSign * Math.abs(amount);
+    return {
+      teamId,
+      delta,
+      kind: "extra",
+      title: extraReason.trim() || "Extra",
+      reason: extraReason,
+    };
+  }
+
+  function submitActivities(e: FormEvent) {
+    e.preventDefault();
+    const drafts = activityDrafts();
+    if (!drafts) return;
+    if (online) onAward(drafts);
+    else onSaveForLater(drafts);
+    setSelected({});
+    setScoreDrafts({});
+  }
+
+  function submitExtra(e: FormEvent) {
+    e.preventDefault();
+    const draft = extraDraft();
+    if (!draft) return;
+    if (online) onAward([draft]);
+    else onSaveForLater([draft]);
+    setExtraReason("");
+  }
+
+  function addCustomEvent(e: FormEvent) {
+    e.preventDefault();
+    const row = sanitizeActivity({
+      title: newTitle,
+      minPoints: Number(newMin),
+      maxPoints: Number(newMax),
+      enabled: true,
+    });
+    if (!row) return;
+    if (
+      activities.some((item) => item.title.toLowerCase() === row.title.toLowerCase())
+    ) {
+      persist(
+        activities.map((item) =>
+          item.title.toLowerCase() === row.title.toLowerCase()
+            ? { ...item, ...row, id: item.id }
+            : item,
+        ),
+      );
+    } else {
+      persist([...activities, row]);
+    }
+    setNewTitle("");
+    setNewMin("0");
+    setNewMax("10");
+  }
+
+  const canSubmitActivities = Boolean(teamId) && selectedRows.length > 0 && !busy;
+  const extraDelta = extraSign * Math.abs(Number(extraAmount) || 0);
+  const canSubmitExtra =
+    Boolean(teamId) && Number.isInteger(Number(extraAmount)) && extraDelta !== 0 && !busy;
+
+  return (
+    <motion.section
+      layout
+      variants={panelIn}
+      className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-1"
+    >
+      <h2 className="display-font text-xl font-bold">Award points</h2>
+      <p className="mt-1 text-sm font-semibold text-muted-soft">
+        Pick a team, then score the events you turned on. Each event stays inside
+        its min–max cap. Use Extra for one-off bonuses or deductions.
+      </p>
+
+      <p className="mt-4 text-sm font-bold text-muted">Team</p>
+      {teams.length === 0 ? (
+        <p className="mt-2 text-sm font-semibold text-muted-soft">
+          Create a team first.
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {teams.map((team) => {
+            const active = team.id === teamId;
+            return (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setTeamId(team.id)}
+                className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                  active ? "ring-2 ring-white/85 dark:ring-white/80" : ""
+                }`}
+                style={teamChipStyle(team.color, active)}
+                aria-pressed={active}
+              >
+                {team.name}
+                <span className="ml-1 text-xs font-bold opacity-80">
+                  {team.score}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("activities")}
+          className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+            tab === "activities"
+              ? "border-star bg-star text-on-star"
+              : "btn-chip"
+          }`}
+          aria-pressed={tab === "activities"}
+        >
+          Camp events
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("extra")}
+          className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+            tab === "extra"
+              ? "border-star bg-star text-on-star"
+              : "btn-chip"
+          }`}
+          aria-pressed={tab === "extra"}
+        >
+          Extra
+        </button>
+      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        {tab === "activities" ? (
+          <motion.form
+            key="activities"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={springSoft}
+            onSubmit={submitActivities}
+            className="mt-4"
+          >
+            {enabled.length === 0 ? (
+              <p className="rounded-2xl border-2 border-dashed border-saddle/25 px-3 py-6 text-center text-sm font-semibold text-muted-soft">
+                No scoring events are on yet. Open setup below and enable the
+                activities you want to award.
+              </p>
+            ) : (
+              <>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Filter events"
+                  className="field w-full rounded-xl border-2 px-3 py-2.5 text-sm font-semibold"
+                />
+                <ul className="mt-3 max-h-[22rem] space-y-2 overflow-y-auto pr-1">
+                  {visible.map((row) => {
+                    const isOn = row.id in selected;
+                    const score = selected[row.id] ?? row.maxPoints;
+                    const scoreText = scoreDrafts[row.id] ?? String(score);
+                    const extraDigits = Math.max(0, scoreText.length - 2);
+                    return (
+                      <li
+                        key={row.id}
+                        className={`rounded-2xl border-2 px-3 py-2.5 ${
+                          isOn
+                            ? "border-saddle bg-chip/70 dark:border-white/50"
+                            : "border-field-border"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleActivity(row)}
+                          className="flex w-full items-start justify-between gap-3 text-left"
+                        >
+                          <span>
+                            <span className="block font-extrabold text-card-ink">
+                              {row.title}
+                            </span>
+                            <span className="text-xs font-semibold text-muted-soft">
+                              Cap {row.minPoints}–{row.maxPoints} pts
+                            </span>
+                          </span>
+                          <span
+                            className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 text-xs font-black ${
+                              isOn
+                                ? "border-saddle bg-star text-on-star dark:border-white"
+                                : "border-saddle/30 text-transparent"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        </button>
+                        {isOn ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setActivityScore(row, score - 1)}
+                              disabled={score <= row.minPoints}
+                              className="btn-soft h-10 w-10 rounded-xl border text-lg font-black disabled:opacity-40"
+                            >
+                              −
+                            </button>
+                            <label className="sr-only" htmlFor={`score-${row.id}`}>
+                              Custom points for {row.title}
+                            </label>
+                            <input
+                              id={`score-${row.id}`}
+                              type="number"
+                              inputMode="numeric"
+                              min={row.minPoints}
+                              max={row.maxPoints}
+                              value={scoreText}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setScoreDrafts((current) => ({
+                                  ...current,
+                                  [row.id]: raw,
+                                }));
+                                const n = Number(raw);
+                                if (!Number.isInteger(n)) return;
+                                setSelected((current) => ({
+                                  ...current,
+                                  [row.id]: clampScore(
+                                    n,
+                                    row.minPoints,
+                                    row.maxPoints,
+                                  ),
+                                }));
+                              }}
+                              onBlur={(e) => commitCustomScore(row, e.target.value)}
+                              style={{
+                                width:
+                                  extraDigits === 0
+                                    ? "5.25rem"
+                                    : `calc(5.25rem + ${extraDigits}ch)`,
+                              }}
+                              className="field display-font h-10 min-w-[5.25rem] max-w-full rounded-xl border-2 px-2 text-center text-2xl font-bold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setActivityScore(row, score + 1)}
+                              disabled={score >= row.maxPoints}
+                              className="btn-soft h-10 w-10 rounded-xl border text-lg font-black disabled:opacity-40"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActivityScore(row, row.minPoints)}
+                              className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
+                            >
+                              Min
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActivityScore(row, row.maxPoints)}
+                              className="btn-soft rounded-lg border px-2.5 py-1.5 text-xs font-extrabold"
+                            >
+                              Max
+                            </button>
+                            <span className="w-full text-xs font-semibold text-muted-soft">
+                              Type any amount in the {row.minPoints}–{row.maxPoints} cap.
+                            </span>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+
+            <p className="mt-3 text-sm font-bold text-muted-soft">
+              {selectedRows.length === 0
+                ? "Select one or more events to award."
+                : `${selectedRows.length} event${selectedRows.length === 1 ? "" : "s"} · ${selectedTotal > 0 ? "+" : ""}${selectedTotal} pts`}
+            </p>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {online ? (
+                <>
+                  <button
+                    type="submit"
+                    disabled={!canSubmitActivities}
+                    className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  >
+                    <BusyLabel busy={busy} busyLabel="Awarding…">
+                      Award selected
+                    </BusyLabel>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canSubmitActivities}
+                    onClick={() => {
+                      const drafts = activityDrafts();
+                      if (!drafts) return;
+                      onSaveForLater(drafts);
+                      setSelected({});
+                      setScoreDrafts({});
+                    }}
+                    className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  >
+                    Save for later
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSubmitActivities}
+                  className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50 sm:col-span-2"
+                >
+                  Save to field notes
+                </button>
+              )}
+            </div>
+          </motion.form>
+        ) : (
+          <motion.form
+            key="extra"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={springSoft}
+            onSubmit={submitExtra}
+            className="mt-4"
+          >
+            <p className="text-sm font-semibold text-muted-soft">
+              Random bonus or deduction that is not tied to a camp event.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setExtraSign(1)}
+                className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                  extraSign === 1
+                    ? "border-emerald-600 bg-emerald-500/15 text-emerald-800 dark:border-emerald-400 dark:text-emerald-300"
+                    : "btn-chip"
+                }`}
+              >
+                Award
+              </button>
+              <button
+                type="button"
+                onClick={() => setExtraSign(-1)}
+                className={`rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                  extraSign === -1
+                    ? "border-red-600 bg-red-500/15 text-red-700 dark:border-red-400 dark:text-red-300"
+                    : "btn-chip"
+                }`}
+              >
+                Deduct
+              </button>
+            </div>
+            <label className="mt-3 block text-sm font-bold text-muted">
+              Points
+              <input
+                type="number"
+                min={1}
+                value={extraAmount}
+                onChange={(e) => setExtraAmount(e.target.value)}
+                className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                required
+              />
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[1, 5, 10, 25].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setExtraAmount(String(n))}
+                  className="btn-soft rounded-lg border px-3 py-1.5 text-sm font-extrabold"
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <label className="mt-3 block text-sm font-bold text-muted">
+              Reason
+              <input
+                type="text"
+                value={extraReason}
+                onChange={(e) => setExtraReason(e.target.value)}
+                placeholder="e.g. Helped clean up, late to chapel"
+                className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+              />
+            </label>
+            <p className="mt-2 text-sm font-bold text-muted-soft">
+              This will post{" "}
+              <span
+                className={
+                  extraDelta >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-red-600 dark:text-red-400"
+                }
+              >
+                {extraDelta > 0 ? `+${extraDelta}` : extraDelta || 0}
+              </span>
+              {extraReason.trim() ? ` · ${extraReason.trim()}` : ""}
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {online ? (
+                <>
+                  <button
+                    type="submit"
+                    disabled={!canSubmitExtra}
+                    className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  >
+                    <BusyLabel busy={busy} busyLabel="Posting…">
+                      {extraSign === 1 ? "Award extra" : "Deduct extra"}
+                    </BusyLabel>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canSubmitExtra}
+                    onClick={() => {
+                      const draft = extraDraft();
+                      if (!draft) return;
+                      onSaveForLater([draft]);
+                      setExtraReason("");
+                    }}
+                    className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                  >
+                    Save for later
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!canSubmitExtra}
+                  className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50 sm:col-span-2"
+                >
+                  Save to field notes
+                </button>
+              )}
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      <div className="mt-5 border-t border-saddle/15 pt-4 dark:border-white/10">
+        <button
+          type="button"
+          onClick={() => setSetupOpen((open) => !open)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span>
+            <span className="display-font block text-lg font-bold">
+              Set up scoring events
+            </span>
+            <span className="text-xs font-semibold text-muted-soft">
+              Turn events on, then set the min and max points for each one.
+              This list stays on this device while we try it locally.
+            </span>
+          </span>
+          <span className="text-lg font-black text-muted-soft">
+            {setupOpen ? "−" : "+"}
+          </span>
+        </button>
+
+        {setupOpen ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => persist(mergeScheduleActivities(activities))}
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+              >
+                Add missing camp events
+              </button>
+              <button
+                type="button"
+                onClick={() => persist(activities.map((row) => ({ ...row, enabled: true })))}
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+              >
+                Enable all
+              </button>
+              <button
+                type="button"
+                onClick={() => persist(activities.map((row) => ({ ...row, enabled: false })))}
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+              >
+                Disable all
+              </button>
+            </div>
+            <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {activities.map((row) => (
+                <li
+                  key={row.id}
+                  className="grid gap-2 rounded-2xl border border-field-border px-3 py-2 sm:grid-cols-[auto_1fr_4.5rem_4.5rem_auto] sm:items-center"
+                >
+                  <label className="flex items-center gap-2 text-sm font-extrabold">
+                    <input
+                      type="checkbox"
+                      checked={row.enabled}
+                      onChange={(e) =>
+                        persist(
+                          activities.map((item) =>
+                            item.id === row.id
+                              ? { ...item, enabled: e.target.checked }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="h-4 w-4 accent-[var(--star)]"
+                    />
+                    <span className="sm:hidden">On</span>
+                  </label>
+                  <p className="text-sm font-extrabold text-card-ink">{row.title}</p>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
+                    Min
+                    <input
+                      type="number"
+                      value={row.minPoints}
+                      onChange={(e) =>
+                        persist(
+                          activities.map((item) =>
+                            item.id === row.id
+                              ? sanitizeActivity({
+                                  ...item,
+                                  minPoints: Number(e.target.value),
+                                }) ?? item
+                              : item,
+                          ),
+                        )
+                      }
+                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold"
+                    />
+                  </label>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
+                    Max
+                    <input
+                      type="number"
+                      value={row.maxPoints}
+                      onChange={(e) =>
+                        persist(
+                          activities.map((item) =>
+                            item.id === row.id
+                              ? sanitizeActivity({
+                                  ...item,
+                                  maxPoints: Number(e.target.value),
+                                }) ?? item
+                              : item,
+                          ),
+                        )
+                      }
+                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      persist(activities.filter((item) => item.id !== row.id))
+                    }
+                    className="btn-danger rounded-xl px-3 py-2 text-xs font-extrabold"
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <form
+              onSubmit={addCustomEvent}
+              className="grid gap-2 rounded-2xl border-2 border-dashed border-saddle/25 p-3 sm:grid-cols-[1fr_4.5rem_4.5rem_auto] sm:items-end"
+            >
+              <label className="text-xs font-bold text-muted">
+                Custom event
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Cabin inspection"
+                  className="field mt-1 w-full rounded-xl border-2 px-3 py-2 text-sm font-semibold"
+                  required
+                />
+              </label>
+              <label className="text-xs font-bold text-muted">
+                Min
+                <input
+                  type="number"
+                  value={newMin}
+                  onChange={(e) => setNewMin(e.target.value)}
+                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold"
+                />
+              </label>
+              <label className="text-xs font-bold text-muted">
+                Max
+                <input
+                  type="number"
+                  value={newMax}
+                  onChange={(e) => setNewMax(e.target.value)}
+                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold"
+                />
+              </label>
+              <button
+                type="submit"
+                className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+              >
+                Add
+              </button>
+            </form>
+          </div>
+        ) : null}
+      </div>
+    </motion.section>
+  );
+}

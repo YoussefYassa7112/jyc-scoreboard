@@ -705,7 +705,7 @@ export function CampSchedule({
       ? "bg-[#2F8F4E] text-on-strong shadow-sm"
       : chrome === "red"
         ? "bg-[#C45C26] text-on-strong shadow-sm"
-        : "bg-star text-on-star shadow-sm";
+        : "bg-[#1E6BB8] text-on-strong shadow-sm";
 
   function handleViewMap(block: ScheduleBlock, locationId?: string) {
     setMapNotice(null);
@@ -950,7 +950,7 @@ export function CampSchedule({
               className={`min-h-11 shrink-0 cursor-pointer rounded-xl px-3.5 py-2 text-sm font-extrabold transition ${
                 active
                   ? dayActiveClass
-                  : "border border-saddle/25 bg-card text-card-ink hover:bg-chip"
+                  : "btn-chip"
               }`}
             >
               {d.label}
@@ -973,14 +973,14 @@ export function CampSchedule({
               id === "red"
                 ? active
                   ? "bg-[#C45C26] text-on-strong"
-                  : "border-[#C45C26]/40 text-[#C45C26] bg-card"
+                  : "border-2 border-[#C45C26] bg-[#C45C26]/15 text-[#C45C26]"
                 : id === "green"
                   ? active
                     ? "bg-[#2F8F4E] text-on-strong"
-                    : "border-[#2F8F4E]/40 text-[#2F8F4E] bg-card"
+                    : "border-2 border-[#2F8F4E] bg-[#2F8F4E]/15 text-[#2F8F4E]"
                   : active
                     ? "bg-[#1E6BB8] text-on-strong"
-                    : "border-saddle/20 text-card-ink bg-card";
+                    : "border-2 border-[#1E6BB8] bg-[#1E6BB8]/20 text-[#1E6BB8] dark:text-[#7dd3fc]";
             return (
               <button
                 key={id}

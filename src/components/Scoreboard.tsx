@@ -22,6 +22,7 @@ import type { StandingRow } from "@/lib/standings";
 import { LIVE_CAMP_SIM } from "@/lib/schedule-sim";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
+import { needsDarkText } from "@/lib/utils";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { BoardAlerts } from "./BoardAlerts";
 import { useIntroReady } from "./IntroSplash";
@@ -74,16 +75,6 @@ function formatAsOf(iso: string) {
   } catch {
     return "";
   }
-}
-
-function needsDarkText(hex: string) {
-  const cleaned = hex.replace("#", "");
-  if (cleaned.length !== 6) return false;
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.72;
 }
 
 export function Scoreboard() {
@@ -473,7 +464,7 @@ export function Scoreboard() {
                 className={`display-font relative flex-1 rounded-xl px-2 py-3 text-sm font-extrabold transition-colors sm:px-3 sm:py-2.5 sm:text-base ${
                   active
                     ? "text-on-star"
-                    : "cursor-pointer text-ink ring-1 ring-saddle/20 hover:bg-chip/70 hover:ring-saddle/35"
+                    : "btn-chip cursor-pointer hover:brightness-105"
                 }`}
                 aria-current={active ? "page" : undefined}
               >

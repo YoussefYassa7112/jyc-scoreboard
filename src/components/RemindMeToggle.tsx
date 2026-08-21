@@ -59,8 +59,8 @@ export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
         type="button"
         onClick={toggle}
         aria-pressed={enabled}
-        className={`btn-soft inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold ${
-          enabled ? "border-star/60 text-star" : ""
+        className={`btn-soft inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold ${
+          enabled ? "ring-2 ring-on-star/50" : ""
         }`}
       >
         <motion.span

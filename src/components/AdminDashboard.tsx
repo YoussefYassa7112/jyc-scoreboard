@@ -32,8 +32,11 @@ import {
   type FieldNote,
 } from "@/lib/field-notes";
 import { TEAM_COLORS } from "@/lib/standings";
+import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
+import { teamChipStyle } from "@/lib/utils";
 import { useOnline } from "@/lib/use-online";
 import { FieldNotes } from "./FieldNotes";
+import { AwardPointsPanel } from "./AwardPointsPanel";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OfflineBanner } from "./OfflineBanner";
@@ -81,9 +84,7 @@ export function AdminDashboard() {
   const [newColor, setNewColor] = useState(TEAM_COLORS[0]);
   const [newCampGroup, setNewCampGroup] = useState<CampGroup>("red");
 
-  const [pointTeamId, setPointTeamId] = useState<number | "">("");
-  const [pointDelta, setPointDelta] = useState("10");
-  const [pointNote, setPointNote] = useState("");
+  const [historyTeamId, setHistoryTeamId] = useState<number | "all">("all");
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -161,18 +162,12 @@ export function AdminDashboard() {
     setTeams(teamsJson.teams);
     writeAdminTeamsCache(teamsJson.teams);
     setHistory(historyJson.history);
-    setPointTeamId((current) =>
-      current === "" && teamsJson.teams[0] ? teamsJson.teams[0].id : current,
-    );
   }, []);
 
   useEffect(() => {
     const cachedTeams = readAdminTeamsCache();
     if (cachedTeams.length) {
       setTeams(cachedTeams);
-      setPointTeamId((current) =>
-        current === "" && cachedTeams[0] ? cachedTeams[0].id : current,
-      );
     }
     setFieldNotes(readFieldNotes());
   }, []);
@@ -217,6 +212,11 @@ export function AdminDashboard() {
     () => [...teams].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)),
     [teams],
   );
+
+  const filteredHistory = useMemo(() => {
+    if (historyTeamId === "all") return history;
+    return history.filter((row) => row.teamId === historyTeamId);
+  }, [history, historyTeamId]);
 
   const postingNoteId =
     fieldNotes.find((note) => isBusy(`note-${note.id}`))?.id ?? null;
@@ -344,38 +344,73 @@ export function AdminDashboard() {
     });
   }
 
-  function parsedAward() {
-    const delta = Number(pointDelta);
-    if (!pointTeamId || !Number.isInteger(delta) || delta === 0) {
-      fail("Need a team and points", "Enter a non-zero whole number.");
-      return null;
+  function awardDrafts(drafts: AwardDraft[]) {
+    const toPost = drafts.filter((draft) => draft.delta !== 0);
+    if (toPost.length === 0) {
+      fail("Need some points", "Give at least 1 point, or use Extra to deduct.");
+      return;
     }
-    const team = teams.find((t) => t.id === pointTeamId);
+    const team = teams.find((t) => t.id === toPost[0].teamId);
     if (!team) {
       fail("Pick a team first");
-      return null;
+      return;
     }
-    return { delta, team };
+    void run("submit-points", async () => {
+      try {
+        for (const draft of toPost) {
+          await postPoints({
+            teamId: draft.teamId,
+            delta: draft.delta,
+            note: formatAwardNote(draft),
+          });
+        }
+        await refresh();
+        const total = toPost.reduce((sum, draft) => sum + draft.delta, 0);
+        const labels = toPost.map((draft) =>
+          draft.kind === "extra" ? "Extra" : draft.title,
+        );
+        flash(
+          total > 0
+            ? `+${total} for ${team.name}`
+            : `${total} for ${team.name}`,
+          labels.length === 1
+            ? labels[0]
+            : `${labels.length} events posted to the board.`,
+        );
+      } catch (err) {
+        fail(err instanceof Error ? err.message : "Could not update points");
+      }
+    });
   }
 
-  function saveToFieldNotes() {
-    const parsed = parsedAward();
-    if (!parsed) return;
+  function saveDraftsToFieldNotes(drafts: AwardDraft[]) {
+    const toSave = drafts.filter((draft) => draft.delta !== 0);
+    if (toSave.length === 0) {
+      fail("Need some points", "Give at least 1 point, or use Extra to deduct.");
+      return;
+    }
+    const team = teams.find((t) => t.id === toSave[0].teamId);
+    if (!team) {
+      fail("Pick a team first");
+      return;
+    }
     const next = [
-      createFieldNote({
-        teamId: parsed.team.id,
-        teamName: parsed.team.name,
-        teamColor: parsed.team.color,
-        delta: parsed.delta,
-        note: pointNote.trim(),
-      }),
+      ...toSave.map((draft) =>
+        createFieldNote({
+          teamId: team.id,
+          teamName: team.name,
+          teamColor: team.color,
+          delta: draft.delta,
+          note: formatAwardNote(draft),
+        }),
+      ),
       ...fieldNotes,
     ];
     persistNotes(next);
-    setPointNote("");
+    const total = toSave.reduce((sum, draft) => sum + draft.delta, 0);
     flash(
       "Saved to field notes",
-      `${parsed.delta > 0 ? "+" : ""}${parsed.delta} for ${parsed.team.name} — post when you have WiFi.`,
+      `${total > 0 ? "+" : ""}${total} for ${team.name} — post when you have WiFi.`,
     );
   }
 
@@ -397,37 +432,6 @@ export function AdminDashboard() {
     if (!res.ok) {
       throw new Error(data.error || "Could not update points");
     }
-  }
-
-  function submitPoints(e: FormEvent) {
-    e.preventDefault();
-    if (!online) {
-      saveToFieldNotes();
-      return;
-    }
-    const parsed = parsedAward();
-    if (!parsed) return;
-    void run("submit-points", async () => {
-      try {
-        await postPoints({
-          teamId: parsed.team.id,
-          delta: parsed.delta,
-          note: pointNote,
-        });
-        setPointNote("");
-        await refresh();
-        flash(
-          parsed.delta > 0
-            ? `+${parsed.delta} for ${parsed.team.name}`
-            : `${parsed.delta} for ${parsed.team.name}`,
-          parsed.delta > 0
-            ? "Points are live on the scoreboard."
-            : "Deduction is live on the scoreboard.",
-        );
-      } catch (err) {
-        fail(err instanceof Error ? err.message : "Could not update points");
-      }
-    });
   }
 
   function postFieldNote(note: FieldNote) {
@@ -541,7 +545,7 @@ export function AdminDashboard() {
               type="button"
               onClick={logout}
               disabled={isBusy("logout")}
-              className="btn-cta rounded-xl bg-saddle px-4 py-2 text-sm font-extrabold disabled:opacity-60"
+              className="btn-cta rounded-xl bg-star px-4 py-2 text-sm font-extrabold disabled:opacity-60"
             >
               <BusyLabel busy={isBusy("logout")} busyLabel="Logging out…">
                 Log out
@@ -573,124 +577,13 @@ export function AdminDashboard() {
           >
             <LayoutGroup>
             <section className="grid gap-5 lg:grid-cols-2">
-              <motion.form
-                layout
-                variants={panelIn}
-                onSubmit={submitPoints}
-                className="panel rounded-3xl p-5 lg:col-start-1 lg:row-start-1"
-              >
-                <h2 className="display-font text-xl font-bold">Add or deduct points</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-soft">
-                  {online
-                    ? "Changes show on the public board within a few seconds."
-                    : "No WiFi — save to Field notes on this device, then post when you're back."}
-                </p>
-
-                <label className="mt-4 block text-sm font-bold text-muted">
-                  Team
-                  <select
-                    value={pointTeamId}
-                    onChange={(e) =>
-                      setPointTeamId(e.target.value ? Number(e.target.value) : "")
-                    }
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select a team
-                    </option>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.score} pts)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="mt-3 block text-sm font-bold text-muted">
-                  Points (use negative to deduct)
-                  <input
-                    type="number"
-                    value={pointDelta}
-                    onChange={(e) => setPointDelta(e.target.value)}
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                    required
-                  />
-                </label>
-
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[5, 10, 25, -5, -10].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPointDelta(String(n))}
-                      className="btn-soft rounded-lg border px-3 py-1.5 text-sm font-extrabold"
-                    >
-                      {n > 0 ? `+${n}` : n}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="mt-3 block text-sm font-bold text-muted">
-                  Note (optional)
-                  <input
-                    type="text"
-                    value={pointNote}
-                    onChange={(e) => setPointNote(e.target.value)}
-                    placeholder="e.g. Capture the flag"
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                  />
-                </label>
-
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {online ? (
-                    <motion.div
-                      key="online-actions"
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={springSoft}
-                      className="mt-4 grid gap-2 sm:grid-cols-2"
-                    >
-                      <button
-                        type="submit"
-                        disabled={teams.length === 0 || isBusy("submit-points")}
-                        className="btn-cta w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                      >
-                        <BusyLabel
-                          busy={isBusy("submit-points")}
-                          busyLabel="Submitting…"
-                        >
-                          Submit points
-                        </BusyLabel>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={saveToFieldNotes}
-                        disabled={teams.length === 0 || isBusy("submit-points")}
-                        className="btn-soft w-full rounded-xl border px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                      >
-                        Save for later
-                      </button>
-                    </motion.div>
-                  ) : (
-                    <motion.button
-                      key="offline-action"
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={springSoft}
-                      type="submit"
-                      disabled={teams.length === 0}
-                      className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                    >
-                      Save to field notes
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-              </motion.form>
+              <AwardPointsPanel
+                teams={teams}
+                online={online}
+                busy={isBusy("submit-points")}
+                onAward={awardDrafts}
+                onSaveForLater={saveDraftsToFieldNotes}
+              />
 
               <FieldNotes
                 notes={fieldNotes}
@@ -956,7 +849,7 @@ export function AdminDashboard() {
                               type="button"
                               onClick={() => requestDeleteTeam(team.id, team.name)}
                               disabled={teamBusy}
-                              className="rounded-xl border border-star/40 px-3 py-2 text-sm font-extrabold text-star disabled:opacity-60"
+                              className="btn-danger rounded-xl px-3 py-2 text-sm font-extrabold disabled:opacity-60"
                             >
                               Delete
                             </button>
@@ -990,14 +883,51 @@ export function AdminDashboard() {
             <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
               <motion.div layout variants={panelIn} className="panel rounded-3xl p-5">
                 <h2 className="display-font text-xl font-bold">Point history</h2>
-                {history.length === 0 ? (
+                <p className="mt-1 text-sm font-semibold text-muted-soft">
+                  Each award shows the team, the event or extra reason, and the cap used.
+                </p>
+                {teams.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryTeamId("all")}
+                      className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
+                        historyTeamId === "all"
+                          ? "border-star bg-star text-on-star"
+                          : "btn-chip"
+                      }`}
+                    >
+                      All teams
+                    </button>
+                    {sortedTeams.map((team) => (
+                      <button
+                        key={team.id}
+                        type="button"
+                        onClick={() => setHistoryTeamId(team.id)}
+                        className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
+                          historyTeamId === team.id
+                            ? "ring-2 ring-white/85 dark:ring-white/80"
+                            : ""
+                        }`}
+                        style={teamChipStyle(team.color, historyTeamId === team.id)}
+                      >
+                        {team.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {filteredHistory.length === 0 ? (
                   <p className="mt-3 font-semibold text-muted-soft">
-                    No point events yet.
+                    {history.length === 0
+                      ? "No point events yet."
+                      : "No history for that team yet."}
                   </p>
                 ) : (
                   <ul className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto pr-1">
                     <AnimatePresence initial={false}>
-                    {history.map((row) => (
+                    {filteredHistory.map((row) => {
+                      const parsed = parsePointNote(row.note);
+                      return (
                       <motion.li
                         key={row.id}
                         layout
@@ -1015,9 +945,19 @@ export function AdminDashboard() {
                             />
                             {row.teamName}
                           </p>
+                          <p className="mt-0.5 text-sm font-bold text-card-ink">
+                            <span className="mr-1.5 rounded-full bg-saddle/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-muted dark:bg-white/10">
+                              {parsed.kind === "extra"
+                                ? "Extra"
+                                : parsed.kind === "activity"
+                                  ? "Event"
+                                  : "Note"}
+                            </span>
+                            {parsed.title}
+                          </p>
                           <p className="text-xs font-semibold text-muted-soft">
                             {new Date(row.createdAt).toLocaleString()}
-                            {row.note ? ` · ${row.note}` : ""}
+                            {parsed.capLabel ? ` · cap ${parsed.capLabel}` : ""}
                           </p>
                         </div>
                         <span
@@ -1030,7 +970,8 @@ export function AdminDashboard() {
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
                         </span>
                       </motion.li>
-                    ))}
+                      );
+                    })}
                     </AnimatePresence>
                   </ul>
                 )}
@@ -1096,6 +1037,7 @@ export function AdminDashboard() {
         title={`Delete ${pendingDelete?.name ?? "this team"}?`}
         detail="This also removes that team's point history. This cannot be undone."
         confirmLabel="Yes, delete"
+        danger
         busy={pendingDelete ? isBusy(`delete-${pendingDelete.id}`) : false}
         onConfirm={confirmDeleteTeam}
         onCancel={() => setPendingDelete(null)}

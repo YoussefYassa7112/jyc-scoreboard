@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { panelIn, springSnappy } from "@/lib/motion";
 import type { FieldNote } from "@/lib/field-notes";
+import { parsePointNote } from "@/lib/scoring";
 import { BusyLabel } from "./Spinner";
 
 type Props = {
@@ -83,7 +84,7 @@ export function FieldNotes({
             Clipboard is empty
           </p>
           <p className="mt-1 max-w-xs text-sm font-semibold text-muted-soft">
-            Use Add or deduct points, then Save for later / Save to field notes.
+            Use Award points, then Save for later / Save to field notes.
           </p>
         </div>
       ) : (
@@ -91,6 +92,7 @@ export function FieldNotes({
           <AnimatePresence initial={false}>
             {notes.map((note) => {
               const busy = postingAll || postingId === note.id;
+              const parsed = parsePointNote(note.note);
               return (
                 <motion.li
                   key={note.id}
@@ -128,9 +130,21 @@ export function FieldNotes({
                       {note.delta > 0 ? `+${note.delta}` : note.delta}
                     </span>
                   </div>
-                  {note.note ? (
+                  {parsed.title && parsed.title !== "No note" ? (
                     <p className="mt-2 rounded-xl bg-white/70 px-2.5 py-1.5 text-sm font-semibold text-card-ink dark:bg-black/20">
-                      {note.note}
+                      <span className="mr-1.5 rounded-full bg-saddle/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-muted dark:bg-white/10">
+                        {parsed.kind === "extra"
+                          ? "Extra"
+                          : parsed.kind === "activity"
+                            ? "Event"
+                            : "Note"}
+                      </span>
+                      {parsed.title}
+                      {parsed.capLabel ? (
+                        <span className="mt-0.5 block text-xs font-bold text-muted-soft">
+                          Cap {parsed.capLabel}
+                        </span>
+                      ) : null}
                     </p>
                   ) : (
                     <p className="mt-2 text-sm font-semibold italic text-muted-soft">
@@ -155,7 +169,7 @@ export function FieldNotes({
                       type="button"
                       onClick={() => onDiscard(note.id)}
                       disabled={busy}
-                      className="rounded-xl border border-star/40 px-3 py-2 text-sm font-extrabold text-star disabled:opacity-50"
+                      className="btn-danger rounded-xl px-3 py-2 text-sm font-extrabold disabled:opacity-50"
                     >
                       Discard
                     </button>

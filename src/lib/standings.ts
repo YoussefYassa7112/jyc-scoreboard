@@ -99,7 +99,7 @@ export async function getStandings(): Promise<StandingsPayload> {
   };
 }
 
-export async function getPointHistory(limit = 50) {
+export async function getPointHistory(limit = 250) {
   const db = getDb();
   return db
     .select({

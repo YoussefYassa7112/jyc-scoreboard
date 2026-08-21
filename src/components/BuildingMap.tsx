@@ -552,7 +552,7 @@ export function BuildingMap({
                 className={`min-h-11 cursor-pointer rounded-xl px-2 py-2 text-sm font-extrabold transition sm:px-3.5 ${
                   active
                     ? "bg-star text-on-star shadow-sm"
-                    : "border border-saddle/25 bg-card text-card-ink ring-1 ring-saddle/15 hover:bg-chip"
+                    : "btn-chip"
                 }`}
               >
                 {f.label}
@@ -1005,7 +1005,7 @@ export function BuildingMap({
                         className={`w-full cursor-pointer rounded-xl border-2 px-3 py-2 text-left transition ${
                           highlighted
                             ? "border-star bg-star/15 ring-2 ring-star/40"
-                            : "border-transparent bg-chip/80 hover:border-saddle/30 hover:bg-chip"
+                            : "btn-chip hover:brightness-105"
                         }`}
                       >
                         <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-muted-soft">
