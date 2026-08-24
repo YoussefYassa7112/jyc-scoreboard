@@ -273,9 +273,11 @@ export function StandingsList({ standings, presentation = false }: Props) {
                           One score bump from {ahead.name} and you swap places.
                         </p>
                       ) : null}
-                      <p className="text-xs font-extrabold text-muted-soft">
-                        Tap to hide
-                      </p>
+                      {presentation ? null : (
+                        <p className="text-xs font-extrabold text-muted-soft">
+                          Tap to hide
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

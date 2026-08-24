@@ -44,7 +44,7 @@ export function AdminLoginForm() {
   }
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="relative flex min-h-dvh items-center justify-center px-4 pb-10 pt-[var(--board-chrome)]">
       <SkyDecor />
       <motion.form
         layout

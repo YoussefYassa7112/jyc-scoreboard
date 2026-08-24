@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 const floaters = [
   { emoji: "🤠", top: "6%", left: "3%", size: "text-3xl sm:text-5xl", delay: 0, dur: 5.5 },
-  { emoji: "🚀", top: "12%", right: "4%", size: "text-3xl sm:text-5xl", delay: 0.4, dur: 4.8 },
+  { emoji: "🚀", top: "16%", right: "18%", size: "text-3xl sm:text-5xl", delay: 0.4, dur: 4.8 },
   { emoji: "⭐", top: "22%", left: "8%", size: "text-2xl sm:text-4xl", delay: 0.8, dur: 3.6 },
   { emoji: "🐴", top: "18%", right: "12%", size: "text-2xl sm:text-4xl", delay: 1.1, dur: 6.2 },
   { emoji: "✨", top: "4%", left: "42%", size: "text-xl sm:text-3xl", delay: 0.2, dur: 3.2 },
@@ -14,7 +14,7 @@ const floaters = [
   { emoji: "🎯", bottom: "22%", right: "6%", size: "text-2xl sm:text-4xl", delay: 1.3, dur: 4.4 },
   { emoji: "💫", top: "40%", right: "8%", size: "text-xl sm:text-3xl", delay: 1.7, dur: 3.8 },
   { emoji: "🐎", bottom: "12%", left: "18%", size: "text-2xl sm:text-3xl", delay: 0.5, dur: 6.5 },
-  { emoji: "🪐", top: "8%", right: "28%", size: "text-2xl sm:text-3xl", delay: 1.0, dur: 5.0 },
+  { emoji: "🪐", top: "10%", right: "32%", size: "text-2xl sm:text-3xl", delay: 1.0, dur: 5.0 },
 ] as const;
 
 const twinkles = [

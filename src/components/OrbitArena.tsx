@@ -574,7 +574,7 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
         ref={wrapRef}
         className={
           stage
-            ? "relative mx-auto aspect-square w-[min(100%,22dvh)] min-h-0 min-w-0 overflow-hidden md:aspect-auto md:h-auto md:w-full md:flex-1"
+            ? "relative mx-auto aspect-square w-full max-w-[min(100%,18dvh)] min-h-0 min-w-0 overflow-hidden md:aspect-auto md:h-auto md:max-w-none md:w-full md:flex-1"
             : "mx-auto w-full max-w-lg overflow-hidden"
         }
       >

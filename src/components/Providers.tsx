@@ -12,11 +12,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider>
       <IntroReadyProvider>
         <NightSky />
-        <div className="fixed right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-50 flex flex-col items-end gap-1.5 sm:right-5 sm:top-5">
-          <ThemeToggle />
-          <Suspense fallback={null}>
-            <PresentationToggle />
-          </Suspense>
+        <div className="pointer-events-none fixed right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.4rem,env(safe-area-inset-top))] z-50 sm:right-5 sm:top-4">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full border-2 border-saddle/20 bg-cloud/85 p-1 shadow-lg backdrop-blur-md dark:border-white/15 dark:bg-[#152038]/85">
+            <ThemeToggle />
+            <Suspense fallback={null}>
+              <PresentationToggle />
+            </Suspense>
+          </div>
         </div>
         {children}
       </IntroReadyProvider>

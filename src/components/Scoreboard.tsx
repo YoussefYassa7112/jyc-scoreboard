@@ -388,8 +388,8 @@ export function Scoreboard() {
     <main
       className={`relative min-w-0 ${
         presenting
-          ? "flex h-dvh max-h-dvh flex-col overflow-hidden px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 md:px-6 md:py-4"
-          : "min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
+          ? "flex h-dvh max-h-dvh flex-col overflow-hidden px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top,0px)+3.6rem)] sm:px-5 sm:pt-[var(--board-chrome)] md:px-6 md:pb-4"
+          : "min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[var(--board-chrome)] sm:px-6 md:px-10 md:pb-10"
       }`}
     >
       <SkyDecor />
@@ -402,10 +402,13 @@ export function Scoreboard() {
         }`}
       >
         {presenting ? (
-          <header className="min-w-0 shrink-0 overflow-hidden pr-[6.75rem] sm:pr-28">
+          <header className="min-w-0 shrink-0 overflow-hidden">
             <div className="flex min-w-0 flex-col gap-1.5 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
-              <div className="min-w-0 shrink-0">
-                <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
+              <div className="min-w-0">
+                <p className="display-font flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
+                  <span aria-hidden className="text-sm normal-case tracking-normal">
+                    {isDark ? "🪐" : "🤠"}
+                  </span>
                   Welcome to the JYC
                 </p>
                 <h1 className="display-font text-xl font-bold leading-tight text-ink sm:text-3xl">
@@ -439,7 +442,7 @@ export function Scoreboard() {
         ) : (
           <header className="text-center">
             <motion.div
-              className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
+              className="mx-auto mb-2 flex items-center justify-center gap-3 pt-1 text-2xl sm:text-3xl"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
             >
@@ -450,7 +453,7 @@ export function Scoreboard() {
                 {isDark ? "🪐" : "🤠"}
               </motion.span>
               <motion.span
-                animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
+                animate={{ y: [0, -6, 0], scale: [1, 1.12, 1] }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
               >
                 ⭐
@@ -468,10 +471,10 @@ export function Scoreboard() {
               </motion.span>
             </motion.div>
 
-            <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
+            <p className="display-font px-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
               Welcome to the JYC
             </p>
-            <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
+            <h1 className="display-font mt-2 px-2 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
               Camp Scoreboard
             </h1>
             {LIVE_CAMP_SIM ? (
@@ -527,8 +530,8 @@ export function Scoreboard() {
                   setScheduleFocus(null);
                   goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 sm:text-base ${
-                  presenting ? "py-1.5 text-sm sm:py-2" : "py-3 text-sm sm:py-2.5"
+                className={`display-font relative min-w-0 flex-1 truncate rounded-xl px-1.5 font-extrabold transition-colors sm:px-3 sm:text-base ${
+                  presenting ? "py-1.5 text-xs sm:py-2 sm:text-sm" : "py-3 text-sm sm:py-2.5"
                 } ${
                   active
                     ? "text-on-star"
@@ -543,7 +546,7 @@ export function Scoreboard() {
                     className="absolute inset-0 rounded-xl bg-star shadow-sm"
                   />
                 ) : null}
-                <span className="relative z-10">{item.label}</span>
+                <span className="relative z-10 truncate">{item.label}</span>
               </button>
             );
           })}
