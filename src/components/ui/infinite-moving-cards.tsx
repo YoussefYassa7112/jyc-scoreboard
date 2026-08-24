@@ -17,12 +17,15 @@ export function InfiniteMovingCards({
   direction = "left",
   speed = "normal",
   pauseOnHover = true,
+  embedded = false,
   className,
 }: {
   items: MarqueeItem[];
   direction?: "left" | "right";
   speed?: "fast" | "normal" | "slow";
   pauseOnHover?: boolean;
+  /** Drop the pill chrome when a parent already draws the frame. */
+  embedded?: boolean;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +63,10 @@ export function InfiniteMovingCards({
     <div
       ref={containerRef}
       className={cn(
-        "scroller relative z-10 mx-auto max-w-3xl overflow-hidden rounded-full border border-saddle/25 bg-card py-2 shadow-sm",
+        "scroller relative z-10 overflow-hidden",
+        embedded
+          ? "max-w-none rounded-none border-0 bg-transparent py-1.5 shadow-none"
+          : "mx-auto max-w-3xl rounded-full border border-saddle/25 bg-card py-2 shadow-sm",
         "[mask-image:linear-gradient(to_right,transparent,white_6%,white_94%,transparent)]",
         className,
       )}

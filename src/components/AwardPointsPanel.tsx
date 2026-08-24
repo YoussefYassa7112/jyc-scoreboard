@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { panelIn, springSoft } from "@/lib/motion";
 import {
@@ -29,6 +29,7 @@ type Props = {
   busy: boolean;
   onAward: (drafts: AwardDraft[]) => void;
   onSaveForLater: (drafts: AwardDraft[]) => void;
+  onSetupSaved?: () => void;
 };
 
 type Tab = "activities" | "extra";
@@ -39,6 +40,7 @@ export function AwardPointsPanel({
   busy,
   onAward,
   onSaveForLater,
+  onSetupSaved,
 }: Props) {
   const [activities, setActivities] = useState<ScoringActivity[]>(() =>
     readScoringActivities(),
@@ -58,6 +60,12 @@ export function AwardPointsPanel({
   const [extraAmount, setExtraAmount] = useState("5");
   const [extraSign, setExtraSign] = useState<1 | -1>(1);
   const [extraReason, setExtraReason] = useState("");
+  const [setupBusy, setSetupBusy] = useState<"save" | "add" | string | null>(
+    null,
+  );
+  const [setupDone, setSetupDone] = useState(false);
+  const [pointDrafts, setPointDrafts] = useState<Record<string, string>>({});
+  const setupDoneTimer = useRef<number>(0);
 
   useEffect(() => {
     if (teams.length === 0) {
@@ -87,9 +95,10 @@ export function AwardPointsPanel({
   );
 
   const setupList = setupDraft ?? activities;
-  const setupDirty =
-    setupDraft !== null &&
-    JSON.stringify(setupDraft) !== JSON.stringify(activities);
+
+  useEffect(() => {
+    return () => window.clearTimeout(setupDoneTimer.current);
+  }, []);
 
   function persist(next: ScoringActivity[]) {
     setActivities(next);
@@ -108,6 +117,7 @@ export function AwardPointsPanel({
       return updated;
     });
     setScoreDrafts({});
+    setPointDrafts({});
     setSetupDraft(next.map((row) => ({ ...row })));
   }
 
@@ -122,16 +132,99 @@ export function AwardPointsPanel({
 
   function closeSetup() {
     setSetupDraft(null);
+    setPointDrafts({});
     setSetupOpen(false);
   }
 
+  function pointDraftKey(id: string, field: "min" | "max") {
+    return `${id}:${field}`;
+  }
+
+  function pointDraftValue(row: ScoringActivity, field: "min" | "max") {
+    const key = pointDraftKey(row.id, field);
+    if (key in pointDrafts) return pointDrafts[key];
+    return String(field === "min" ? row.minPoints : row.maxPoints);
+  }
+
+  function setPointDraft(
+    row: ScoringActivity,
+    field: "min" | "max",
+    raw: string,
+  ) {
+    const cleaned = raw.replace(/[^\d-]/g, "");
+    setPointDrafts((current) => ({
+      ...current,
+      [pointDraftKey(row.id, field)]: cleaned,
+    }));
+  }
+
+  function commitPointDraft(row: ScoringActivity, field: "min" | "max") {
+    const raw = pointDraftValue(row, field);
+    const n = Number(raw);
+    const nextVal = Number.isFinite(n) ? Math.trunc(n) : 0;
+    patchSetup(
+      setupList.map((item) =>
+        item.id === row.id
+          ? sanitizeActivity({
+              ...item,
+              [field === "min" ? "minPoints" : "maxPoints"]: nextVal,
+            }) ?? item
+          : item,
+      ),
+    );
+    setPointDrafts((current) => {
+      const next = { ...current };
+      delete next[pointDraftKey(row.id, field)];
+      return next;
+    });
+  }
+
+  async function commitSetup(
+    next: ScoringActivity[],
+    key: "save" | "add" | string,
+  ) {
+    setSetupBusy(key);
+    setSetupDone(false);
+    await new Promise((resolve) => window.setTimeout(resolve, 450));
+    persist(applyPointDrafts(next));
+    setSetupBusy(null);
+    setSetupDone(true);
+    onSetupSaved?.();
+    window.clearTimeout(setupDoneTimer.current);
+    setupDoneTimer.current = window.setTimeout(() => setSetupDone(false), 3200);
+  }
+
   function saveSetup() {
-    if (setupDraft) persist(setupDraft);
+    if (!setupDraft) return;
+    void commitSetup(setupDraft, "save");
   }
 
   function cancelSetup() {
+    setPointDrafts({});
     setSetupDraft(activities.map((row) => ({ ...row })));
   }
+
+  function applyPointDrafts(list: ScoringActivity[]) {
+    return list.map((item) => {
+      const minRaw = pointDrafts[pointDraftKey(item.id, "min")];
+      const maxRaw = pointDrafts[pointDraftKey(item.id, "max")];
+      if (minRaw === undefined && maxRaw === undefined) return item;
+      const minPoints =
+        minRaw !== undefined && Number.isFinite(Number(minRaw))
+          ? Math.trunc(Number(minRaw))
+          : item.minPoints;
+      const maxPoints =
+        maxRaw !== undefined && Number.isFinite(Number(maxRaw))
+          ? Math.trunc(Number(maxRaw))
+          : item.maxPoints;
+      return sanitizeActivity({ ...item, minPoints, maxPoints }) ?? item;
+    });
+  }
+
+  const setupDirty =
+    setupDraft !== null &&
+    JSON.stringify(applyPointDrafts(setupDraft)) !==
+      JSON.stringify(activities);
 
   function toggleActivity(row: ScoringActivity) {
     setSelected((current) => {
@@ -231,20 +324,19 @@ export function AwardPointsPanel({
     });
     if (!row) return;
     const list = setupList;
-    if (list.some((item) => item.title.toLowerCase() === row.title.toLowerCase())) {
-      patchSetup(
-        list.map((item) =>
+    const next = list.some(
+      (item) => item.title.toLowerCase() === row.title.toLowerCase(),
+    )
+      ? list.map((item) =>
           item.title.toLowerCase() === row.title.toLowerCase()
             ? { ...item, ...row, id: item.id }
             : item,
-        ),
-      );
-    } else {
-      patchSetup([...list, row]);
-    }
+        )
+      : [...list, row];
     setNewTitle("");
     setNewMin("0");
     setNewMax("10");
+    void commitSetup(next, "add");
   }
 
   const canSubmitActivities = Boolean(teamId) && selectedRows.length > 0 && !busy;
@@ -668,28 +760,31 @@ export function AwardPointsPanel({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                disabled={setupBusy !== null}
                 onClick={() =>
                   patchSetup(mergeScheduleActivities(setupList))
                 }
-                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold disabled:opacity-50"
               >
                 Add missing camp events
               </button>
               <button
                 type="button"
+                disabled={setupBusy !== null}
                 onClick={() =>
                   patchSetup(setupList.map((row) => ({ ...row, enabled: true })))
                 }
-                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold disabled:opacity-50"
               >
                 Enable all
               </button>
               <button
                 type="button"
+                disabled={setupBusy !== null}
                 onClick={() =>
                   patchSetup(setupList.map((row) => ({ ...row, enabled: false })))
                 }
-                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold"
+                className="btn-soft rounded-xl border px-3 py-2 text-xs font-extrabold disabled:opacity-50"
               >
                 Disable all
               </button>
@@ -721,51 +816,48 @@ export function AwardPointsPanel({
                   <label className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
                     Min
                     <input
-                      type="number"
-                      value={row.minPoints}
+                      type="text"
+                      inputMode="numeric"
+                      value={pointDraftValue(row, "min")}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) =>
-                        patchSetup(
-                          setupList.map((item) =>
-                            item.id === row.id
-                              ? sanitizeActivity({
-                                  ...item,
-                                  minPoints: Number(e.target.value),
-                                }) ?? item
-                              : item,
-                          ),
-                        )
+                        setPointDraft(row, "min", e.target.value)
                       }
-                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold"
+                      onBlur={() => commitPointDraft(row, "min")}
+                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold [appearance:textfield]"
                     />
                   </label>
                   <label className="text-[10px] font-bold uppercase tracking-wide text-muted-soft">
                     Max
                     <input
-                      type="number"
-                      value={row.maxPoints}
+                      type="text"
+                      inputMode="numeric"
+                      value={pointDraftValue(row, "max")}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) =>
-                        patchSetup(
-                          setupList.map((item) =>
-                            item.id === row.id
-                              ? sanitizeActivity({
-                                  ...item,
-                                  maxPoints: Number(e.target.value),
-                                }) ?? item
-                              : item,
-                          ),
-                        )
+                        setPointDraft(row, "max", e.target.value)
                       }
-                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold"
+                      onBlur={() => commitPointDraft(row, "max")}
+                      className="field mt-0.5 w-full rounded-lg border px-2 py-1.5 text-sm font-semibold [appearance:textfield]"
                     />
                   </label>
                   <button
                     type="button"
+                    disabled={setupBusy !== null}
                     onClick={() =>
-                      patchSetup(setupList.filter((item) => item.id !== row.id))
+                      void commitSetup(
+                        setupList.filter((item) => item.id !== row.id),
+                        `del-${row.id}`,
+                      )
                     }
-                    className="btn-danger rounded-xl px-3 py-2 text-xs font-extrabold"
+                    className="btn-danger rounded-xl px-3 py-2 text-xs font-extrabold disabled:opacity-50"
                   >
-                    Delete
+                    <BusyLabel
+                      busy={setupBusy === `del-${row.id}`}
+                      busyLabel="Removing…"
+                    >
+                      Delete
+                    </BusyLabel>
                   </button>
                 </li>
               ))}
@@ -788,33 +880,44 @@ export function AwardPointsPanel({
               <label className="text-xs font-bold text-muted">
                 Min
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={newMin}
-                  onChange={(e) => setNewMin(e.target.value)}
-                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold"
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) =>
+                    setNewMin(e.target.value.replace(/[^\d-]/g, ""))
+                  }
+                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold [appearance:textfield]"
                 />
               </label>
               <label className="text-xs font-bold text-muted">
                 Max
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={newMax}
-                  onChange={(e) => setNewMax(e.target.value)}
-                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold"
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) =>
+                    setNewMax(e.target.value.replace(/[^\d-]/g, ""))
+                  }
+                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold [appearance:textfield]"
                 />
               </label>
               <button
                 type="submit"
-                className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold"
+                disabled={setupBusy !== null || !newTitle.trim()}
+                className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-50"
               >
-                Add
+                <BusyLabel busy={setupBusy === "add"} busyLabel="Adding…">
+                  Add
+                </BusyLabel>
               </button>
             </form>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={cancelSetup}
-                disabled={!setupDirty}
+                disabled={!setupDirty || setupBusy !== null}
                 className="btn-chip rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-40"
               >
                 Cancel
@@ -822,12 +925,23 @@ export function AwardPointsPanel({
               <button
                 type="button"
                 onClick={saveSetup}
-                disabled={!setupDirty}
+                disabled={!setupDirty || setupBusy !== null}
                 className="btn-cta rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-40"
               >
-                Save
+                <BusyLabel busy={setupBusy === "save"} busyLabel="Saving…">
+                  Save
+                </BusyLabel>
               </button>
             </div>
+            {setupDone ? (
+              <p
+                className="text-center text-sm font-extrabold text-emerald-700 dark:text-emerald-300"
+                role="status"
+                aria-live="polite"
+              >
+                I&apos;m done
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

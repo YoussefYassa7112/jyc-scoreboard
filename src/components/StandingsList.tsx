@@ -133,10 +133,10 @@ export function StandingsList({ standings, presentation = false }: Props) {
 
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`display-font truncate font-bold text-card-ink ${
+                      className={`display-font font-bold text-card-ink ${
                         presentation
-                          ? "text-base sm:text-xl md:text-2xl"
-                          : "text-lg sm:text-2xl md:text-3xl"
+                          ? "text-base leading-tight sm:text-lg md:text-xl"
+                          : "truncate text-lg sm:text-2xl md:text-3xl"
                       }`}
                     >
                       {team.name}

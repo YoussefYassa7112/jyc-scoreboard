@@ -5,6 +5,8 @@ import type { StandingRow } from "@/lib/standings";
 
 type Props = {
   standings: StandingRow[];
+  /** `inset` is a compact footer inside the orbit card, below the graph. */
+  layout?: "bar" | "stack" | "inset";
 };
 
 function Chip({
@@ -12,25 +14,35 @@ function Chip({
   value,
   hint,
   accent,
+  compact,
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-saddle/15 bg-chip/70 px-2.5 py-2 dark:border-white/10 sm:px-3 sm:py-2.5">
+    <div
+      className={`rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm dark:border-white/10 ${
+        compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3 sm:py-2.5"
+      }`}
+    >
       <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
         {label}
       </p>
       <p
-        className="display-font mt-0.5 truncate text-base font-bold leading-tight text-card-ink sm:text-xl"
+        className={`display-font mt-0.5 truncate font-bold leading-tight text-card-ink ${
+          compact ? "text-sm sm:text-base" : "text-base sm:text-xl"
+        }`}
         style={accent ? { color: accent } : undefined}
       >
         {value}
       </p>
       {hint ? (
-        <p className="mt-0.5 hidden truncate text-[11px] font-bold text-muted-soft sm:block">
+        <p
+          className="mt-0.5 hidden truncate text-[11px] font-bold text-muted-soft sm:block"
+        >
           {hint}
         </p>
       ) : null}
@@ -38,7 +50,9 @@ function Chip({
   );
 }
 
-export function CampStatStrip({ standings }: Props) {
+export function CampStatStrip({ standings, layout = "bar" }: Props) {
+  const stacked = layout === "stack";
+  const inset = layout === "inset";
   const stats = useMemo(() => {
     const total = standings.reduce((sum, team) => sum + team.score, 0);
     const red = standings
@@ -63,31 +77,111 @@ export function CampStatStrip({ standings }: Props) {
     };
   }, [standings]);
 
+  if (inset) {
+    return (
+      <section aria-label="Camp stats" className="shrink-0">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+          <Chip
+            compact
+            label="Leader"
+            value={stats.leader?.name ?? "—"}
+            hint={stats.leader ? `${stats.leader.score} pts` : undefined}
+          />
+          <Chip
+            compact
+            label="Red camp"
+            value={String(stats.red)}
+            hint="group total"
+            accent="#C45C26"
+          />
+          <Chip
+            compact
+            label="Green camp"
+            value={String(stats.green)}
+            hint="group total"
+            accent="#2F8F4E"
+          />
+          <div className="hidden sm:contents">
+            <Chip
+              compact
+              label="All points"
+              value={String(stats.total)}
+              hint={`${standings.length} teams`}
+            />
+            <Chip
+              compact
+              label="Orbits"
+              value={String(stats.orbits)}
+              hint={stats.spread ? `spread ${stats.spread}` : "unique scores"}
+            />
+          </div>
+        </div>
+        <div className="mt-1.5">
+          <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted-soft">
+            <span>Red vs Green</span>
+            <span className="normal-case tracking-normal text-muted">
+              {stats.red === stats.green
+                ? "Tied"
+                : stats.red > stats.green
+                  ? `Red +${stats.red - stats.green}`
+                  : `Green +${stats.green - stats.red}`}
+            </span>
+          </div>
+          <div className="flex h-2 overflow-hidden rounded-full border border-saddle/15 bg-chip">
+            <div
+              className="h-full bg-[#C45C26] transition-[width] duration-500"
+              style={{ width: `${stats.redShare}%` }}
+            />
+            <div
+              className="h-full bg-[#2F8F4E] transition-[width] duration-500"
+              style={{ width: `${stats.greenShare}%` }}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Camp stats"
-      className="panel flex shrink-0 flex-col gap-2 rounded-3xl p-2.5 sm:gap-3 sm:p-4"
+      className={`panel flex shrink-0 flex-col gap-2 rounded-3xl ${
+        stacked ? "p-2.5 sm:p-3" : "p-2.5 sm:gap-3 sm:p-4"
+      }`}
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div
+        className={`grid gap-2 ${
+          stacked ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-5"
+        }`}
+      >
         <Chip
+          compact={stacked}
           label="Leader"
           value={stats.leader?.name ?? "—"}
           hint={stats.leader ? `${stats.leader.score} pts` : undefined}
         />
         <Chip
+          compact={stacked}
           label="Red camp"
           value={String(stats.red)}
           hint="group total"
           accent="#C45C26"
         />
         <Chip
+          compact={stacked}
           label="Green camp"
           value={String(stats.green)}
           hint="group total"
           accent="#2F8F4E"
         />
-        <Chip label="All points" value={String(stats.total)} hint={`${standings.length} teams`} />
         <Chip
+          compact={stacked}
+          label="All points"
+          value={String(stats.total)}
+          hint={`${standings.length} teams`}
+        />
+        <Chip
+          compact={stacked}
           label="Orbits"
           value={String(stats.orbits)}
           hint={stats.spread ? `spread ${stats.spread}` : "unique scores"}

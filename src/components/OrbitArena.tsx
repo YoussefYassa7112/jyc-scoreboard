@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import * as d3 from "d3";
 import { useTheme } from "@/lib/theme";
 import type { StandingRow } from "@/lib/standings";
@@ -9,6 +9,7 @@ type Props = {
   standings: StandingRow[];
   /** `stage` fills the pane so every orbit stays on screen. */
   variant?: "board" | "stage";
+  children?: ReactNode;
 };
 
 const PLANET_R = 14;
@@ -16,7 +17,9 @@ const LEADER_R = 18;
 const CORE_R = 26;
 const LEVEL_GAP = 36;
 const PAD = 48;
-const ORBIT_EASE = 4.2;
+/** Lower = slower radius lerp when ranks/scores change. */
+const ORBIT_EASE = 1.15;
+const RANK_MOVE_MS = 1800;
 
 type OrbitNode = StandingRow & {
   level: number;
@@ -44,7 +47,7 @@ type Scene = {
  * Higher score => closer to Camp. Arena grows with unique scores.
  * Rank/score changes lerp radius instead of wiping the SVG.
  */
-export function OrbitArena({ standings, variant = "board" }: Props) {
+export function OrbitArena({ standings, variant = "board", children }: Props) {
   const { theme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -77,7 +80,7 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
     );
     const orbitCount = Math.max(uniqueScores.length, 1);
     const gap = variant === "stage" ? 42 : LEVEL_GAP;
-    const pad = variant === "stage" ? 72 : PAD;
+    const pad = variant === "stage" ? 80 : PAD;
     const maxOrbit = CORE_R + 16 + orbitCount * gap;
     const size = Math.max(240, maxOrbit * 2 + pad * 2);
     sizeRef.current.target = size;
@@ -183,8 +186,8 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
     ringMerge
       .select("circle.halo")
       .transition()
-      .duration(720)
-      .ease(d3.easeCubicOut)
+      .duration(RANK_MOVE_MS)
+      .ease(d3.easeCubicInOut)
       .attr("r", (d) => d.r)
       .attr("fill", ringFill);
     ringMerge
@@ -194,8 +197,8 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
       .attr("stroke-dasharray", null)
       .attr("opacity", (d) => (d.level === 1 ? 0.9 : 0.5))
       .transition()
-      .duration(720)
-      .ease(d3.easeCubicOut)
+      .duration(RANK_MOVE_MS)
+      .ease(d3.easeCubicInOut)
       .attr("r", (d) => d.r);
     ringMerge
       .select("circle.drift")
@@ -207,18 +210,18 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
         (d) => `${Math.max(16, d.r * 0.18)} ${Math.max(26, d.r * 0.42)}`,
       )
       .transition()
-      .duration(720)
-      .ease(d3.easeCubicOut)
+      .duration(RANK_MOVE_MS)
+      .ease(d3.easeCubicInOut)
       .attr("r", (d) => d.r);
     ringMerge
       .select("text.pts")
       .attr("fill", qFill)
       .text((d) => `${d.score} pts`)
       .transition()
-      .duration(720)
-      .ease(d3.easeCubicOut)
+      .duration(RANK_MOVE_MS)
+      .ease(d3.easeCubicInOut)
       .attr("y", (d) => -d.r + 3);
-    ring.exit().transition().duration(400).style("opacity", 0).remove();
+    ring.exit().transition().duration(900).style("opacity", 0).remove();
 
     const slotByScore = new Map<number, number>();
     const countByScore = new Map<number, number>();
@@ -274,7 +277,7 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
     enter.append("circle").attr("class", "body");
     enter.append("text").attr("class", "score");
     enter.append("text").attr("class", "label");
-    enter.transition().duration(500).attr("opacity", 1);
+    enter.transition().duration(800).attr("opacity", 1);
 
     const merge = enter.merge(planet);
     merge
@@ -306,16 +309,16 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
       .attr("text-anchor", "middle")
       .attr("fill", labelFill)
       .attr("font-weight", 800)
-      .attr("font-size", variant === "stage" ? 13 : 11)
+      .attr("font-size", variant === "stage" ? 14 : 11)
       .text((d) => {
-        const cap = variant === "stage" ? 16 : 12;
+        const cap = variant === "stage" ? 18 : 12;
         return d.name.length > cap ? `${d.name.slice(0, cap - 1)}…` : d.name;
       });
 
     planet
       .exit()
       .transition()
-      .duration(420)
+      .duration(900)
       .attr("opacity", 0)
       .remove();
     // dataKey captures standings content; avoid rebuild on every poll reference change
@@ -406,28 +409,17 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
 
   return (
     <section
-      className={`panel toy-box relative flex flex-col rounded-3xl p-3 sm:p-5 ${
-        stage ? "h-full min-h-0 overflow-hidden" : "overflow-hidden"
+      className={`panel toy-box relative flex flex-col rounded-3xl ${
+        stage
+          ? "h-auto min-h-0 p-2 sm:p-3 md:h-full md:overflow-hidden"
+          : "overflow-hidden p-3 sm:p-5"
       }`}
     >
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2 sm:gap-3">
-        <div>
-          <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
-            D3 quantum orbits
-          </p>
-          <h2 className="display-font text-xl font-bold text-ink sm:text-2xl">
-            Team constellation
-          </h2>
-        </div>
-        <p className="text-xs font-bold text-muted-soft">
-          One orbit per score · ties share a ring · closer = ahead
-        </p>
-      </div>
       <div
         ref={wrapRef}
         className={
           stage
-            ? "mx-auto h-full min-h-0 w-full"
+            ? "relative mx-auto aspect-square h-96 w-96 max-h-[50dvh] max-w-full min-h-0 md:aspect-auto md:h-auto md:max-h-none md:w-full md:flex-1"
             : "mx-auto w-full max-w-lg overflow-hidden"
         }
       >
@@ -438,6 +430,11 @@ export function OrbitArena({ standings, variant = "board" }: Props) {
           }
         />
       </div>
+      {children ? (
+        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3 dark:border-white/10">
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }

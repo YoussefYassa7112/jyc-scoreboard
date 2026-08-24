@@ -634,6 +634,9 @@ export function AdminDashboard() {
                 busy={isBusy("submit-points")}
                 onAward={awardDrafts}
                 onSaveForLater={saveDraftsToFieldNotes}
+                onSetupSaved={() =>
+                  flash("I'm done", "Scoring events are saved on this device.")
+                }
               />
 
               <FieldNotes

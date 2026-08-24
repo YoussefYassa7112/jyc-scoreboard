@@ -397,36 +397,44 @@ export function Scoreboard() {
       <div
         className={`relative z-10 mx-auto flex w-full flex-col ${
           presenting
-            ? "min-h-0 max-w-7xl flex-1 gap-3 md:overflow-hidden md:gap-3"
+            ? "min-h-0 max-w-7xl flex-1 gap-3 md:gap-3"
             : "max-w-3xl gap-5 md:max-w-5xl md:gap-7"
         }`}
       >
         {presenting ? (
           <header className="shrink-0 pr-[6.75rem] sm:pr-28">
-            <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
-              Welcome to the JYC
-            </p>
-            <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
-              Camp Scoreboard
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
-              <span
-                className={`live-dot inline-block h-2 w-2 rounded-full ${
-                  online && !staleCache ? "bg-red-500" : "bg-muted-soft"
-                }`}
+            <div className="flex flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
+              <div className="min-w-0 shrink-0">
+                <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
+                  Welcome to the JYC
+                </p>
+                <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
+                  Camp Scoreboard
+                </h1>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
+                  <span
+                    className={`live-dot inline-block h-2 w-2 rounded-full ${
+                      online && !staleCache ? "bg-red-500" : "bg-muted-soft"
+                    }`}
+                  />
+                  <span>{liveLabel}</span>
+                  {data?.asOf ? (
+                    <span className="font-semibold text-muted-soft">
+                      · {formatAsOf(data.asOf)}
+                    </span>
+                  ) : null}
+                </div>
+                {LIVE_CAMP_SIM ? (
+                  <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-star">
+                    Simulation preview
+                  </p>
+                ) : null}
+              </div>
+              <ReachForTheSkyMarquee
+                compact
+                className="mt-0 min-w-0 w-full max-w-none min-[880px]:flex-1"
               />
-              <span>{liveLabel}</span>
-              {data?.asOf ? (
-                <span className="font-semibold text-muted-soft">
-                  · {formatAsOf(data.asOf)}
-                </span>
-              ) : null}
             </div>
-            {LIVE_CAMP_SIM ? (
-              <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-star">
-                Simulation preview
-              </p>
-            ) : null}
           </header>
         ) : (
           <header className="text-center">
@@ -558,10 +566,6 @@ export function Scoreboard() {
           >
         {tab === "standings" && presenting ? (
           <>
-            {data && data.standings.length > 0 ? (
-              <CampStatStrip standings={data.standings} />
-            ) : null}
-
             {loading && !data ? (
               <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
                 Opening the toy box…
@@ -581,12 +585,17 @@ export function Scoreboard() {
             ) : null}
 
             {data && data.standings.length > 0 ? (
-              <div className="grid min-h-0 items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(16.5rem,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
+              <div className="grid min-h-0 items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
                 <section className="panel toy-box relative order-2 min-h-0 overflow-hidden rounded-3xl p-3 sm:p-4 md:order-1 md:h-full md:overflow-y-auto">
                   <StandingsList standings={data.standings} presentation />
                 </section>
-                <div className="order-1 h-[min(44dvh,22rem)] min-h-0 w-full md:order-2 md:h-full">
-                  <OrbitArena standings={data.standings} variant="stage" />
+                <div className="order-1 min-h-0 w-full md:order-2 md:h-full">
+                  <OrbitArena standings={data.standings} variant="stage">
+                    <CampStatStrip
+                      standings={data.standings}
+                      layout="inset"
+                    />
+                  </OrbitArena>
                 </div>
               </div>
             ) : null}
