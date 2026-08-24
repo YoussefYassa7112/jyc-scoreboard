@@ -1,23 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-import { setPresentationMode, usePresentationMode } from "@/lib/presentation";
+import { usePresentationMode } from "@/lib/presentation";
+import { useTheme } from "@/lib/theme";
 
 export function PresentationToggle() {
-  const pathname = usePathname();
   const { on, toggle } = usePresentationMode();
+  const { theme } = useTheme();
 
-  useEffect(() => {
-    if (!on) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPresentationMode(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [on]);
-
-  if (pathname !== "/") return null;
+  const icon = on ? "📺" : theme === "dark" ? "🪐" : "🤠";
 
   return (
     <button
@@ -30,16 +20,14 @@ export function PresentationToggle() {
           ? "Exit presentation (Esc)"
           : "Presentation mode — full standings stats and orbit"
       }
-      className={`flex h-11 items-center gap-1.5 rounded-full border-2 px-3 shadow-lg ${
-        on
-          ? "border-star bg-star text-on-star"
-          : "border-saddle/25 bg-cloud/90 text-ink dark:border-white/20 dark:bg-[#152038]/90"
+      className={`dock-button flex h-9 w-full items-center justify-center gap-1 rounded-full ${
+        on ? "dock-button-on" : ""
       }`}
     >
-      <span aria-hidden className="text-base">
-        {on ? "📺" : "🪐"}
+      <span aria-hidden className="text-sm leading-none">
+        {icon}
       </span>
-      <span className="display-font text-[11px] font-extrabold uppercase tracking-wide">
+      <span className="display-font text-[10px] font-extrabold uppercase tracking-wide">
         {on ? "Exit" : "Present"}
       </span>
     </button>

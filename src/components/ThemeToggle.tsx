@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useTheme } from "@/lib/theme";
 
 export function ThemeToggle() {
@@ -8,26 +7,39 @@ export function ThemeToggle() {
   const isDark = theme === "dark";
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col gap-1">
       <button
         type="button"
+        role="switch"
+        aria-checked={isDark}
         onClick={toggleTheme}
-        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className="relative h-11 w-[4.5rem] overflow-hidden rounded-full border-2 border-saddle/25 bg-cloud/90 shadow-lg dark:border-white/20 dark:bg-[#152038]/90"
+        aria-label={isDark ? "Switch to day mode" : "Switch to night mode"}
+        className="dock-switch relative flex h-9 w-full items-center rounded-full"
       >
-        <motion.span
-          className="absolute top-1 left-1 flex h-8 w-8 items-center justify-center rounded-full bg-horizon text-base shadow-md dark:bg-[#3b82f6]"
-          animate={{ x: isDark ? 34 : 0 }}
-          transition={{ type: "spring", stiffness: 700, damping: 38 }}
+        <span
+          aria-hidden
+          className="dock-switch-knob absolute bottom-1 left-1 top-1 w-[calc(50%-0.5rem)] rounded-full"
+          style={{
+            transform: isDark
+              ? "translateX(calc(100% + 0.5rem))"
+              : "translateX(0)",
+          }}
+        />
+        <span
+          aria-hidden
+          className="relative z-10 flex w-1/2 justify-center text-sm leading-none"
         >
-          {isDark ? "🌙" : "☀️"}
-        </motion.span>
-        <span className="sr-only">Toggle theme</span>
+          ☀️
+        </span>
+        <span
+          aria-hidden
+          className="relative z-10 flex w-1/2 justify-center text-sm leading-none"
+        >
+          🌙
+        </span>
       </button>
       {isAutoNight ? (
-        <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-bold text-white/90 backdrop-blur-sm">
-          Auto night
-        </span>
+        <span className="control-dock-note">Auto night</span>
       ) : null}
     </div>
   );

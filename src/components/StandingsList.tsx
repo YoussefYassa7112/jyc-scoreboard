@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { needsDarkText } from "@/lib/utils";
 import type { StandingRow } from "@/lib/standings";
@@ -55,6 +55,46 @@ function chaseLines(team: StandingRow, standings: StandingRow[], index: number) 
   return lines;
 }
 
+/**
+ * The drawer height comes from a measured pixel value instead of `height: auto`
+ * so a single CSS transition owns the resize. Framer-motion is deliberately kept
+ * away from this box — two animators on one height is what made it stutter.
+ */
+function ChaseDrawer({
+  id,
+  open,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    const node = contentRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.borderBoxSize?.[0];
+      setContentHeight(box ? box.blockSize : node.offsetHeight);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      id={id}
+      className="chase-drawer"
+      aria-hidden={!open}
+      style={{ height: open ? contentHeight : 0, opacity: open ? 1 : 0 }}
+    >
+      <div ref={contentRef}>{children}</div>
+    </div>
+  );
+}
+
 export function StandingsList({ standings, presentation = false }: Props) {
   const [openId, setOpenId] = useState<number | null>(null);
   const leaderScore = standings[0]?.score ?? 0;
@@ -68,6 +108,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
             const topThree = team.rank <= 3;
             const isFirst = team.rank === 1;
             const open = openId === team.id;
+            const drawerId = `chase-${team.id}`;
             const badge =
               team.rank === 1 ? "👑" : team.rank === 2 ? "⭐" : team.rank === 3 ? "🚀" : null;
             const { ahead, group, cabin } = teamMeta(team, standings, index);
@@ -79,7 +120,8 @@ export function StandingsList({ standings, presentation = false }: Props) {
             return (
               <motion.li
                 key={team.id}
-                layout
+                layout="position"
+                layoutDependency={team.rank}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
@@ -119,6 +161,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                 <button
                   type="button"
                   aria-expanded={open}
+                  aria-controls={drawerId}
                   aria-label={
                     open
                       ? `Hide chase details for ${team.name}`
@@ -127,7 +170,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   onClick={() =>
                     setOpenId((current) => (current === team.id ? null : team.id))
                   }
-                  className="relative w-full cursor-pointer text-left"
+                  className="chase-row relative w-full cursor-pointer text-left"
                 >
                 <div
                   className={`relative flex w-full items-center ${
@@ -201,14 +244,14 @@ export function StandingsList({ standings, presentation = false }: Props) {
                         {team.rank === 3 ? " · 3rd place" : ""}
                       </p>
                     )}
-                    {!open ? (
-                      <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
-                        {preview}
-                        <span className="ml-1 font-extrabold text-muted-soft">
-                          · tap for more
-                        </span>
-                      </p>
-                    ) : null}
+                    {/* Stays mounted and on one line: a row that resizes at the
+                        same moment as the drawer reads as a double jump. */}
+                    <p className="mt-0.5 flex items-baseline gap-1 text-[11px] font-bold leading-snug text-muted sm:text-xs">
+                      <span className="truncate">{preview}</span>
+                      <span className="shrink-0 font-extrabold text-muted-soft">
+                        {open ? "· tap to close" : "· tap for more"}
+                      </span>
+                    </p>
                     {presentation ? (
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-chip">
                         <div
@@ -239,44 +282,38 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   >
                     {team.score}
                   </motion.div>
-                </div>
 
-                <AnimatePresence initial={false}>
-                  {open ? (
-                    <motion.div
-                      key="chase"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <div
-                        className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
-                          presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
-                        }`}
-                      >
-                        {lines.map((line) => (
-                          <p
-                            key={line}
-                            className="text-sm font-extrabold leading-snug text-card-ink"
-                          >
-                            {line}
-                          </p>
-                        ))}
-                        {ahead && team.score < ahead.score ? (
-                          <p className="text-xs font-bold text-muted-soft">
-                            One score bump from {ahead.name} and you swap places.
-                          </p>
-                        ) : null}
-                        <p className="text-xs font-extrabold text-muted-soft">
-                          Tap to hide
-                        </p>
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                  <span
+                    aria-hidden
+                    className="chase-caret shrink-0 text-xs font-bold text-muted-soft"
+                    style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+                  >
+                    ▾
+                  </span>
+                </div>
                 </button>
+
+                <ChaseDrawer id={drawerId} open={open}>
+                  <div
+                    className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
+                      presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
+                    }`}
+                  >
+                    {lines.map((line) => (
+                      <p
+                        key={line}
+                        className="text-sm font-extrabold leading-snug text-card-ink"
+                      >
+                        {line}
+                      </p>
+                    ))}
+                    {ahead && team.score < ahead.score ? (
+                      <p className="text-xs font-bold text-muted-soft">
+                        One score bump from {ahead.name} and you swap places.
+                      </p>
+                    ) : null}
+                  </div>
+                </ChaseDrawer>
               </motion.li>
             );
           })}

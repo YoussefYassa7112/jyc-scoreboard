@@ -402,7 +402,7 @@ export function Scoreboard() {
         }`}
       >
         {presenting ? (
-          <header className="shrink-0 pr-[6.75rem] sm:pr-28">
+          <header className="shrink-0 pr-[8rem] sm:pr-[8.5rem]">
             <div className="flex flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
               <div className="min-w-0 shrink-0">
                 <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
@@ -447,7 +447,7 @@ export function Scoreboard() {
                 animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
                 transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               >
-                {isDark ? "⭐" : "🤠"}
+                {isDark ? "🪐" : "🤠"}
               </motion.span>
               <motion.span
                 animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
