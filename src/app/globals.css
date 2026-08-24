@@ -405,6 +405,38 @@ html.dark .btn-soft {
 .board-tab {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+/* The whole active/inactive look hangs off one attribute so the click handler
+   can flip it directly on the DOM. React state cannot do this job: a setState
+   inside a click handler renders synchronously in that same task, so the browser
+   has no chance to paint until the render finishes — which on a phone is long
+   enough to see. No transitions here on purpose; the swap must be immediate. */
+.board-tab[data-active="false"] {
+  background: color-mix(in srgb, var(--star) 16%, var(--card));
+  border-color: color-mix(in srgb, var(--star) 50%, transparent);
+}
+
+.board-tab[data-active="false"]:hover {
+  background: color-mix(in srgb, var(--star) 24%, var(--card));
+}
+
+.board-tab-label {
+  color: var(--on-star);
+}
+
+.board-tab[data-active="false"] .board-tab-label {
+  color: var(--star);
+}
+
+.board-tab-pill {
+  opacity: 0;
+}
+
+.board-tab[data-active="true"] .board-tab-pill {
+  opacity: 1;
 }
 
 .btn-chip {
@@ -581,6 +613,27 @@ html.presentation .sky-floaters {
 
 html.dark .sky-floaters {
   opacity: 0;
+}
+
+/* The day sky sits behind the board out of focus, so nothing back there
+   competes with the cards for attention. The blur is on each element rather
+   than the wrapper on purpose: a filter over the wrapper re-rasterises the
+   whole layer on every frame of every child animation, while a per-element
+   blur is baked into that element's texture once and its transform/opacity
+   loop stays on the compositor. */
+.sky-bob {
+  filter: blur(2px);
+}
+
+/* No blur on the twinkles: they animate scale, and scaling a blurred layer
+   forces the compositor to re-rasterise it on every frame. They are small
+   enough to read as soft sparkles without it. */
+.sky-ring {
+  filter: blur(3px);
+}
+
+.sky-comet {
+  filter: blur(2px);
 }
 
 /* Ambient sky motion. Kept in CSS so the compositor owns it and no JS ticks. */

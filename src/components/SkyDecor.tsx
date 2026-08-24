@@ -60,14 +60,16 @@ export function SkyDecor() {
           <div className="cloud-shape float-b left-[60%] top-[20%] h-6 w-16 opacity-50 md:h-9 md:w-24" />
         </div>
 
-        {/* Soft cardboard toy-box rings */}
-        <div className="absolute left-[-80px] top-[30%] h-40 w-40 rounded-full border-[10px] border-[#c4a574]/35" />
-        <div className="absolute right-[-60px] top-[42%] h-32 w-32 rounded-full border-[8px] border-[#1e6bb8]/25" />
+        {/* Soft cardboard toy-box rings. Hidden on phones: pinned to the
+            viewport they land at the top of the standings, where a clipped arc
+            of the blue one reads as a stray halo rather than decoration. */}
+        <div className="sky-ring absolute left-[-100px] top-[30%] h-40 w-40 rounded-full border-[10px] border-[#c4a574]/35 max-sm:hidden" />
+        <div className="sky-ring absolute right-[-80px] top-[42%] h-32 w-32 rounded-full border-[8px] border-[#1e6bb8]/25 max-sm:hidden" />
 
         {twinkles.map((t, i) => (
           <span
             key={`twinkle-${i}`}
-            className="sky-twinkle absolute text-horizon drop-shadow-sm"
+            className="sky-twinkle absolute text-horizon"
             style={{
               top: t.top,
               left: t.left,
@@ -82,7 +84,7 @@ export function SkyDecor() {
         {floaters.map((item, i) => (
           <span
             key={`${item.emoji}-${i}`}
-            className={`sky-bob absolute select-none drop-shadow-md ${item.size} ${
+            className={`sky-bob absolute select-none ${item.size} ${
               "phone" in item ? "" : "max-sm:hidden"
             }`}
             style={{

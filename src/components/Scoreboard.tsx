@@ -99,6 +99,10 @@ export function Scoreboard() {
   const [tab, setTab] = useState<BoardTab>("standings");
   const [panelTab, setPanelTab] = useState<BoardTab>("standings");
   const panelFrame = useRef(0);
+  const navRef = useRef<HTMLElement>(null);
+  // Tracks the tab the camper just asked for, which the deferred state has not
+  // caught up to yet, so a fast second tap still gets its slide direction right.
+  const pendingTab = useRef<BoardTab>("standings");
   const presenting = presentationOn && panelTab === "standings";
   const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
@@ -116,6 +120,8 @@ export function Scoreboard() {
     fromRoomId?: string;
   } | null>(null);
   const isDark = theme === "dark";
+  const presentationOnRef = useRef(presentationOn);
+  presentationOnRef.current = presentationOn;
 
   const [alerts, setAlerts] = useState<BoardAlert[]>([]);
   const [toasts, setToasts] = useState<AdminToast[]>([]);
@@ -254,34 +260,51 @@ export function Scoreboard() {
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
 
-  // Highlight now, panel next. A rAF callback still runs before the paint it
-  // precedes, so it takes two of them to be sure the highlight is on screen
-  // before the expensive mount begins.
-  const showTab = useCallback((next: BoardTab) => {
-    setTab(next);
-    cancelAnimationFrame(panelFrame.current);
-    panelFrame.current = requestAnimationFrame(() => {
-      panelFrame.current = requestAnimationFrame(() => setPanelTab(next));
-    });
-  }, []);
+  // Move the highlight on the DOM, then let React catch up two frames later.
+  // A setState inside a click handler renders synchronously in that same task,
+  // so the browser cannot paint until the render finishes — on a phone that is
+  // long enough to read as the colour lagging behind the tap. Writing the
+  // attribute directly keeps the handler cheap. Two frames because a rAF
+  // callback still runs before the paint it precedes, so it takes a second one
+  // to be sure the new highlight actually reached the screen first.
+  const goToTab = useCallback(
+    (next: BoardTab, opts?: { clearScheduleFocus?: boolean }) => {
+      navRef.current
+        ?.querySelectorAll<HTMLElement>("[data-tab]")
+        .forEach((el) => {
+          el.dataset.active = String(el.dataset.tab === next);
+        });
+
+      const current = pendingTab.current;
+      const from = TABS.findIndex((t) => t.id === current);
+      const to = TABS.findIndex((t) => t.id === next);
+      const leavingMap = current === "map" && next !== "map";
+      pendingTab.current = next;
+
+      cancelAnimationFrame(panelFrame.current);
+      panelFrame.current = requestAnimationFrame(() => {
+        panelFrame.current = requestAnimationFrame(() => {
+          if (opts?.clearScheduleFocus) setScheduleFocus(null);
+          if (leavingMap) setMapFocus(null);
+          // Presentation is a standings-only view. Map and Schedule stay normal.
+          if (next !== "standings" && presentationOnRef.current) {
+            setPresentationMode(false);
+          }
+          setTabDirection(to >= from ? 1 : -1);
+          setTab(next);
+          setPanelTab(next);
+        });
+      });
+    },
+    [],
+  );
 
   useEffect(() => () => cancelAnimationFrame(panelFrame.current), []);
 
-  function goToTab(next: BoardTab) {
-    const from = TABS.findIndex((t) => t.id === tab);
-    const to = TABS.findIndex((t) => t.id === next);
-    if (tab === "map" && next !== "map") setMapFocus(null);
-    // Presentation is a standings-only view. Map and Schedule stay normal.
-    if (next !== "standings" && presentationOn) setPresentationMode(false);
-    setTabDirection(to >= from ? 1 : -1);
-    showTab(next);
-  }
-
   useEffect(() => {
     if (!presentationOn) return;
-    setScheduleFocus(null);
-    showTab("standings");
-  }, [presentationOn, showTab]);
+    goToTab("standings", { clearScheduleFocus: true });
+  }, [presentationOn, goToTab]);
 
   const clearMapFocus = useCallback(() => setMapFocus(null), []);
   const clearScheduleFocus = useCallback(() => setScheduleFocus(null), []);
@@ -544,6 +567,7 @@ export function Scoreboard() {
         />
 
         <nav
+          ref={navRef}
           className="panel flex shrink-0 gap-1 rounded-2xl p-1.5 sm:gap-1.5"
           aria-label="Scoreboard sections"
         >
@@ -553,33 +577,24 @@ export function Scoreboard() {
               <button
                 key={item.id}
                 type="button"
+                data-tab={item.id}
+                data-active={active ? "true" : "false"}
                 onClick={() => {
                   // Manual tab changes should never reuse a leftover map→schedule
                   // scroll/highlight intent.
-                  setScheduleFocus(null);
-                  goToTab(item.id);
+                  goToTab(item.id, { clearScheduleFocus: true });
                 }}
                 className={`board-tab display-font relative flex-1 rounded-xl px-2 font-extrabold sm:px-3 ${
                   presenting
                     ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
                     : "py-3 text-sm sm:py-2.5 sm:text-base"
-                } ${
-                  active ? "" : "btn-chip cursor-pointer hover:brightness-105"
                 }`}
                 aria-current={active ? "page" : undefined}
               >
-                {/* The pill and both label colours change in the same frame, with
-                    no transition anywhere. Sliding the pill meant the old tab
-                    briefly held gold text over the gold pill, which is what read
-                    as the label lagging behind the tap. */}
-                {active ? (
-                  <span className="absolute inset-0 rounded-xl bg-star shadow-sm" />
-                ) : null}
-                <span
-                  className={`relative z-10 ${
-                    active ? "text-on-star" : "text-star"
-                  }`}
-                >
+                {/* Both states are always in the DOM and swapped by CSS off
+                    data-active, so the highlight can move without React. */}
+                <span className="board-tab-pill absolute inset-0 rounded-xl bg-star shadow-sm" />
+                <span className="board-tab-label relative z-10">
                   {item.label}
                 </span>
               </button>
