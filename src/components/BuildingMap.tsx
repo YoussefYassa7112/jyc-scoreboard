@@ -25,6 +25,12 @@ import { getScheduleDays } from "@/lib/schedule-demo";
 import { blocksAtRoom } from "@/lib/schedule-time";
 
 type BuildingMapProps = {
+  /**
+   * False while the camper is on another tab. The panel stays mounted so the
+   * chosen floor and zoom survive, but the arrival spotlight must not fire at
+   * something nobody is looking at.
+   */
+  active?: boolean;
   focusFloorId?: string | null;
   focusRoomId?: string | null;
   /** Bumped on every schedule→map jump so the room re-pulses on arrival */
@@ -381,6 +387,8 @@ function Decorations({
 }
 
 export function BuildingMap({
+  // Aliased: the room loop below has its own `active` for the selected room.
+  active: panelActive = true,
   focusFloorId,
   focusRoomId,
   focusArrivalNonce,
@@ -433,13 +441,13 @@ export function BuildingMap({
   // Arriving from a schedule card: bring the map into view, then flash the room
   // so it is obvious which building the event points at.
   useEffect(() => {
-    if (!focusArrivalNonce || !focusRoomId) return;
+    if (!panelActive || !focusArrivalNonce || !focusRoomId) return;
     setSpotlightKey(focusArrivalNonce);
     const timer = window.setTimeout(() => {
       wrapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 320);
     return () => window.clearTimeout(timer);
-  }, [focusArrivalNonce, focusRoomId]);
+  }, [panelActive, focusArrivalNonce, focusRoomId]);
 
   useEffect(() => {
     if (!highlightBlockId || !selectedId) return;
@@ -462,12 +470,6 @@ export function BuildingMap({
   const floorBg = dark ? "#0b1224" : "#faf6ee";
   const ink = dark ? "#e2e8f0" : "#2a1f14";
   const laser = dark ? "#38bdf8" : "#e11d48";
-  const laserGlow = dark
-    ? "drop-shadow(0 0 16px rgba(56,189,248,0.95))"
-    : "drop-shadow(0 0 14px rgba(225,29,72,0.7))";
-  const idleGlow = dark
-    ? "drop-shadow(0 0 8px rgba(184,224,98,0.4))"
-    : "drop-shadow(0 0 8px rgba(107,66,38,0.38))";
 
   function notifyFocusCleared() {
     if (!mountedRef.current) return;
@@ -645,21 +647,6 @@ export function BuildingMap({
             if (e.target === e.currentTarget) clearSelection();
           }}
         >
-          <defs>
-            <filter
-              id="map-inner-halo"
-              x="-50%"
-              y="-50%"
-              width="200%"
-              height="200%"
-            >
-              <feGaussianBlur stdDeviation="5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
           <rect
             width={floor.viewBox.w}
             height={floor.viewBox.h}
@@ -711,8 +698,8 @@ export function BuildingMap({
               fill,
               stroke,
               strokeWidth: active ? 3.2 : 1.6,
-              className: "cursor-pointer",
-              style: { outline: "none" as const, cursor: "pointer" },
+              className: "map-room cursor-pointer",
+              style: { cursor: "pointer" },
               initial: false as const,
               whileHover: {
                 strokeWidth: active ? 3.6 : 2.8,
@@ -721,13 +708,16 @@ export function BuildingMap({
               // Idle rooms hold a static outline. This used to breathe on an
               // infinite loop, but that animated `filter` on every room at once
               // (12 on the basement floor) and repainted the map every frame.
+              //
+              // The remaining per-room `filter: drop-shadow(...)` is gone too.
+              // A filtered SVG element is promoted to its own layer, and that
+              // layer was still being composited while the tab panel it lives
+              // in was animating away — which is how a stray blue glow could
+              // survive onto another tab and stay there until something forced
+              // a full repaint. Emphasis is stroke width and the halo stroke
+              // below, neither of which needs a filter.
               animate: {
                 strokeWidth: active ? 3.2 : selectedId ? 1.4 : 2.2,
-                filter: active
-                  ? laserGlow
-                  : selectedId
-                    ? "drop-shadow(0 0 0 rgba(0,0,0,0))"
-                    : idleGlow,
               },
               transition: { duration: 0.2 },
               onClick: (e: MouseEvent) => {
@@ -791,33 +781,60 @@ export function BuildingMap({
                       clipPath={`url(#map-halo-clip-${room.id})`}
                       className="pointer-events-none"
                     >
-                      {/* Static opacity: this stroke is behind a Gaussian blur,
-                          and pulsing it re-rasterised the filter every frame. */}
+                      {/* Was one stroke behind a feGaussianBlur. The blur put
+                          this room on its own composited layer, which is the
+                          layer that could outlive the panel and leave a glow
+                          stranded on another tab. Two plain strokes — a wide
+                          faint one under a narrower brighter one — read as the
+                          same inner glow with no filter and no extra layer. */}
                       {ellipse ? (
-                        <ellipse
-                          cx={cx}
-                          cy={cy}
-                          rx={room.w / 2}
-                          ry={room.h / 2}
-                          fill="none"
-                          stroke={laser}
-                          strokeWidth={haloW}
-                          filter="url(#map-inner-halo)"
-                          opacity={dark ? 0.72 : 0.54}
-                        />
+                        <>
+                          <ellipse
+                            cx={cx}
+                            cy={cy}
+                            rx={room.w / 2}
+                            ry={room.h / 2}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW}
+                            opacity={dark ? 0.28 : 0.2}
+                          />
+                          <ellipse
+                            cx={cx}
+                            cy={cy}
+                            rx={room.w / 2}
+                            ry={room.h / 2}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW * 0.45}
+                            opacity={dark ? 0.5 : 0.36}
+                          />
+                        </>
                       ) : (
-                        <rect
-                          x={room.x}
-                          y={room.y}
-                          width={room.w}
-                          height={room.h}
-                          rx={6}
-                          fill="none"
-                          stroke={laser}
-                          strokeWidth={haloW}
-                          filter="url(#map-inner-halo)"
-                          opacity={dark ? 0.72 : 0.54}
-                        />
+                        <>
+                          <rect
+                            x={room.x}
+                            y={room.y}
+                            width={room.w}
+                            height={room.h}
+                            rx={6}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW}
+                            opacity={dark ? 0.28 : 0.2}
+                          />
+                          <rect
+                            x={room.x}
+                            y={room.y}
+                            width={room.w}
+                            height={room.h}
+                            rx={6}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW * 0.45}
+                            opacity={dark ? 0.5 : 0.36}
+                          />
+                        </>
                       )}
                     </g>
                   </>

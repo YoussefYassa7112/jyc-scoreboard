@@ -406,37 +406,68 @@ html.dark .btn-soft {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   cursor: pointer;
-  border: 2px solid transparent;
-}
-
-/* The whole active/inactive look hangs off one attribute so the click handler
-   can flip it directly on the DOM. React state cannot do this job: a setState
-   inside a click handler renders synchronously in that same task, so the browser
-   has no chance to paint until the render finishes — which on a phone is long
-   enough to see. No transitions here on purpose; the swap must be immediate. */
-.board-tab[data-active="false"] {
+  position: relative;
+  /* The inactive skin is painted permanently and the active pill covers it,
+     so neither background nor border-color ever changes on tap. Anything that
+     changes here would need a main-thread repaint, and that repaint queues
+     behind the panel work the same tap kicks off. */
+  border: 2px solid color-mix(in srgb, var(--star) 50%, transparent);
   background: color-mix(in srgb, var(--star) 16%, var(--card));
-  border-color: color-mix(in srgb, var(--star) 50%, transparent);
+  /* Chrome's default focus ring is a blue rectangle that survives a pointer
+     tap and only clears when focus moves. Rings are defined once, on brand,
+     in the :focus-visible block near the bottom of this file. */
+  outline: none;
 }
 
-.board-tab[data-active="false"]:hover {
+.board-tab:hover {
   background: color-mix(in srgb, var(--star) 24%, var(--card));
 }
 
-.board-tab-label {
-  color: var(--on-star);
-}
-
-.board-tab[data-active="false"] .board-tab-label {
-  color: var(--star);
-}
-
+/* Every state a tap changes is opacity-only, on elements that are already
+   painted. Opacity is a compositor property: it lands in the very next frame
+   even while the main thread is busy mounting the incoming panel. Colour is
+   not — swapping `color` on the label made the words trail the pill, because
+   that repaint waited for the main thread. Both label colours are therefore
+   pre-painted and cross-faded instead. No transitions: the swap is immediate. */
 .board-tab-pill {
   opacity: 0;
+  /* Covers the 2px border too, so the active tab reads as one solid shape. */
+  inset: -2px;
+  border-radius: calc(0.75rem + 2px);
 }
 
 .board-tab[data-active="true"] .board-tab-pill {
   opacity: 1;
+}
+
+.board-tab-label {
+  position: relative;
+  z-index: 10;
+  display: grid;
+}
+
+/* Both copies share one grid cell, so the button is sized by the text once
+   and the two colours sit exactly on top of each other. */
+.board-tab-label > span {
+  grid-area: 1 / 1;
+}
+
+.board-tab-label-on {
+  color: var(--on-star);
+  opacity: 0;
+}
+
+.board-tab-label-off {
+  color: var(--star);
+  opacity: 1;
+}
+
+.board-tab[data-active="true"] .board-tab-label-on {
+  opacity: 1;
+}
+
+.board-tab[data-active="true"] .board-tab-label-off {
+  opacity: 0;
 }
 
 .btn-chip {
@@ -604,15 +635,28 @@ html.dark .schedule-done {
 
 .sky-floaters {
   opacity: 1;
-  transition: opacity var(--bg-fade) ease-out;
+  visibility: visible;
+  /* visibility flips in immediately on the way back to day, and is held until
+     the fade finishes on the way to night (see the dark rule below). */
+  transition:
+    opacity var(--bg-fade) ease-out,
+    visibility 0s linear 0s;
 }
 
 html.presentation .sky-floaters {
   opacity: 0.42;
 }
 
+/* Was `opacity: 0` alone, which left a dozen blurred emoji, six twinkles and
+   the comet animating behind a fully transparent layer on every night-mode
+   phone. visibility takes the subtree out of paint once the fade finishes, so
+   the browser stops rasterising and compositing work nobody can see. */
 html.dark .sky-floaters {
   opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--bg-fade) ease-out,
+    visibility 0s linear var(--bg-fade);
 }
 
 /* The day sky sits behind the board out of focus, so nothing back there
@@ -736,6 +780,71 @@ html.dark .sky-floaters {
 
 .qr-breathe {
   animation: qr-breathe 3.5s ease-in-out infinite;
+}
+
+/* Tab panels.
+   Panels are mounted on first visit and then kept, so switching back is a
+   `display` flip instead of a React mount. That removes the ~1.5s standings
+   mount from the tap path, and it keeps the map's floor and the schedule's day
+   where the camper left them. `display:none` also parks every CSS animation
+   and IntersectionObserver inside the hidden panel, so nothing off-screen
+   costs frames. */
+.board-panel {
+  display: none;
+}
+
+.board-panel[data-active="true"] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* none -> flex restarts the animation, so the slide replays on every switch
+   without needing AnimatePresence to unmount anything. Transform and opacity
+   only, so it stays on the compositor. */
+.board-panel[data-active="true"][data-dir="forward"] {
+  animation: board-panel-in-forward 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.board-panel[data-active="true"][data-dir="back"] {
+  animation: board-panel-in-back 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes board-panel-in-forward {
+  from {
+    opacity: 0;
+    transform: translate3d(40px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes board-panel-in-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-40px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* One on-brand focus ring for the whole app. Without this the browser falls
+   back to its own — a blue rectangle in light mode that sticks around after a
+   pointer tap and only clears when focus moves or the page reloads. */
+:focus-visible {
+  outline: 2px solid var(--star);
+  outline-offset: 2px;
+}
+
+/* SVG map rooms carry role="button" and tabIndex, so they need a ring the
+   outline property cannot draw on an SVG child in every browser. */
+.map-room:focus-visible {
+  outline: none;
+  stroke: var(--star);
+  stroke-width: 4;
 }
 
 /* Standings chase drawer */
