@@ -212,7 +212,7 @@ export function NightSky() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className={`pointer-events-none fixed inset-0 z-0 h-lvh w-screen transition-opacity ease-in-out ${
+      className={`pointer-events-none fixed inset-0 z-0 h-lvh w-full transition-opacity ease-in-out ${
         theme === "dark" ? "opacity-100" : "opacity-0"
       }`}
       style={{ transitionDuration: "var(--bg-fade)" }}

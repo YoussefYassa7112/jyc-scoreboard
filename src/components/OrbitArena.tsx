@@ -566,7 +566,7 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     <section
       className={`panel toy-box relative flex flex-col rounded-3xl ${
         stage
-          ? "h-auto min-h-0 p-2 sm:p-3 md:h-full md:overflow-hidden"
+          ? "h-full min-h-0 min-w-0 overflow-hidden p-2 sm:p-3"
           : "overflow-hidden p-3 sm:p-5"
       }`}
     >
@@ -574,19 +574,19 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
         ref={wrapRef}
         className={
           stage
-            ? "relative mx-auto aspect-square h-96 w-96 max-h-[50dvh] max-w-full min-h-0 md:aspect-auto md:h-auto md:max-h-none md:w-full md:flex-1"
+            ? "relative mx-auto aspect-square w-[min(100%,22dvh)] min-h-0 min-w-0 overflow-hidden md:aspect-auto md:h-auto md:w-full md:flex-1"
             : "mx-auto w-full max-w-lg overflow-hidden"
         }
       >
         <svg
           ref={svgRef}
           className={
-            stage ? "block h-full w-full" : "block h-auto w-full"
+            stage ? "block h-full w-full max-w-full overflow-hidden" : "block h-auto w-full"
           }
         />
       </div>
       {children ? (
-        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
+        <div className="mt-2 hidden shrink-0 border-t border-saddle/10 pt-2 sm:mt-3 sm:pt-3 md:block">
           {children}
         </div>
       ) : null}

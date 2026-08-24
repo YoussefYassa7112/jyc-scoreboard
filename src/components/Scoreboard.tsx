@@ -386,29 +386,29 @@ export function Scoreboard() {
 
   return (
     <main
-      className={`relative overflow-x-hidden ${
+      className={`relative min-w-0 ${
         presenting
-          ? "flex min-h-dvh flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.65rem,env(safe-area-inset-top))] sm:px-5 md:h-dvh md:overflow-hidden md:px-6 md:py-4"
-          : "min-h-dvh px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
+          ? "flex h-dvh max-h-dvh flex-col overflow-hidden px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 md:px-6 md:py-4"
+          : "min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
       }`}
     >
       <SkyDecor />
 
       <div
-        className={`relative z-10 mx-auto flex w-full flex-col ${
+        className={`relative z-10 mx-auto flex w-full min-w-0 flex-col ${
           presenting
-            ? "min-h-0 max-w-7xl flex-1 gap-3 md:gap-3"
+            ? "h-full min-h-0 max-w-7xl flex-1 gap-1.5 overflow-hidden md:gap-3"
             : "max-w-3xl gap-5 md:max-w-5xl md:gap-7"
         }`}
       >
         {presenting ? (
-          <header className="shrink-0 pr-[6.75rem] sm:pr-28">
-            <div className="flex flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
+          <header className="min-w-0 shrink-0 overflow-hidden pr-[6.75rem] sm:pr-28">
+            <div className="flex min-w-0 flex-col gap-1.5 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
               <div className="min-w-0 shrink-0">
                 <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
                   Welcome to the JYC
                 </p>
-                <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
+                <h1 className="display-font text-xl font-bold leading-tight text-ink sm:text-3xl">
                   Camp Scoreboard
                 </h1>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
@@ -432,7 +432,7 @@ export function Scoreboard() {
               </div>
               <ReachForTheSkyMarquee
                 compact
-                className="mt-0 min-w-0 w-full max-w-none min-[880px]:flex-1"
+                className="mt-0 hidden min-w-0 w-full max-w-none overflow-hidden md:block min-[880px]:flex-1"
               />
             </div>
           </header>
@@ -512,7 +512,7 @@ export function Scoreboard() {
         />
 
         <nav
-          className="panel flex shrink-0 gap-1 rounded-2xl p-1.5 sm:gap-1.5"
+          className="panel flex min-w-0 shrink-0 gap-1 overflow-hidden rounded-2xl p-1.5 sm:gap-1.5"
           aria-label="Scoreboard sections"
         >
           {TABS.map((item) => {
@@ -528,7 +528,7 @@ export function Scoreboard() {
                   goToTab(item.id);
                 }}
                 className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 sm:text-base ${
-                  presenting ? "py-2 text-sm sm:py-2" : "py-3 text-sm sm:py-2.5"
+                  presenting ? "py-1.5 text-sm sm:py-2" : "py-3 text-sm sm:py-2.5"
                 } ${
                   active
                     ? "text-on-star"
@@ -561,9 +561,9 @@ export function Scoreboard() {
               duration: tab === "map" ? 0.48 : 0.28,
               ease: easeSoft,
             }}
-            className={`flex flex-col ${
+            className={`flex min-h-0 min-w-0 flex-col ${
               presenting
-                ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
+                ? "flex-1 gap-1.5 overflow-hidden"
                 : "gap-5 md:gap-7"
             }`}
           >
@@ -588,11 +588,11 @@ export function Scoreboard() {
             ) : null}
 
             {data && data.standings.length > 0 ? (
-              <div className="grid min-h-0 items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
-                <section className="panel toy-box relative order-2 min-h-0 overflow-hidden rounded-3xl p-3 sm:p-4 md:order-1 md:h-full md:overflow-y-auto">
+              <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,auto)_minmax(0,1fr)] items-stretch gap-1.5 overflow-hidden md:h-full md:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
+                <section className="panel toy-box relative order-2 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl p-2 sm:p-4 md:order-1 md:h-full">
                   <StandingsList standings={data.standings} presentation />
                 </section>
-                <div className="order-1 min-h-0 w-full md:order-2 md:h-full">
+                <div className="order-1 min-h-0 min-w-0 w-full overflow-hidden md:order-2 md:h-full">
                   <OrbitArena standings={data.standings} variant="stage">
                     <CampStatStrip
                       standings={data.standings}

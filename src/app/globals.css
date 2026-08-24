@@ -568,6 +568,12 @@ html.dark .schedule-done {
   transition: opacity var(--bg-fade) ease-out;
 }
 
+html.presentation,
+html.presentation body {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 html.presentation .sky-floaters {
   opacity: 0.42;
 }
