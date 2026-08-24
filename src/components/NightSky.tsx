@@ -27,6 +27,14 @@ type Shooter = {
   vy: number;
   life: number;
   maxLife: number;
+  /** Fraction of life spent brightening — timed to when it reaches the sky. */
+  riseAt: number;
+  /** Seconds of travel the trail covers, so tails vary in length. */
+  tail: number;
+  /** Peak brightness — most meteors are faint, a few are bright. */
+  bright: number;
+  /** Head radius in px. */
+  size: number;
 };
 
 function seedStars(count: number): Star[] {
@@ -68,7 +76,7 @@ export function NightSky() {
     const lasers = seedLasers();
     let shooters: Shooter[] = [];
     let raf = 0;
-    let lastSpawn = 0;
+    let nextSpawnAt = 0;
     let running = true;
     let lastDraw = 0;
 
@@ -105,15 +113,45 @@ export function NightSky() {
       }
     };
 
+    // No two meteors share a slope, speed, length or brightness, and each one is
+    // aimed through a point in the visible upper sky so none are wasted just
+    // outside the frame.
     const spawnShooter = () => {
+      if (shooters.length >= 3) return;
+      const rightward = Math.random() > 0.3;
+      const speed = 150 + Math.random() * 230;
+      const angle = (14 + Math.random() * 34) * (Math.PI / 180);
+      const dx = Math.cos(angle) * (rightward ? 1 : -1);
+      const dy = Math.sin(angle);
+      // Aimed at this point, then walked backwards along its own path, so it
+      // either flies in from off-frame or swells up out of the dark — never
+      // blinks into existence at full brightness where you're looking.
+      const entryX =
+        width * (rightward ? 0.06 + Math.random() * 0.4 : 0.54 + Math.random() * 0.4);
+      const entryY = height * (0.04 + Math.random() * 0.26);
+      const lead = 0.2 + Math.random() * 0.35;
+      const maxLife = lead + (width * (0.5 + Math.random() * 0.65)) / speed;
       shooters.push({
-        x: Math.random() * width * 0.7,
-        y: Math.random() * height * 0.35,
-        vx: 220 + Math.random() * 180,
-        vy: 90 + Math.random() * 80,
+        x: entryX - dx * speed * lead,
+        y: entryY - dy * speed * lead,
+        vx: dx * speed,
+        vy: dy * speed,
         life: 0,
-        maxLife: 0.9 + Math.random() * 0.5,
+        maxLife,
+        riseAt: lead / maxLife,
+        tail: 0.1 + Math.random() * 0.12,
+        bright: 0.5 + Math.random() * 0.5,
+        size: 4.5 + Math.random() * 4.5,
       });
+    };
+
+    const scheduleShooter = (now: number) => {
+      // Real meteors arrive in uneven clusters, so a streak occasionally brings
+      // a companion; otherwise the sky goes quiet for several seconds.
+      const cluster = Math.random() < 0.18;
+      nextSpawnAt =
+        now +
+        (cluster ? 350 + Math.random() * 900 : 4500 + Math.random() * 8500);
     };
 
     // Every frame, at the display's rate — the shooting stars are the point, and
@@ -162,9 +200,11 @@ export function NightSky() {
         ctx.stroke();
       }
 
-      if (now - lastSpawn > 1700) {
+      if (nextSpawnAt === 0) {
+        nextSpawnAt = now + 800 + Math.random() * 2400;
+      } else if (now >= nextSpawnAt) {
         spawnShooter();
-        lastSpawn = now;
+        scheduleShooter(now);
       }
 
       shooters = shooters.filter((s) => s.life < s.maxLife);
@@ -173,30 +213,41 @@ export function NightSky() {
         s.life += step;
         s.x += s.vx * step;
         s.y += s.vy * step;
-        const fade = 1 - s.life / s.maxLife;
+
+        // Smoothstep in, long ease out. Starting at full brightness is what made
+        // the old streaks pop into frame; here they swell up out of the dark and
+        // die away, and the tail grows with them instead of arriving full length.
+        // Clamped: life can overshoot maxLife inside the frame it dies on, and a
+        // negative base in the pow below would make env NaN and kill the loop.
+        const p = Math.min(1, s.life / s.maxLife);
+        const rise = Math.min(1, p / s.riseAt);
+        const env =
+          rise * rise * (3 - 2 * rise) * Math.pow(1 - p, 1.6) * s.bright;
+        if (env < 0.004) continue;
 
         // Tail tapers to nothing via a gradient stroke; the head glow is a
         // radial fill. Both stay crisp at any DPR, unlike ctx.shadowBlur.
-        const tailX = s.x - s.vx * 0.15;
-        const tailY = s.y - s.vy * 0.15;
+        const span = s.tail * (0.35 + 0.65 * rise);
+        const tailX = s.x - s.vx * span;
+        const tailY = s.y - s.vy * span;
         const trail = ctx.createLinearGradient(tailX, tailY, s.x, s.y);
         trail.addColorStop(0, "rgba(255,236,179,0)");
-        trail.addColorStop(0.55, `rgba(255,240,198,${0.34 * fade})`);
-        trail.addColorStop(1, `rgba(255,250,232,${0.95 * fade})`);
+        trail.addColorStop(0.55, `rgba(255,240,198,${0.32 * env})`);
+        trail.addColorStop(1, `rgba(255,250,232,${0.92 * env})`);
         ctx.strokeStyle = trail;
-        ctx.lineWidth = 2.6;
+        ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(tailX, tailY);
         ctx.lineTo(s.x, s.y);
         ctx.stroke();
 
-        const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 8);
-        halo.addColorStop(0, `rgba(255,255,255,${fade})`);
-        halo.addColorStop(0.3, `rgba(255,244,214,${0.5 * fade})`);
+        const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.size);
+        halo.addColorStop(0, `rgba(255,255,255,${env})`);
+        halo.addColorStop(0.3, `rgba(255,244,214,${0.5 * env})`);
         halo.addColorStop(1, "rgba(255,240,200,0)");
         ctx.fillStyle = halo;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
         ctx.fill();
       }
 

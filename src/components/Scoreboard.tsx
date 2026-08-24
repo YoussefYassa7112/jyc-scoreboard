@@ -539,7 +539,7 @@ export function Scoreboard() {
                   setScheduleFocus(null);
                   goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 ${
+                className={`board-tab display-font relative flex-1 rounded-xl px-2 font-extrabold sm:px-3 ${
                   presenting
                     ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
                     : "py-3 text-sm sm:py-2.5 sm:text-base"
@@ -548,16 +548,15 @@ export function Scoreboard() {
                 }`}
                 aria-current={active ? "page" : undefined}
               >
+                {/* The pill and both label colours change in the same frame, with
+                    no transition anywhere. Sliding the pill meant the old tab
+                    briefly held gold text over the gold pill, which is what read
+                    as the label lagging behind the tap. */}
                 {active ? (
-                  <motion.span
-                    layoutId="board-tab-pill"
-                    transition={{ duration: 0.17, ease: easeSoft }}
-                    className="absolute inset-0 rounded-xl bg-star shadow-sm"
-                  />
+                  <span className="absolute inset-0 rounded-xl bg-star shadow-sm" />
                 ) : null}
                 <span
-                  data-active={active}
-                  className={`board-tab-label relative z-10 ${
+                  className={`relative z-10 ${
                     active ? "text-on-star" : "text-star"
                   }`}
                 >

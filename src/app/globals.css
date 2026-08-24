@@ -185,8 +185,6 @@
   --speck-2: rgba(255, 255, 255, 0.4);
   --speck-3: rgba(255, 255, 255, 0.35);
   --bg-fade: 0.16s;
-  /* How long the active tab pill takes to slide between tabs. */
-  --tab-slide: 170ms;
 
   --card: #fff8ee;
   --card-ink: #2a1f14;
@@ -402,17 +400,11 @@ html.dark .btn-soft {
   border-color: color-mix(in srgb, var(--star) 55%, #ffffff);
 }
 
-/**
- * A deactivating tab holds its light label until the pill has slid away —
- * flipping to the gold inactive color immediately left gold text sitting on the
- * gold pill, which read as the label taking a moment to catch up.
- */
-.board-tab-label {
-  transition: color 0s linear var(--tab-slide);
-}
-
-.board-tab-label[data-active="true"] {
-  transition: color 0s;
+/* manipulation opts out of the browser's wait-for-a-double-tap delay, so the
+   section switches the instant a finger lands. */
+.board-tab {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .btn-chip {
