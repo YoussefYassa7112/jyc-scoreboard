@@ -42,6 +42,7 @@ import { AwardPointsPanel } from "./AwardPointsPanel";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OfflineBanner, NeedsWifiNotice } from "./OfflineBanner";
+import { ControlDock } from "./ControlDock";
 import { SkyDecor } from "./SkyDecor";
 import { SpiderChart } from "./SpiderChart";
 import { BusyLabel, Spinner } from "./Spinner";
@@ -559,7 +560,7 @@ export function AdminDashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <main className="relative min-h-dvh px-4 pb-6 pt-16 sm:px-6 sm:pb-8 sm:pt-8 md:px-8">
+    <main className="relative min-h-dvh px-4 pb-6 pt-6 sm:px-6 sm:pb-8 sm:pt-8 md:px-8">
       {theme !== "dark" ? <SkyDecor /> : null}
 
       <motion.div
@@ -568,6 +569,7 @@ export function AdminDashboard() {
         initial="hidden"
         animate="show"
       >
+        <ControlDock />
         <motion.header
           variants={panelIn}
           className="panel flex flex-wrap items-center justify-between gap-3 rounded-3xl px-5 py-4"

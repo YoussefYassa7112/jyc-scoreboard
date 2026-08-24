@@ -33,6 +33,7 @@ import { CampPhotosButton } from "./CampPhotosButton";
 import { CampSchedule } from "./CampSchedule";
 import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
+import { ControlDock } from "./ControlDock";
 import { SkyDecor } from "./SkyDecor";
 import { StandingsList } from "./StandingsList";
 import { ReachForTheSkyMarquee } from "./SurpriseFX";
@@ -401,8 +402,10 @@ export function Scoreboard() {
             : "max-w-3xl gap-5 md:max-w-5xl md:gap-7"
         }`}
       >
+        <ControlDock />
+
         {presenting ? (
-          <header className="shrink-0 pr-[8rem] sm:pr-[8.5rem]">
+          <header className="shrink-0">
             <div className="flex flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
               <div className="min-w-0 shrink-0">
                 <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">

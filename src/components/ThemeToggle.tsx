@@ -7,14 +7,17 @@ export function ThemeToggle() {
   const isDark = theme === "dark";
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex items-center gap-1.5">
+      {isAutoNight ? (
+        <span className="control-dock-note px-1.5">Auto</span>
+      ) : null}
       <button
         type="button"
         role="switch"
         aria-checked={isDark}
         onClick={toggleTheme}
         aria-label={isDark ? "Switch to day mode" : "Switch to night mode"}
-        className="dock-switch relative flex h-9 w-full items-center rounded-full"
+        className="dock-switch relative flex h-9 w-[4.75rem] items-center rounded-full"
       >
         <span
           aria-hidden
@@ -38,9 +41,6 @@ export function ThemeToggle() {
           🌙
         </span>
       </button>
-      {isAutoNight ? (
-        <span className="control-dock-note">Auto night</span>
-      ) : null}
     </div>
   );
 }

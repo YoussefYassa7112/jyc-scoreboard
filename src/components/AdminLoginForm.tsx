@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { fadeSoft, springSoft } from "@/lib/motion";
 import { useOnline } from "@/lib/use-online";
+import { ControlDock } from "./ControlDock";
 import { OfflineBanner } from "./OfflineBanner";
 import { SkyDecor } from "./SkyDecor";
 import { BusyLabel } from "./Spinner";
@@ -44,8 +45,12 @@ export function AdminLoginForm() {
   }
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="relative flex min-h-dvh flex-col px-4 py-6">
       <SkyDecor />
+      <div className="relative z-10 mx-auto w-full max-w-md">
+        <ControlDock />
+      </div>
+      <div className="relative z-10 flex flex-1 items-center justify-center py-6">
       <motion.form
         layout
         initial={{ opacity: 0, y: 18, scale: 0.97 }}
@@ -118,6 +123,7 @@ export function AdminLoginForm() {
           Back to scoreboard
         </Link>
       </motion.form>
+      </div>
     </main>
   );
 }

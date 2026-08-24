@@ -63,10 +63,12 @@ function chaseLines(team: StandingRow, standings: StandingRow[], index: number) 
 function ChaseDrawer({
   id,
   open,
+  onClose,
   children,
 }: {
   id: string;
   open: boolean;
+  onClose: () => void;
   children: React.ReactNode;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -88,6 +90,7 @@ function ChaseDrawer({
       id={id}
       className="chase-drawer"
       aria-hidden={!open}
+      onClick={open ? onClose : undefined}
       style={{ height: open ? contentHeight : 0, opacity: open ? 1 : 0 }}
     >
       <div ref={contentRef}>{children}</div>
@@ -155,7 +158,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                 ) : null}
 
                 <div
-                  className="absolute inset-y-0 left-0 w-2 sm:w-2.5"
+                  className="pointer-events-none absolute inset-y-0 left-0 w-2 sm:w-2.5"
                   style={{ backgroundColor: team.color }}
                 />
                 <button
@@ -244,12 +247,13 @@ export function StandingsList({ standings, presentation = false }: Props) {
                         {team.rank === 3 ? " · 3rd place" : ""}
                       </p>
                     )}
-                    {/* Stays mounted and on one line: a row that resizes at the
-                        same moment as the drawer reads as a double jump. */}
-                    <p className="mt-0.5 flex items-baseline gap-1 text-[11px] font-bold leading-snug text-muted sm:text-xs">
-                      <span className="truncate">{preview}</span>
-                      <span className="shrink-0 font-extrabold text-muted-soft">
-                        {open ? "· tap to close" : "· tap for more"}
+                    {/* Wording never changes on toggle: a row that reflows at the
+                        same moment as the drawer reads as a double jump. The
+                        caret carries the open/closed state instead. */}
+                    <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
+                      {preview}
+                      <span className="ml-1 font-extrabold text-muted-soft">
+                        · tap for details
                       </span>
                     </p>
                     {presentation ? (
@@ -285,15 +289,19 @@ export function StandingsList({ standings, presentation = false }: Props) {
 
                   <span
                     aria-hidden
-                    className="chase-caret shrink-0 text-xs font-bold text-muted-soft"
+                    className="chase-caret flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-chip text-[0.7rem] font-bold text-muted"
                     style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
                   >
-                    ▾
+                    ▼
                   </span>
                 </div>
                 </button>
 
-                <ChaseDrawer id={drawerId} open={open}>
+                <ChaseDrawer
+                  id={drawerId}
+                  open={open}
+                  onClose={() => setOpenId(null)}
+                >
                   <div
                     className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
                       presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"

@@ -608,7 +608,9 @@ html.dark .sky-floaters {
 }
 
 .control-dock-rule {
-  height: 2px;
+  align-self: stretch;
+  width: 2px;
+  margin: 0.25rem 0;
   border-radius: 999px;
   background: var(--panel-border);
 }

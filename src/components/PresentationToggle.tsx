@@ -20,7 +20,7 @@ export function PresentationToggle() {
           ? "Exit presentation (Esc)"
           : "Presentation mode — full standings stats and orbit"
       }
-      className={`dock-button flex h-9 w-full items-center justify-center gap-1 rounded-full ${
+      className={`dock-button flex h-9 items-center justify-center gap-1 rounded-full px-3 ${
         on ? "dock-button-on" : ""
       }`}
     >
