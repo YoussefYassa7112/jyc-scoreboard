@@ -61,6 +61,9 @@ const themeBootScript = `
     var theme = stored === 'light' || stored === 'dark' ? stored : (night ? 'dark' : 'light');
     if (theme === 'dark') document.documentElement.classList.add('dark');
     document.documentElement.dataset.theme = theme;
+    if (localStorage.getItem('camp-presentation') === '1') {
+      document.documentElement.classList.add('presentation');
+    }
   } catch (e) {}
 })();
 `;

@@ -8,7 +8,7 @@ export function ThemeToggle() {
   const isDark = theme === "dark";
 
   return (
-    <div className="fixed right-[max(0.75rem,env(safe-area-inset-right))] top-[max(0.75rem,env(safe-area-inset-top))] z-50 flex flex-col items-end gap-1 sm:right-5 sm:top-5">
+    <div className="flex flex-col items-end gap-1">
       <button
         type="button"
         onClick={toggleTheme}

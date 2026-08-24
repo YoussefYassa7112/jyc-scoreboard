@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   announceDueReminders,
   useEventReminders,
@@ -23,9 +23,10 @@ import type { StandingRow } from "@/lib/standings";
 import { LIVE_CAMP_SIM } from "@/lib/schedule-sim";
 import { useTheme } from "@/lib/theme";
 import { useOnline } from "@/lib/use-online";
-import { needsDarkText } from "@/lib/utils";
+import { setPresentationMode, usePresentationMode } from "@/lib/presentation";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { BoardAlerts } from "./BoardAlerts";
+import { CampStatStrip } from "./CampStatStrip";
 import { useIntroReady } from "./IntroSplash";
 import { BuildingMap } from "./BuildingMap";
 import { CampPhotosButton } from "./CampPhotosButton";
@@ -33,6 +34,7 @@ import { CampSchedule } from "./CampSchedule";
 import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
 import { SkyDecor } from "./SkyDecor";
+import { StandingsList } from "./StandingsList";
 import { ReachForTheSkyMarquee } from "./SurpriseFX";
 
 type BoardTab = "standings" | "map" | "schedule";
@@ -80,12 +82,14 @@ function formatAsOf(iso: string) {
 
 export function Scoreboard() {
   const { theme } = useTheme();
+  const { on: presentationOn } = usePresentationMode();
   const online = useOnline();
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [staleCache, setStaleCache] = useState(false);
   const [tab, setTab] = useState<BoardTab>("standings");
+  const presenting = presentationOn && tab === "standings";
   const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
@@ -244,9 +248,17 @@ export function Scoreboard() {
     const from = TABS.findIndex((t) => t.id === tab);
     const to = TABS.findIndex((t) => t.id === next);
     if (tab === "map" && next !== "map") setMapFocus(null);
+    // Presentation is a standings-only view. Map and Schedule stay normal.
+    if (next !== "standings" && presentationOn) setPresentationMode(false);
     setTabDirection(to >= from ? 1 : -1);
     setTab(next);
   }
+
+  useEffect(() => {
+    if (!presentationOn) return;
+    setScheduleFocus(null);
+    setTab("standings");
+  }, [presentationOn]);
 
   const clearMapFocus = useCallback(() => setMapFocus(null), []);
   const clearScheduleFocus = useCallback(() => setScheduleFocus(null), []);
@@ -365,80 +377,122 @@ export function Scoreboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online, tab]);
 
+  const liveLabel =
+    online && !staleCache
+      ? "Live standings"
+      : online
+        ? "Standings"
+        : "Cached standings";
+
   return (
-    <main className="relative min-h-dvh overflow-x-hidden px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10">
+    <main
+      className={`relative overflow-x-hidden ${
+        presenting
+          ? "flex min-h-dvh flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.65rem,env(safe-area-inset-top))] sm:px-5 md:h-dvh md:overflow-hidden md:px-6 md:py-4"
+          : "min-h-dvh px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
+      }`}
+    >
       {!isDark ? <SkyDecor /> : null}
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-5 md:max-w-5xl md:gap-7">
-        <header className="text-center">
-          <motion.div
-            className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <motion.span
-              animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-            >
-              {isDark ? "⭐" : "🤠"}
-            </motion.span>
-            <motion.span
-              animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              ⭐
-            </motion.span>
-            <motion.span
-              animate={{ rotate: [8, -8, 8], y: [0, -6, 0] }}
-              transition={{
-                duration: 2.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.3,
-              }}
-            >
-              🚀
-            </motion.span>
-          </motion.div>
-
-          <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
-            Welcome to the JYC
-          </p>
-          <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
-            Camp Scoreboard
-          </h1>
-          {LIVE_CAMP_SIM ? (
-            <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
-              Simulation preview — not the public camp site
+      <div
+        className={`relative z-10 mx-auto flex w-full flex-col ${
+          presenting
+            ? "min-h-0 max-w-7xl flex-1 gap-3 md:overflow-hidden md:gap-3"
+            : "max-w-3xl gap-5 md:max-w-5xl md:gap-7"
+        }`}
+      >
+        {presenting ? (
+          <header className="shrink-0 pr-[6.75rem] sm:pr-28">
+            <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
+              Welcome to the JYC
             </p>
-          ) : null}
-
-          <ReachForTheSkyMarquee />
-
-          <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
-            <span
-              className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
-                online && !staleCache ? "bg-red-500" : "bg-muted-soft"
-              }`}
-            />
-            <span>
-              {online && !staleCache
-                ? "Live standings"
-                : online
-                  ? "Standings"
-                  : "Cached standings"}
-            </span>
-            {data?.asOf ? (
-              <span className="font-semibold text-muted-soft">
-                · as of {formatAsOf(data.asOf)}
-              </span>
+            <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
+              Camp Scoreboard
+            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
+              <span
+                className={`live-dot inline-block h-2 w-2 rounded-full ${
+                  online && !staleCache ? "bg-red-500" : "bg-muted-soft"
+                }`}
+              />
+              <span>{liveLabel}</span>
+              {data?.asOf ? (
+                <span className="font-semibold text-muted-soft">
+                  · {formatAsOf(data.asOf)}
+                </span>
+              ) : null}
+            </div>
+            {LIVE_CAMP_SIM ? (
+              <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-star">
+                Simulation preview
+              </p>
             ) : null}
-          </div>
+          </header>
+        ) : (
+          <header className="text-center">
+            <motion.div
+              className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <motion.span
+                animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              >
+                {isDark ? "⭐" : "🤠"}
+              </motion.span>
+              <motion.span
+                animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+              >
+                ⭐
+              </motion.span>
+              <motion.span
+                animate={{ rotate: [8, -8, 8], y: [0, -6, 0] }}
+                transition={{
+                  duration: 2.8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: 0.3,
+                }}
+              >
+                🚀
+              </motion.span>
+            </motion.div>
 
-          <div className="mt-4 flex justify-center">
-            <CampPhotosButton online={online} />
-          </div>
-        </header>
+            <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
+              Welcome to the JYC
+            </p>
+            <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
+              Camp Scoreboard
+            </h1>
+            {LIVE_CAMP_SIM ? (
+              <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
+                Simulation preview — not the public camp site
+              </p>
+            ) : null}
+
+            <ReachForTheSkyMarquee />
+
+            <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
+              <span
+                className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
+                  online && !staleCache ? "bg-red-500" : "bg-muted-soft"
+                }`}
+              />
+              <span>{liveLabel}</span>
+              {data?.asOf ? (
+                <span className="font-semibold text-muted-soft">
+                  · as of {formatAsOf(data.asOf)}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <CampPhotosButton online={online} />
+            </div>
+          </header>
+        )}
 
         <OfflineBanner
           online={online}
@@ -450,7 +504,7 @@ export function Scoreboard() {
         />
 
         <nav
-          className="panel flex gap-1 rounded-2xl p-1.5 sm:gap-1.5"
+          className="panel flex shrink-0 gap-1 rounded-2xl p-1.5 sm:gap-1.5"
           aria-label="Scoreboard sections"
         >
           {TABS.map((item) => {
@@ -465,7 +519,9 @@ export function Scoreboard() {
                   setScheduleFocus(null);
                   goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 py-3 text-sm font-extrabold transition-colors sm:px-3 sm:py-2.5 sm:text-base ${
+                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 sm:text-base ${
+                  presenting ? "py-2 text-sm sm:py-2" : "py-3 text-sm sm:py-2.5"
+                } ${
                   active
                     ? "text-on-star"
                     : "btn-chip cursor-pointer hover:brightness-105"
@@ -494,9 +550,50 @@ export function Scoreboard() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.28, ease: easeSoft }}
-            className="flex flex-col gap-5 md:gap-7"
+            className={`flex flex-col ${
+              presenting
+                ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
+                : "gap-5 md:gap-7"
+            }`}
           >
-        {tab === "standings" ? (
+        {tab === "standings" && presenting ? (
+          <>
+            {data && data.standings.length > 0 ? (
+              <CampStatStrip standings={data.standings} />
+            ) : null}
+
+            {loading && !data ? (
+              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
+                Opening the toy box…
+              </p>
+            ) : null}
+
+            {error && !data ? (
+              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-star">
+                {error}
+              </p>
+            ) : null}
+
+            {data && data.standings.length === 0 ? (
+              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
+                No teams yet — ask a counselor to set up the scoreboard!
+              </p>
+            ) : null}
+
+            {data && data.standings.length > 0 ? (
+              <div className="grid min-h-0 items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(16.5rem,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
+                <section className="panel toy-box relative order-2 min-h-0 overflow-hidden rounded-3xl p-3 sm:p-4 md:order-1 md:h-full md:overflow-y-auto">
+                  <StandingsList standings={data.standings} presentation />
+                </section>
+                <div className="order-1 h-[min(44dvh,22rem)] min-h-0 w-full md:order-2 md:h-full">
+                  <OrbitArena standings={data.standings} variant="stage" />
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+
+        {tab === "standings" && !presenting ? (
         <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
           <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
             ✨
@@ -524,123 +621,7 @@ export function Scoreboard() {
           ) : null}
 
           {data && data.standings.length > 0 ? (
-            <LayoutGroup>
-              <ul className="flex flex-col gap-3 pt-2">
-                <AnimatePresence initial={false}>
-                  {data.standings.map((team) => {
-                    const dark = needsDarkText(team.color);
-                    const topThree = team.rank <= 3;
-                    const isFirst = team.rank === 1;
-                    const badge =
-                      team.rank === 1
-                        ? "👑"
-                        : team.rank === 2
-                          ? "⭐"
-                          : team.rank === 3
-                            ? "🚀"
-                            : null;
-                    return (
-                      <motion.li
-                        key={team.id}
-                        layout
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.96 }}
-                        transition={{
-                          layout: {
-                            type: "spring",
-                            stiffness: 380,
-                            damping: 32,
-                          },
-                          opacity: { duration: 0.2 },
-                        }}
-                        className={`relative overflow-hidden rounded-2xl border-2 shadow-md ${
-                          isFirst
-                            ? "sheriff-glow border-saddle/20 bg-first-card"
-                            : topThree
-                              ? "border-star/40 bg-card"
-                              : "border-saddle/20 bg-card"
-                        }`}
-                      >
-                        {isFirst ? (
-                          <motion.div
-                            className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                            animate={{ x: ["-120%", "120%"] }}
-                            transition={{
-                              duration: 2.8,
-                              repeat: Infinity,
-                              repeatDelay: 2.2,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        ) : null}
-
-                        <div
-                          className="absolute inset-y-0 left-0 w-2 sm:w-2.5"
-                          style={{ backgroundColor: team.color }}
-                        />
-                        <div className="relative flex items-center gap-3 py-3 pl-5 pr-3 sm:gap-4 sm:py-4 sm:pl-6 sm:pr-5">
-                          <div
-                            className="display-font relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl font-bold sm:h-14 sm:w-14 sm:text-2xl"
-                            style={{
-                              backgroundColor: team.color,
-                              color: dark ? "#2a1f14" : "#fff8ee",
-                              boxShadow: topThree
-                                ? "0 0 0 3px rgba(232, 185, 35, 0.55)"
-                                : undefined,
-                            }}
-                          >
-                            {team.rank}
-                            {badge ? (
-                              <motion.span
-                                className="absolute -right-2 -top-2 text-base sm:text-lg"
-                                animate={{
-                                  y: [0, -3, 0],
-                                  rotate: [-8, 8, -8],
-                                }}
-                                transition={{
-                                  duration: 2.2,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                }}
-                              >
-                                {badge}
-                              </motion.span>
-                            ) : null}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="display-font truncate text-lg font-bold text-card-ink sm:text-2xl md:text-3xl">
-                              {team.name}
-                            </p>
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
-                              Rank #{team.rank}
-                              {isFirst ? " · 1st place" : ""}
-                              {team.rank === 2 ? " · 2nd place" : ""}
-                              {team.rank === 3 ? " · 3rd place" : ""}
-                            </p>
-                          </div>
-
-                          <motion.div
-                            key={`${team.id}-${team.score}`}
-                            initial={{ scale: 1.2, rotate: -4 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            transition={{
-                              type: "spring",
-                              stiffness: 420,
-                              damping: 16,
-                            }}
-                            className="display-font shrink-0 text-[1.65rem] font-bold tabular-nums leading-none text-card-ink sm:text-4xl md:text-5xl"
-                          >
-                            {team.score}
-                          </motion.div>
-                        </div>
-                      </motion.li>
-                    );
-                  })}
-                </AnimatePresence>
-              </ul>
-            </LayoutGroup>
+            <StandingsList standings={data.standings} />
           ) : null}
         </section>
         ) : null}
@@ -701,20 +682,24 @@ export function Scoreboard() {
           </motion.div>
         </AnimatePresence>
 
-        <div
-          className={tab === "standings" ? "mt-5 md:mt-7" : "hidden"}
-          aria-hidden={tab !== "standings"}
-        >
-          <OrbitArena standings={data?.standings ?? []} />
-        </div>
+        {presenting ? null : (
+          <div
+            className={tab === "standings" ? "mt-5 md:mt-7" : "hidden"}
+            aria-hidden={tab !== "standings"}
+          >
+            <OrbitArena standings={data?.standings ?? []} />
+          </div>
+        )}
 
-        <motion.p
-          className="text-center text-xs font-semibold text-muted-soft sm:text-sm"
-          animate={{ opacity: [0.7, 1, 0.7] }}
-          transition={{ duration: 3.5, repeat: Infinity }}
-        >
-          Scan the camp QR anytime to check who&apos;s leading the adventure
-        </motion.p>
+        {presenting ? null : (
+          <motion.p
+            className="text-center text-xs font-semibold text-muted-soft sm:text-sm"
+            animate={{ opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 3.5, repeat: Infinity }}
+          >
+            Scan the camp QR anytime to check who&apos;s leading the adventure
+          </motion.p>
+        )}
       </div>
 
       <AdminToasts

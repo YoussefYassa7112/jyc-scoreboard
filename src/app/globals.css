@@ -400,3 +400,7 @@ html.dark .sheriff-glow {
   font-feature-settings: "tnum";
   letter-spacing: 0.04em;
 }
+
+html.presentation .sky-floaters {
+  opacity: 0.42;
+}

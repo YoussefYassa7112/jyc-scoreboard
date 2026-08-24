@@ -7,6 +7,8 @@ import type { StandingRow } from "@/lib/standings";
 
 type Props = {
   standings: StandingRow[];
+  /** `stage` fills the pane so every orbit stays on screen. */
+  variant?: "board" | "stage";
 };
 
 const PLANET_R = 14;
@@ -42,7 +44,7 @@ type Scene = {
  * Higher score => closer to Camp. Arena grows with unique scores.
  * Rank/score changes lerp radius instead of wiping the SVG.
  */
-export function OrbitArena({ standings }: Props) {
+export function OrbitArena({ standings, variant = "board" }: Props) {
   const { theme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -74,8 +76,10 @@ export function OrbitArena({ standings }: Props) {
       (a, b) => b - a,
     );
     const orbitCount = Math.max(uniqueScores.length, 1);
-    const maxOrbit = CORE_R + 16 + orbitCount * LEVEL_GAP;
-    const size = Math.max(240, maxOrbit * 2 + PAD * 2);
+    const gap = variant === "stage" ? 42 : LEVEL_GAP;
+    const pad = variant === "stage" ? 72 : PAD;
+    const maxOrbit = CORE_R + 16 + orbitCount * gap;
+    const size = Math.max(240, maxOrbit * 2 + pad * 2);
     sizeRef.current.target = size;
 
     const dark = theme === "dark";
@@ -132,7 +136,7 @@ export function OrbitArena({ standings }: Props) {
     paintStars(scene.stars, maxOrbit + 20, dark);
     paintCore(scene.core, coreOuter, campInk, campHalo);
 
-    const orbitForLevel = (level: number) => CORE_R + 16 + level * LEVEL_GAP;
+    const orbitForLevel = (level: number) => CORE_R + 16 + level * gap;
     const levelByScore = new Map(
       uniqueScores.map((score, idx) => [score, idx + 1]),
     );
@@ -301,9 +305,12 @@ export function OrbitArena({ standings }: Props) {
       .select("text.label")
       .attr("text-anchor", "middle")
       .attr("fill", labelFill)
-      .attr("font-size", 11)
       .attr("font-weight", 800)
-      .text((d) => (d.name.length > 12 ? `${d.name.slice(0, 11)}…` : d.name));
+      .attr("font-size", variant === "stage" ? 13 : 11)
+      .text((d) => {
+        const cap = variant === "stage" ? 16 : 12;
+        return d.name.length > cap ? `${d.name.slice(0, cap - 1)}…` : d.name;
+      });
 
     planet
       .exit()
@@ -313,7 +320,7 @@ export function OrbitArena({ standings }: Props) {
       .remove();
     // dataKey captures standings content; avoid rebuild on every poll reference change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataKey, theme]);
+  }, [dataKey, theme, variant]);
 
   useEffect(() => {
     let last = performance.now();
@@ -395,9 +402,15 @@ export function OrbitArena({ standings }: Props) {
     };
   }, []);
 
+  const stage = variant === "stage";
+
   return (
-    <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5">
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+    <section
+      className={`panel toy-box relative flex flex-col rounded-3xl p-3 sm:p-5 ${
+        stage ? "h-full min-h-0 overflow-hidden" : "overflow-hidden"
+      }`}
+    >
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2 sm:gap-3">
         <div>
           <p className="display-font text-xs font-semibold uppercase tracking-[0.22em] text-muted-soft">
             D3 quantum orbits
@@ -410,8 +423,20 @@ export function OrbitArena({ standings }: Props) {
           One orbit per score · ties share a ring · closer = ahead
         </p>
       </div>
-      <div ref={wrapRef} className="mx-auto w-full max-w-lg overflow-hidden">
-        <svg ref={svgRef} className="block h-auto w-full" />
+      <div
+        ref={wrapRef}
+        className={
+          stage
+            ? "mx-auto h-full min-h-0 w-full"
+            : "mx-auto w-full max-w-lg overflow-hidden"
+        }
+      >
+        <svg
+          ref={svgRef}
+          className={
+            stage ? "block h-full w-full" : "block h-auto w-full"
+          }
+        />
       </div>
     </section>
   );

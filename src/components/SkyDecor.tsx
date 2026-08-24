@@ -28,7 +28,7 @@ const twinkles = [
 
 export function SkyDecor() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div aria-hidden className="sky-floaters pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute inset-[-40px] scale-105 opacity-70 blur-[8px] sm:blur-[12px]">
       <div className="cloud-shape float-a left-[-4%] top-[8%] h-10 w-28 md:h-14 md:w-40" />
       <div className="cloud-shape float-b right-[8%] top-[14%] h-8 w-24 md:h-12 md:w-36" />
