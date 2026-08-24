@@ -447,7 +447,7 @@ export function Scoreboard() {
                 animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
                 transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               >
-                {isDark ? "⭐" : "🤠"}
+                {isDark ? "🪐" : "🤠"}
               </motion.span>
               <motion.span
                 animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
