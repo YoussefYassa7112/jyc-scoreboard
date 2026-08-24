@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, type ReactNode } from "react";
 import * as d3 from "d3";
 import { useTheme } from "@/lib/theme";
 import type { StandingRow } from "@/lib/standings";
@@ -205,7 +205,14 @@ const AMBIENT_MS = 1000 / 30;
  * Higher score => closer to Camp. Arena grows with unique scores.
  * Rank/score changes lerp radius instead of wiping the SVG.
  */
-export function OrbitArena({ standings, variant = "board", children }: Props) {
+// Memoised for the same reason as StandingsList: the arena stays mounted on
+// every tab, so without this it re-runs its D3 setup on each tab change and
+// delays the paint of the tab highlight.
+export const OrbitArena = memo(function OrbitArena({
+  standings,
+  variant = "board",
+  children,
+}: Props) {
   const { theme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -694,7 +701,7 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
       ) : null}
     </section>
   );
-}
+});
 
 function ensureDefs(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,

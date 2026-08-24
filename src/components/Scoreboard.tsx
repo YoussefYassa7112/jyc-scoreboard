@@ -91,8 +91,15 @@ export function Scoreboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [staleCache, setStaleCache] = useState(false);
+  // The nav paints from `tab`; the panel mounts from `panelTab` a frame later.
+  // Mounting a panel is heavy — on a throttled phone the standings panel costs
+  // ~1.5s of main-thread work — and while that sits in the same commit as the
+  // highlight the browser cannot paint the new tab colours until it finishes.
+  // That is the delay that reads as the label lagging behind the tap.
   const [tab, setTab] = useState<BoardTab>("standings");
-  const presenting = presentationOn && tab === "standings";
+  const [panelTab, setPanelTab] = useState<BoardTab>("standings");
+  const panelFrame = useRef(0);
+  const presenting = presentationOn && panelTab === "standings";
   const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
@@ -247,6 +254,19 @@ export function Scoreboard() {
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
 
+  // Highlight now, panel next. A rAF callback still runs before the paint it
+  // precedes, so it takes two of them to be sure the highlight is on screen
+  // before the expensive mount begins.
+  const showTab = useCallback((next: BoardTab) => {
+    setTab(next);
+    cancelAnimationFrame(panelFrame.current);
+    panelFrame.current = requestAnimationFrame(() => {
+      panelFrame.current = requestAnimationFrame(() => setPanelTab(next));
+    });
+  }, []);
+
+  useEffect(() => () => cancelAnimationFrame(panelFrame.current), []);
+
   function goToTab(next: BoardTab) {
     const from = TABS.findIndex((t) => t.id === tab);
     const to = TABS.findIndex((t) => t.id === next);
@@ -254,14 +274,14 @@ export function Scoreboard() {
     // Presentation is a standings-only view. Map and Schedule stay normal.
     if (next !== "standings" && presentationOn) setPresentationMode(false);
     setTabDirection(to >= from ? 1 : -1);
-    setTab(next);
+    showTab(next);
   }
 
   useEffect(() => {
     if (!presentationOn) return;
     setScheduleFocus(null);
-    setTab("standings");
-  }, [presentationOn]);
+    showTab("standings");
+  }, [presentationOn, showTab]);
 
   const clearMapFocus = useCallback(() => setMapFocus(null), []);
   const clearScheduleFocus = useCallback(() => setScheduleFocus(null), []);
@@ -569,7 +589,7 @@ export function Scoreboard() {
 
         <AnimatePresence mode="wait" custom={tabDirection} initial={false}>
           <motion.div
-            key={tab}
+            key={panelTab}
             custom={tabDirection}
             variants={panelVariants}
             initial="enter"
@@ -582,7 +602,7 @@ export function Scoreboard() {
                 : "gap-5 md:gap-7"
             }`}
           >
-        {tab === "standings" && presenting ? (
+        {panelTab === "standings" && presenting ? (
           <>
             {loading && !data ? (
               <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
@@ -620,7 +640,7 @@ export function Scoreboard() {
           </>
         ) : null}
 
-        {tab === "standings" && !presenting ? (
+        {panelTab === "standings" && !presenting ? (
         <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
           <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
             ✨
@@ -653,7 +673,7 @@ export function Scoreboard() {
         </section>
         ) : null}
 
-        {tab === "map" ? (
+        {panelTab === "map" ? (
           <BuildingMap
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
@@ -674,7 +694,7 @@ export function Scoreboard() {
           />
         ) : null}
 
-        {tab === "schedule" ? (
+        {panelTab === "schedule" ? (
           <CampSchedule
             teams={data?.standings ?? []}
             rosterAuthoritative={!staleCache && data != null}
@@ -711,8 +731,8 @@ export function Scoreboard() {
 
         {presenting ? null : (
           <div
-            className={tab === "standings" ? "mt-5 md:mt-7" : "hidden"}
-            aria-hidden={tab !== "standings"}
+            className={panelTab === "standings" ? "mt-5 md:mt-7" : "hidden"}
+            aria-hidden={panelTab !== "standings"}
           >
             <OrbitArena standings={data?.standings ?? []} />
           </div>

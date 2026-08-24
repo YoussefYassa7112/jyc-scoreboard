@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { needsDarkText } from "@/lib/utils";
 import type { StandingRow } from "@/lib/standings";
@@ -120,7 +120,13 @@ function ChaseDrawer({
   );
 }
 
-export function StandingsList({ standings, presentation = false }: Props) {
+// Memoised because the board re-renders on every tab change, and re-rendering
+// eight cards plus their drawers is enough main-thread work on a phone to hold
+// up the paint of the tab highlight the camper just tapped.
+export const StandingsList = memo(function StandingsList({
+  standings,
+  presentation = false,
+}: Props) {
   const [openId, setOpenId] = useState<number | null>(null);
   const leaderScore = standings[0]?.score ?? 0;
 
@@ -347,4 +353,4 @@ export function StandingsList({ standings, presentation = false }: Props) {
       </ul>
     </LayoutGroup>
   );
-}
+});
