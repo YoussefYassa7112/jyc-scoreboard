@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { needsDarkText } from "@/lib/utils";
 import type { StandingRow } from "@/lib/standings";
@@ -17,15 +18,45 @@ function groupLabel(group: StandingRow["campGroup"]) {
 
 function teamMeta(team: StandingRow, standings: StandingRow[], index: number) {
   const ahead = index > 0 ? standings[index - 1] : null;
-  const behindLeader = standings[0] ? standings[0].score - team.score : 0;
-  const toCatch = ahead ? ahead.score - team.score : 0;
+  const behind = standings[index + 1] ?? null;
+  const leader = standings[0] ?? null;
   const group = groupLabel(team.campGroup);
   const cabin =
     typeof team.cabinId === "number" ? `Cabin ${team.cabinId}` : "No cabin";
-  return { ahead, behindLeader, toCatch, group, cabin };
+  return { ahead, behind, leader, group, cabin };
+}
+
+function chaseLines(team: StandingRow, standings: StandingRow[], index: number) {
+  const { ahead, behind, leader } = teamMeta(team, standings, index);
+  if (index === 0) {
+    return behind
+      ? [`Leading by ${team.score - behind.score} pts over ${behind.name}`]
+      : ["In the lead"];
+  }
+  const lines: string[] = [];
+  if (ahead) {
+    const gap = ahead.score - team.score;
+    lines.push(
+      gap === 0
+        ? `Tied with ${ahead.name}`
+        : `${gap} pts to catch ${ahead.name} (#${ahead.rank})`,
+    );
+  }
+  if (leader && leader.id !== ahead?.id) {
+    lines.push(
+      `${leader.score - team.score} pts to catch 1st · ${leader.name}`,
+    );
+  }
+  if (behind && team.score - behind.score > 0) {
+    lines.push(
+      `${team.score - behind.score} pts ahead of ${behind.name} (#${behind.rank})`,
+    );
+  }
+  return lines;
 }
 
 export function StandingsList({ standings, presentation = false }: Props) {
+  const [openId, setOpenId] = useState<number | null>(null);
   const leaderScore = standings[0]?.score ?? 0;
 
   return (
@@ -36,22 +67,14 @@ export function StandingsList({ standings, presentation = false }: Props) {
             const dark = needsDarkText(team.color);
             const topThree = team.rank <= 3;
             const isFirst = team.rank === 1;
+            const open = openId === team.id;
             const badge =
               team.rank === 1 ? "👑" : team.rank === 2 ? "⭐" : team.rank === 3 ? "🚀" : null;
-            const { ahead, behindLeader, toCatch, group, cabin } = teamMeta(
-              team,
-              standings,
-              index,
-            );
+            const { ahead, group, cabin } = teamMeta(team, standings, index);
             const vsLeader =
               leaderScore > 0 ? Math.max(8, (team.score / leaderScore) * 100) : 0;
-            const gapCopy = isFirst
-              ? standings[1]
-                ? `+${team.score - standings[1].score} on 2nd`
-                : "In the lead"
-              : toCatch === 0
-                ? `Tied with ${ahead?.name ?? "next"}`
-                : `−${toCatch} to #${team.rank - 1}`;
+            const lines = chaseLines(team, standings, index);
+            const preview = lines[0] ?? "";
 
             return (
               <motion.li
@@ -93,8 +116,21 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   className="absolute inset-y-0 left-0 w-2 sm:w-2.5"
                   style={{ backgroundColor: team.color }}
                 />
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-label={
+                    open
+                      ? `Hide chase details for ${team.name}`
+                      : `Show how ${team.name} can catch the ranks above`
+                  }
+                  onClick={() =>
+                    setOpenId((current) => (current === team.id ? null : team.id))
+                  }
+                  className="relative w-full cursor-pointer text-left"
+                >
                 <div
-                  className={`relative flex items-center ${
+                  className={`relative flex w-full items-center ${
                     presentation
                       ? "gap-2.5 py-2.5 pl-5 pr-3 sm:gap-3 sm:py-3 sm:pl-6 sm:pr-4"
                       : "gap-3 py-3 pl-5 pr-3 sm:gap-4 sm:py-4 sm:pl-6 sm:pr-5"
@@ -135,14 +171,14 @@ export function StandingsList({ standings, presentation = false }: Props) {
                     <p
                       className={`display-font font-bold text-card-ink ${
                         presentation
-                          ? "text-base leading-tight sm:text-lg md:text-xl"
+                          ? "break-words text-base leading-tight sm:text-lg md:text-xl"
                           : "truncate text-lg sm:text-2xl md:text-3xl"
                       }`}
                     >
                       {team.name}
                     </p>
                     {presentation ? (
-                      <p className="mt-0.5 truncate text-[11px] font-bold text-muted-soft sm:text-xs">
+                      <p className="mt-0.5 text-[11px] font-bold text-muted-soft sm:text-xs">
                         <span
                           className={
                             team.campGroup === "red"
@@ -156,10 +192,6 @@ export function StandingsList({ standings, presentation = false }: Props) {
                         </span>
                         {" · "}
                         {cabin}
-                        {gapCopy ? ` · ${gapCopy}` : ""}
-                        {!isFirst && behindLeader > 0 && behindLeader !== toCatch
-                          ? ` · −${behindLeader} from 1st`
-                          : ""}
                       </p>
                     ) : (
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
@@ -169,6 +201,14 @@ export function StandingsList({ standings, presentation = false }: Props) {
                         {team.rank === 3 ? " · 3rd place" : ""}
                       </p>
                     )}
+                    {!open ? (
+                      <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
+                        {preview}
+                        <span className="ml-1 font-extrabold text-muted-soft">
+                          · tap for more
+                        </span>
+                      </p>
+                    ) : null}
                     {presentation ? (
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-chip">
                         <div
@@ -200,6 +240,43 @@ export function StandingsList({ standings, presentation = false }: Props) {
                     {team.score}
                   </motion.div>
                 </div>
+
+                <AnimatePresence initial={false}>
+                  {open ? (
+                    <motion.div
+                      key="chase"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div
+                        className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
+                          presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
+                        }`}
+                      >
+                        {lines.map((line) => (
+                          <p
+                            key={line}
+                            className="text-sm font-extrabold leading-snug text-card-ink"
+                          >
+                            {line}
+                          </p>
+                        ))}
+                        {ahead && team.score < ahead.score ? (
+                          <p className="text-xs font-bold text-muted-soft">
+                            One score bump from {ahead.name} and you swap places.
+                          </p>
+                        ) : null}
+                        <p className="text-xs font-extrabold text-muted-soft">
+                          Tap to hide
+                        </p>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+                </button>
               </motion.li>
             );
           })}

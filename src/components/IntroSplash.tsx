@@ -21,7 +21,8 @@ function introAlreadySeen() {
 }
 
 export function IntroReadyProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(introAlreadySeen);
+  // Always start false so SSR and the first client paint match.
+  const [ready, setReady] = useState(false);
   const markReady = useCallback(() => setReady(true), []);
 
   return (

@@ -13,12 +13,12 @@ export function ThemeToggle() {
         type="button"
         onClick={toggleTheme}
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        className="relative h-11 w-[4.5rem] overflow-hidden rounded-full border-2 border-saddle/25 bg-cloud/90 shadow-lg backdrop-blur-md transition-colors duration-500 dark:border-white/20 dark:bg-[#152038]/90"
+        className="relative h-11 w-[4.5rem] overflow-hidden rounded-full border-2 border-saddle/25 bg-cloud/90 shadow-lg dark:border-white/20 dark:bg-[#152038]/90"
       >
         <motion.span
           className="absolute top-1 left-1 flex h-8 w-8 items-center justify-center rounded-full bg-horizon text-base shadow-md dark:bg-[#3b82f6]"
           animate={{ x: isDark ? 34 : 0 }}
-          transition={{ type: "spring", stiffness: 420, damping: 28 }}
+          transition={{ type: "spring", stiffness: 700, damping: 38 }}
         >
           {isDark ? "🌙" : "☀️"}
         </motion.span>

@@ -143,9 +143,9 @@ function BlockCard({
           : `bg-card ${colors.cardBorder}`
       } ${
         highlighted && !done
-          ? `ring-2 ring-star ring-offset-2 ring-offset-transparent`
+          ? `bg-laser/15 ring-2 ring-laser ring-offset-2 ring-offset-transparent`
           : ""
-      } ${live ? "ring-2 ring-star/70" : ""}`}
+      } ${live ? "ring-2 ring-laser/70" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

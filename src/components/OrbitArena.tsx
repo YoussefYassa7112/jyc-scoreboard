@@ -20,6 +20,145 @@ const PAD = 48;
 /** Lower = slower radius lerp when ranks/scores change. */
 const ORBIT_EASE = 1.15;
 const RANK_MOVE_MS = 1800;
+const THEME_MS = 160;
+
+type OrbitChrome = {
+  ringStroke: string;
+  ringFill: string;
+  labelFill: string;
+  emptyFill: string;
+  qFill: string;
+  coreHot: string;
+  coreInner: string;
+  coreOuter: string;
+  leaderRing: string;
+  campInk: string;
+  campHalo: string;
+  skyFill: string;
+  starFill: string;
+  leaderStroke: string;
+};
+
+function applyOrbitTheme(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  scene: Scene,
+  chrome: OrbitChrome,
+) {
+  const {
+    ringStroke,
+    ringFill,
+    labelFill,
+    emptyFill,
+    qFill,
+    coreHot,
+    coreInner,
+    coreOuter,
+    leaderRing,
+    campInk,
+    campHalo,
+    skyFill,
+    starFill,
+    leaderStroke,
+  } = chrome;
+
+  ensureDefs(svg, coreHot, coreInner, coreOuter);
+  paintStars(scene.stars, 0, starFill);
+  paintCore(scene.core, coreOuter, campInk, campHalo);
+
+  const sky = scene.world.select("circle.sky");
+  if (!sky.empty() && sky.attr("fill")) {
+    sky
+      .transition("theme")
+      .duration(THEME_MS)
+      .ease(d3.easeCubicOut)
+      .attr("fill", skyFill);
+  }
+
+  scene.rings
+    .selectAll("circle.halo")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("fill", ringFill);
+  scene.rings
+    .selectAll<SVGCircleElement, { level: number }>("circle.track")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("stroke", (d) => (d?.level === 1 ? leaderStroke : ringStroke));
+  scene.rings
+    .selectAll<SVGCircleElement, { level: number }>("circle.drift")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("stroke", (d) => (d?.level === 1 ? leaderStroke : ringStroke));
+  scene.rings
+    .selectAll("text.pts")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("fill", qFill);
+
+  scene.planets
+    .selectAll<SVGGElement, { level: number }>("g.planet")
+    .select("circle.body")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("stroke", (d) => (d?.level === 1 ? leaderRing : "#fff8ee"));
+  scene.planets
+    .selectAll("text.label")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("fill", labelFill);
+
+  svg
+    .selectAll("text.empty-orbit")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("fill", emptyFill);
+}
+
+function orbitChrome(dark: boolean): OrbitChrome {
+  if (dark) {
+    // Night: Buzz cyan on navy.
+    return {
+      ringStroke: "rgba(148,163,184,0.42)",
+      ringFill: "rgba(56,189,248,0.07)",
+      labelFill: "#e2e8f0",
+      emptyFill: "#cbd5e1",
+      qFill: "rgba(186,198,214,0.72)",
+      coreHot: "#7dd3fc",
+      coreInner: "#1d4ed8",
+      coreOuter: "#38bdf8",
+      leaderRing: "#f5d76e",
+      campInk: "#fff8ee",
+      campHalo: "#0b1224",
+      skyFill: "rgba(15,23,42,0.35)",
+      starFill: "#e2e8f0",
+      leaderStroke: "#f5d76e",
+    };
+  }
+  // Day: light apricot — readable on cream without the harsh pumpkin.
+  return {
+    ringStroke: "rgba(224,154,82,0.5)",
+    ringFill: "rgba(244,197,138,0.16)",
+    labelFill: "#9a5b2a",
+    emptyFill: "#d4924a",
+    qFill: "rgba(201,132,64,0.78)",
+    coreHot: "#fff8e1",
+    coreInner: "#f4d35e",
+    coreOuter: "#f0b15b",
+    leaderRing: "#f4d35e",
+    campInk: "#fff8ee",
+    campHalo: "#e09a4a",
+    skyFill: "rgba(244,197,138,0.14)",
+    starFill: "#e8b55a",
+    leaderStroke: "#e09a4a",
+  };
+}
 
 type OrbitNode = StandingRow & {
   level: number;
@@ -32,14 +171,14 @@ type OrbitNode = StandingRow & {
   targetBodyR: number;
 };
 
-type Scene = {
+interface Scene {
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
   world: d3.Selection<SVGGElement, unknown, null, undefined>;
   stars: d3.Selection<SVGGElement, unknown, null, undefined>;
   rings: d3.Selection<SVGGElement, unknown, null, undefined>;
   core: d3.Selection<SVGGElement, unknown, null, undefined>;
   planets: d3.Selection<SVGGElement, unknown, null, undefined>;
-};
+}
 
 /**
  * Quantum orbit arena — continuous revolution.
@@ -55,6 +194,8 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
   const nodesRef = useRef<OrbitNode[]>([]);
   const sizeRef = useRef({ current: 220, target: 220 });
   const clockOrigin = useRef(performance.now());
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   const dataKey = useMemo(
     () =>
@@ -85,19 +226,23 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     const size = Math.max(240, maxOrbit * 2 + pad * 2);
     sizeRef.current.target = size;
 
-    const dark = theme === "dark";
-    const ringStroke = dark ? "rgba(148,163,184,0.38)" : "rgba(92,64,51,0.2)";
-    const ringFill = dark ? "rgba(56,189,248,0.045)" : "rgba(232,185,35,0.05)";
-    const labelFill = dark ? "#e2e8f0" : "#2a1f14";
-    const emptyFill = dark ? "#cbd5e1" : "#5c4033";
-    const qFill = dark ? "rgba(186,198,214,0.72)" : "rgba(92,64,51,0.42)";
-    const coreHot = dark ? "#7dd3fc" : "#f4d35e";
-    const coreInner = dark ? "#1d4ed8" : "#c45c26";
-    const coreOuter = dark ? "#38bdf8" : "#e8b923";
-    const leaderRing = dark ? "#f5d76e" : "#c9a227";
-    const campInk = dark ? "#fff8ee" : "#2a1f14";
-    const campHalo = dark ? "#0b1224" : "#fff4d0";
-    const skyFill = dark ? "rgba(15,23,42,0.35)" : "rgba(255,248,238,0.35)";
+    const chrome = orbitChrome(themeRef.current === "dark");
+    const {
+      ringStroke,
+      ringFill,
+      labelFill,
+      emptyFill,
+      qFill,
+      coreHot,
+      coreInner,
+      coreOuter,
+      leaderRing,
+      campInk,
+      campHalo,
+      skyFill,
+      starFill,
+      leaderStroke,
+    } = chrome;
 
     ensureDefs(svg, coreHot, coreInner, coreOuter);
     const scene = ensureScene(svg);
@@ -131,12 +276,10 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     if (sizeRef.current.current < 2) sizeRef.current.current = size;
     svg.attr("preserveAspectRatio", "xMidYMid meet");
 
-    scene.world
-      .select("circle.sky")
-      .attr("r", maxOrbit + 28)
-      .attr("fill", skyFill);
+    const sky = scene.world.select("circle.sky").attr("r", maxOrbit + 28);
+    if (!sky.attr("fill")) sky.attr("fill", skyFill);
 
-    paintStars(scene.stars, maxOrbit + 20, dark);
+    paintStars(scene.stars, maxOrbit + 20, starFill);
     paintCore(scene.core, coreOuter, campInk, campHalo);
 
     const orbitForLevel = (level: number) => CORE_R + 16 + level * gap;
@@ -182,42 +325,47 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
           .attr("stroke-linecap", "round");
       }
     });
-    const leaderStroke = dark ? "#f5d76e" : "#c9a227";
     ringMerge
       .select("circle.halo")
-      .transition()
+      .attr("fill", ringFill)
+      .transition("rank")
       .duration(RANK_MOVE_MS)
       .ease(d3.easeCubicInOut)
-      .attr("r", (d) => d.r)
-      .attr("fill", ringFill);
+      .attr("r", (d) => d.r);
     ringMerge
       .select("circle.track")
-      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke))
-      .attr("stroke-width", (d) => (d.level === 1 ? 2.2 : 1.35))
       .attr("stroke-dasharray", null)
       .attr("opacity", (d) => (d.level === 1 ? 0.9 : 0.5))
-      .transition()
+      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke))
+      .attr("stroke-width", (d) => (d.level === 1 ? 2.2 : 1.35));
+    ringMerge
+      .select("circle.track")
+      .transition("rank")
       .duration(RANK_MOVE_MS)
       .ease(d3.easeCubicInOut)
       .attr("r", (d) => d.r);
     ringMerge
       .select("circle.drift")
-      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke))
       .attr("stroke-width", 1.7)
       .attr("opacity", 0.75)
       .attr(
         "stroke-dasharray",
         (d) => `${Math.max(16, d.r * 0.18)} ${Math.max(26, d.r * 0.42)}`,
       )
-      .transition()
+      .attr("stroke", (d) => (d.level === 1 ? leaderStroke : ringStroke));
+    ringMerge
+      .select("circle.drift")
+      .transition("rank")
       .duration(RANK_MOVE_MS)
       .ease(d3.easeCubicInOut)
       .attr("r", (d) => d.r);
     ringMerge
       .select("text.pts")
-      .attr("fill", qFill)
       .text((d) => `${d.score} pts`)
-      .transition()
+      .attr("fill", qFill);
+    ringMerge
+      .select("text.pts")
+      .transition("rank")
       .duration(RANK_MOVE_MS)
       .ease(d3.easeCubicInOut)
       .attr("y", (d) => -d.r + 3);
@@ -291,8 +439,8 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     merge
       .select("circle.body")
       .attr("fill", (d) => d.color)
-      .attr("stroke", (d) => (d.level === 1 ? leaderRing : "#fff8ee"))
-      .attr("stroke-width", (d) => (d.level === 1 ? 3.5 : 2));
+      .attr("stroke-width", (d) => (d.level === 1 ? 3.5 : 2))
+      .attr("stroke", (d) => (d.level === 1 ? leaderRing : "#fff8ee"));
     merge
       .select("text.score")
       .attr("text-anchor", "middle")
@@ -307,13 +455,13 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     merge
       .select("text.label")
       .attr("text-anchor", "middle")
-      .attr("fill", labelFill)
       .attr("font-weight", 800)
       .attr("font-size", variant === "stage" ? 14 : 11)
       .text((d) => {
-        const cap = variant === "stage" ? 18 : 12;
+        const cap = variant === "stage" ? 18 : 16;
         return d.name.length > cap ? `${d.name.slice(0, cap - 1)}…` : d.name;
-      });
+      })
+      .attr("fill", labelFill);
 
     planet
       .exit()
@@ -321,9 +469,16 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
       .duration(900)
       .attr("opacity", 0)
       .remove();
-    // dataKey captures standings content; avoid rebuild on every poll reference change
+    // dataKey captures standings content; theme is painted in a separate lerp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataKey, theme, variant]);
+  }, [dataKey, variant]);
+
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    const scene = sceneRef.current;
+    if (!svgEl || !scene) return;
+    applyOrbitTheme(d3.select(svgEl), scene, orbitChrome(theme === "dark"));
+  }, [theme]);
 
   useEffect(() => {
     let last = performance.now();
@@ -431,7 +586,7 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
         />
       </div>
       {children ? (
-        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3 dark:border-white/10">
+        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
           {children}
         </div>
       ) : null}
@@ -463,9 +618,23 @@ function ensureDefs(
     grad.append("stop").attr("class", "core-mid").attr("offset", "55%");
     grad.append("stop").attr("class", "core-outer").attr("offset", "100%");
   }
-  defs.select("stop.core-inner").attr("stop-color", hot);
-  defs.select("stop.core-mid").attr("stop-color", inner);
-  defs.select("stop.core-outer").attr("stop-color", outer);
+  const innerStop = defs.select("stop.core-inner");
+  const painted = Boolean(innerStop.attr("stop-color"));
+  const paintStop = (cls: string, color: string) => {
+    const sel = defs.select(`stop.${cls}`);
+    if (!painted) {
+      sel.attr("stop-color", color);
+      return;
+    }
+    sel
+      .transition("theme")
+      .duration(THEME_MS)
+      .ease(d3.easeCubicOut)
+      .attr("stop-color", color);
+  };
+  paintStop("core-inner", hot);
+  paintStop("core-mid", inner);
+  paintStop("core-outer", outer);
 }
 
 function ensureScene(
@@ -493,12 +662,15 @@ function ensureScene(
 function paintStars(
   stars: d3.Selection<SVGGElement, unknown, null, undefined>,
   radius: number,
-  dark: boolean,
+  fill: string,
 ) {
   if (!stars.select("circle.star").empty()) {
     stars
       .selectAll("circle.star")
-      .attr("fill", dark ? "#e2e8f0" : "#e8b923");
+      .transition("theme")
+      .duration(THEME_MS)
+      .ease(d3.easeCubicOut)
+      .attr("fill", fill);
     return;
   }
   const dots = d3.range(28).map((i) => {
@@ -520,8 +692,8 @@ function paintStars(
     .attr("cx", (d) => d.x)
     .attr("cy", (d) => d.y)
     .attr("r", (d) => d.size)
-    .attr("fill", dark ? "#e2e8f0" : "#e8b923")
-    .attr("opacity", 0.35);
+    .attr("fill", fill)
+    .attr("opacity", 0.45);
 }
 
 function paintCore(
@@ -547,14 +719,21 @@ function paintCore(
       .attr("font-weight", 800)
       .attr("paint-order", "stroke")
       .attr("stroke-linejoin", "round")
+      .attr("stroke-width", 3.5)
       .text("JYC");
   }
-  core.select("circle.halo").attr("stroke", haloStroke);
+  core
+    .select("circle.halo")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
+    .attr("stroke", haloStroke);
   core.select("circle.body").attr("fill", "url(#camp-core)");
   core
     .select("text.camp-label")
+    .transition("theme")
+    .duration(THEME_MS)
+    .ease(d3.easeCubicOut)
     .attr("fill", campInk)
-    .attr("stroke", campHalo)
-    .attr("stroke-width", 3.5)
-    .text("JYC");
+    .attr("stroke", campHalo);
 }

@@ -66,8 +66,10 @@ export function diffStandings(
         kind: "team",
         title: movedUp
           ? `Your team climbed to #${after.rank}`
-          : `Your team slipped to #${after.rank}`,
-        detail: `${after.name} · ${after.score} pts`,
+          : `Dropped to #${after.rank} — still in this`,
+        detail: movedUp
+          ? `${after.name} · ${after.score} pts`
+          : `${after.name} · ${after.score} pts · comeback starts now`,
         color: after.color,
         teamName: after.name,
         direction: movedUp ? "up" : "down",

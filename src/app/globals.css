@@ -3,6 +3,163 @@
 /* Tie Tailwind's dark: variant to the in-app toggle instead of the OS setting */
 @custom-variant dark (&:where(html.dark, html.dark *));
 
+/* Interpolate theme tokens so light↔dark fades instead of snapping */
+@property --sky-top {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7ec8e3;
+}
+@property --sky-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #b8e0f0;
+}
+@property --horizon {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f4d35e;
+}
+@property --grass {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #3d8b5a;
+}
+@property --woody {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c45c26;
+}
+@property --saddle {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5c4033;
+}
+@property --star {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #6b4226;
+}
+@property --on-star {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff8ee;
+}
+@property --cloud {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff8ee;
+}
+@property --ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a1f14;
+}
+@property --card {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff8ee;
+}
+@property --card-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a1f14;
+}
+@property --muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5c4033;
+}
+@property --muted-soft {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #7a5c4a;
+}
+@property --chip {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f0e2cc;
+}
+@property --laser {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e11d48;
+}
+@property --panel {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff8ee;
+}
+@property --panel-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5c4033;
+}
+@property --first-card {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff4d6;
+}
+@property --chip-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a1f14;
+}
+@property --field {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+@property --field-ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a1f14;
+}
+@property --field-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5c4033;
+}
+@property --on-laser {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #fff8ee;
+}
+@property --toy-shadow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #2a1f14;
+}
+@property --toy-inset {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c4a574;
+}
+@property --sheriff-ring {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #e8b923;
+}
+@property --sheriff-glow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #c45c26;
+}
+@property --speck-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+@property --speck-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+@property --speck-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+
 /* Light mode palette */
 :root {
   --sky-top: #7ec8e3;
@@ -20,7 +177,14 @@
   --panel: rgba(255, 248, 238, 0.92);
   --panel-border: rgba(92, 64, 51, 0.18);
   --shadow: 0 12px 40px rgba(42, 31, 20, 0.18);
-  --bg-fade: 0.85s;
+  --toy-shadow: rgba(42, 31, 20, 0.18);
+  --toy-inset: rgba(196, 165, 116, 0.25);
+  --sheriff-ring: rgba(232, 185, 35, 0.45);
+  --sheriff-glow: rgba(196, 92, 38, 0.22);
+  --speck-1: rgba(255, 255, 255, 0.55);
+  --speck-2: rgba(255, 255, 255, 0.4);
+  --speck-3: rgba(255, 255, 255, 0.35);
+  --bg-fade: 0.16s;
 
   --card: #fff8ee;
   --card-ink: #2a1f14;
@@ -35,6 +199,9 @@
   --first-card: #fff4d6;
   --on-strong: #ffffff;
   --ring: rgba(92, 64, 51, 0.2);
+  /* Event/map selection glow — Buzz laser in daylight, sky laser at night */
+  --laser: #e11d48;
+  --on-laser: #fff8ee;
 }
 
 /* Dark mode palette */
@@ -53,6 +220,13 @@ html.dark {
   --panel: rgba(15, 23, 42, 0.82);
   --panel-border: rgba(148, 163, 184, 0.28);
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --toy-shadow: rgba(0, 0, 0, 0.45);
+  --toy-inset: rgba(56, 189, 248, 0.18);
+  --sheriff-ring: rgba(56, 189, 248, 0.45);
+  --sheriff-glow: rgba(14, 165, 233, 0.28);
+  --speck-1: rgba(255, 255, 255, 0.08);
+  --speck-2: rgba(255, 255, 255, 0.06);
+  --speck-3: rgba(255, 255, 255, 0.04);
 
   --card: #1e293b;
   --card-ink: #f8fafc;
@@ -67,6 +241,8 @@ html.dark {
   --first-card: #243447;
   --on-strong: #ffffff;
   --ring: rgba(148, 163, 184, 0.35);
+  --laser: #38bdf8;
+  --on-laser: #082033;
 }
 
 @theme inline {
@@ -93,6 +269,8 @@ html.dark {
   --color-field-ink: var(--field-ink);
   --color-field-border: var(--field-border);
   --color-accent: var(--accent);
+  --color-laser: var(--laser);
+  --color-on-laser: var(--on-laser);
   --color-first-card: var(--first-card);
   --color-on-strong: var(--on-strong);
   --animate-scroll: scroll var(--animation-duration, 40s)
@@ -119,6 +297,26 @@ body {
 
 html {
   color-scheme: light;
+  transition:
+    --sky-top var(--bg-fade) ease-out,
+    --sky-mid var(--bg-fade) ease-out,
+    --horizon var(--bg-fade) ease-out,
+    --grass var(--bg-fade) ease-out,
+    --star var(--bg-fade) ease-out,
+    --on-star var(--bg-fade) ease-out,
+    --cloud var(--bg-fade) ease-out,
+    --ink var(--bg-fade) ease-out,
+    --card var(--bg-fade) ease-out,
+    --card-ink var(--bg-fade) ease-out,
+    --muted var(--bg-fade) ease-out,
+    --muted-soft var(--bg-fade) ease-out,
+    --chip var(--bg-fade) ease-out,
+    --panel var(--bg-fade) ease-out,
+    --panel-border var(--bg-fade) ease-out,
+    --first-card var(--bg-fade) ease-out,
+    --saddle var(--bg-fade) ease-out,
+    --toy-shadow var(--bg-fade) ease-out,
+    --toy-inset var(--bg-fade) ease-out;
 }
 
 html.dark {
@@ -127,37 +325,35 @@ html.dark {
 
 body {
   margin: 0;
+  isolation: isolate;
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
+  background: linear-gradient(
+    180deg,
+    var(--sky-top) 0%,
+    var(--sky-mid) 42%,
+    var(--horizon) 68%,
+    var(--grass) 100%
+  );
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background:
     radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
     radial-gradient(circle at 78% 12%, rgba(255, 255, 255, 0.4) 0 1.5px, transparent 2.5px),
-    radial-gradient(circle at 55% 8%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px),
-    linear-gradient(
-      180deg,
-      var(--sky-top) 0%,
-      var(--sky-mid) 42%,
-      var(--horizon) 68%,
-      var(--grass) 100%
-    );
-  background-attachment: fixed;
-  transition:
-    color var(--bg-fade) ease,
-    background var(--bg-fade) ease,
-    background-color var(--bg-fade) ease;
+    radial-gradient(circle at 55% 8%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px);
+  opacity: 1;
+  transition: opacity var(--bg-fade) ease-out;
 }
 
-html.dark body {
-  background:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.08) 0 1px, transparent 2px),
-    radial-gradient(circle at 72% 20%, rgba(255, 255, 255, 0.06) 0 1px, transparent 2px),
-    linear-gradient(
-      180deg,
-      var(--sky-top) 0%,
-      var(--sky-mid) 48%,
-      var(--horizon) 78%,
-      var(--grass) 100%
-    );
+html.dark body::before {
+  opacity: 0;
 }
 
 .display-font {
@@ -166,36 +362,22 @@ html.dark body {
 }
 
 .panel {
-  background: var(--panel);
+  background-color: var(--panel);
   border: 2px solid var(--panel-border);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(6px);
+  box-shadow: 0 12px 40px var(--toy-shadow);
   color: var(--ink);
-  transition:
-    background-color var(--bg-fade) ease,
-    border-color var(--bg-fade) ease,
-    box-shadow var(--bg-fade) ease,
-    color var(--bg-fade) ease;
 }
 
 .surface-card {
   background: var(--card);
   color: var(--card-ink);
   border-color: var(--ring);
-  transition:
-    background-color var(--bg-fade) ease,
-    color var(--bg-fade) ease,
-    border-color var(--bg-fade) ease;
 }
 
 .field {
   background: var(--field);
   color: var(--field-ink);
   border-color: var(--field-border);
-  transition:
-    background-color var(--bg-fade) ease,
-    color var(--bg-fade) ease,
-    border-color var(--bg-fade) ease;
 }
 
 .field::placeholder {
@@ -234,11 +416,8 @@ select,
 input,
 textarea {
   transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease,
-    box-shadow 220ms ease,
-    opacity 200ms ease;
+    opacity 200ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .btn-cta,
@@ -246,10 +425,6 @@ textarea {
 .btn-chip,
 .btn-danger {
   transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease,
-    box-shadow 220ms ease,
     opacity 200ms ease,
     transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -315,7 +490,7 @@ html.dark .btn-danger:hover:not(:disabled) {
   border-radius: 999px;
   filter: blur(0.5px);
   pointer-events: none;
-  transition: opacity var(--bg-fade) ease;
+  transition: opacity var(--bg-fade) ease-out;
 }
 
 html.dark .cloud-shape {
@@ -368,27 +543,14 @@ html.dark .schedule-done {
 
 .toy-box {
   box-shadow:
-    0 12px 40px rgba(42, 31, 20, 0.18),
-    inset 0 0 0 3px rgba(196, 165, 116, 0.25);
-  transition: box-shadow var(--bg-fade) ease;
-}
-
-html.dark .toy-box {
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(56, 189, 248, 0.18);
+    0 12px 40px var(--toy-shadow),
+    inset 0 0 0 3px var(--toy-inset);
 }
 
 .sheriff-glow {
   box-shadow:
-    0 0 0 2px rgba(232, 185, 35, 0.45),
-    0 10px 28px rgba(196, 92, 38, 0.22);
-}
-
-html.dark .sheriff-glow {
-  box-shadow:
-    0 0 0 2px rgba(56, 189, 248, 0.45),
-    0 10px 28px rgba(14, 165, 233, 0.28);
+    0 0 0 2px var(--sheriff-ring),
+    0 10px 28px var(--sheriff-glow);
 }
 
 /* Fixed-width clock so 09 → 10 does not shove the layout. */
@@ -401,6 +563,15 @@ html.dark .sheriff-glow {
   letter-spacing: 0.04em;
 }
 
+.sky-floaters {
+  opacity: 1;
+  transition: opacity var(--bg-fade) ease-out;
+}
+
 html.presentation .sky-floaters {
   opacity: 0.42;
+}
+
+html.dark .sky-floaters {
+  opacity: 0;
 }

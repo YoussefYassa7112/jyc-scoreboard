@@ -49,13 +49,13 @@ const TABS: { id: BoardTab; label: string }[] = [
 const panelVariants = {
   enter: (direction: number) => ({
     opacity: 0,
-    x: direction >= 0 ? 56 : -56,
-    scale: 0.98,
+    x: direction >= 0 ? 72 : -72,
+    scale: 0.97,
   }),
   center: { opacity: 1, x: 0, scale: 1 },
   exit: (direction: number) => ({
     opacity: 0,
-    x: direction >= 0 ? -40 : 40,
+    x: direction >= 0 ? -48 : 48,
     scale: 0.98,
   }),
 };
@@ -392,7 +392,7 @@ export function Scoreboard() {
           : "min-h-dvh px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
       }`}
     >
-      {!isDark ? <SkyDecor /> : null}
+      <SkyDecor />
 
       <div
         className={`relative z-10 mx-auto flex w-full flex-col ${
@@ -557,7 +557,10 @@ export function Scoreboard() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.28, ease: easeSoft }}
+            transition={{
+              duration: tab === "map" ? 0.48 : 0.28,
+              ease: easeSoft,
+            }}
             className={`flex flex-col ${
               presenting
                 ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
@@ -702,8 +705,8 @@ export function Scoreboard() {
 
         {presenting ? null : (
           <motion.p
-            className="text-center text-xs font-semibold text-muted-soft sm:text-sm"
-            animate={{ opacity: [0.7, 1, 0.7] }}
+            className="mx-auto w-fit max-w-[min(100%,22rem)] rounded-full bg-cloud/90 px-3.5 py-1.5 text-center text-xs font-semibold text-muted shadow-sm sm:max-w-xl sm:text-sm dark:bg-[#152038]/90 dark:text-slate-300"
+            animate={{ opacity: [0.78, 1, 0.78] }}
             transition={{ duration: 3.5, repeat: Infinity }}
           >
             Scan the camp QR anytime to check who&apos;s leading the adventure

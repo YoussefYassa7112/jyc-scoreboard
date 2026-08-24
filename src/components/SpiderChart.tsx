@@ -82,6 +82,7 @@ export function SpiderChart({ teams }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const prevPts = useRef<Map<number, Pt>>(new Map());
   const hasPlayedIntro = useRef(false);
+  const gridKeyRef = useRef("");
   const tipLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tip, setTip] = useState<TipState>(null);
 
@@ -160,6 +161,7 @@ export function SpiderChart({ teams }: Props) {
     const fillPoly =
       theme === "dark" ? "rgba(184,224,98,0.22)" : "rgba(107,66,38,0.2)";
     const strokePoly = theme === "dark" ? "#B8E062" : "#6B4226";
+    const themeMs = 160;
 
     const angles = sorted.map((_, i) => i * angleSlice - Math.PI / 2);
 
@@ -183,6 +185,11 @@ export function SpiderChart({ teams }: Props) {
 
     let grid = root.select<SVGGElement>("g.grid");
     if (grid.empty()) grid = root.append("g").attr("class", "grid");
+    const nextGridKey = `${sorted.length}:${width}:${height}`;
+    const rebuildGrid = gridKeyRef.current !== nextGridKey;
+    gridKeyRef.current = nextGridKey;
+
+    if (rebuildGrid) {
     grid.selectAll("*").remove();
 
     d3.range(1, levels + 1).forEach((level) => {
@@ -232,6 +239,14 @@ export function SpiderChart({ teams }: Props) {
       .transition()
       .duration(playIntro ? 500 : 200)
       .attr("opacity", 0.7);
+    } else {
+      grid
+        .selectAll("polygon, line, circle")
+        .transition("theme")
+        .duration(themeMs)
+        .ease(d3.easeCubicOut)
+        .attr("stroke", gridStroke);
+    }
 
     let labels = root.select<SVGGElement>("g.labels");
     if (labels.empty()) labels = root.append("g").attr("class", "labels");
@@ -257,8 +272,12 @@ export function SpiderChart({ teams }: Props) {
 
     labelsMerged
       .text((d) => (d.name.length > 12 ? `${d.name.slice(0, 11)}…` : d.name))
-      .attr("fill", labelFill)
-      .transition()
+      .transition("theme")
+      .duration(themeMs)
+      .ease(d3.easeCubicOut)
+      .attr("fill", labelFill);
+    labelsMerged
+      .transition("layout")
       .duration(playIntro ? 600 : 350)
       .delay((_, i) => (playIntro ? 200 + i * 50 : 0))
       .attr("opacity", 1)
@@ -284,11 +303,15 @@ export function SpiderChart({ teams }: Props) {
     });
 
     poly
-      .attr("fill", fillPoly)
-      .attr("stroke", strokePoly)
       .attr("points", polyString(fromPts))
       .attr("opacity", playIntro ? 0 : 1)
-      .transition()
+      .transition("theme")
+      .duration(themeMs)
+      .ease(d3.easeCubicOut)
+      .attr("fill", fillPoly)
+      .attr("stroke", strokePoly);
+    poly
+      .transition("layout")
       .duration(playIntro ? 900 : 700)
       .ease(d3.easeCubicOut)
       .attr("opacity", 1)

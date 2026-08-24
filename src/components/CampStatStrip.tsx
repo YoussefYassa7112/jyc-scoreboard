@@ -24,7 +24,7 @@ function Chip({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm dark:border-white/10 ${
+      className={`rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm ${
         compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3 sm:py-2.5"
       }`}
     >

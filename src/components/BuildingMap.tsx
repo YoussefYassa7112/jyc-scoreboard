@@ -68,8 +68,7 @@ function roomFill(
   active: boolean,
   dimmed: boolean,
 ) {
-  const floorFill = dark ? "#152038" : "#fff8ee";
-  if (active) return floorFill;
+  if (active) return dark ? "#16344c" : "#ffe4ea";
   if (dimmed) return dark ? "#152038" : "#f3efe6";
   return dark ? kindFillDark[kind] : kindFillLight[kind];
 }
@@ -462,7 +461,13 @@ export function BuildingMap({
   const wall = dark ? "rgba(226,232,240,0.85)" : "#2a1f14";
   const floorBg = dark ? "#0b1224" : "#faf6ee";
   const ink = dark ? "#e2e8f0" : "#2a1f14";
-  const starStroke = dark ? "#B8E062" : "#6B4226";
+  const laser = dark ? "#38bdf8" : "#e11d48";
+  const laserGlow = dark
+    ? "drop-shadow(0 0 16px rgba(56,189,248,0.95))"
+    : "drop-shadow(0 0 14px rgba(225,29,72,0.7))";
+  const idleGlow = dark
+    ? "drop-shadow(0 0 8px rgba(184,224,98,0.4))"
+    : "drop-shadow(0 0 8px rgba(107,66,38,0.38))";
 
   function notifyFocusCleared() {
     if (!mountedRef.current) return;
@@ -484,6 +489,7 @@ export function BuildingMap({
     }
     setSelectedId(room.id);
     setHighlightBlockId(null);
+    setSpotlightKey(Date.now());
   }
 
   function onMapBlur(e: FocusEvent<HTMLElement>) {
@@ -590,9 +596,16 @@ export function BuildingMap({
         ))}
       </div>
 
-      <div className={`mt-4 overflow-hidden rounded-2xl border-2 bg-chip/40 ${
-        selectedId ? "border-saddle/15" : "border-star/70"
-      }`}>
+      <div style={{ perspective: 1100 }}>
+      <motion.div
+        initial={{ opacity: 0, rotateX: 16, y: 28, scale: 0.96 }}
+        animate={{ opacity: 1, rotateX: 0, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 220, damping: 24 }}
+        style={{ transformOrigin: "50% 0%" }}
+        className={`mt-4 overflow-hidden rounded-2xl border-2 bg-chip/40 ${
+          selectedId ? "border-laser ring-2 ring-laser/40" : "border-star/70"
+        }`}
+      >
         {!selectedId ? (
           <div className="flex items-center justify-center gap-2 bg-star px-3 py-2.5">
             <span className="text-lg" aria-hidden>
@@ -686,7 +699,7 @@ export function BuildingMap({
             const cy = room.y + room.h / 2;
             const ellipse = room.shape === "ellipse";
             const fill = roomFill(room.kind, dark, active, dimmed);
-            const stroke = active ? starStroke : wall;
+            const stroke = active ? laser : wall;
             const haloW = Math.max(
               10,
               Math.min(24, Math.min(room.w, room.h) * 0.22),
@@ -709,14 +722,10 @@ export function BuildingMap({
                     ? 1.4
                     : [1.7, 2.8, 1.7],
                 filter: active
-                  ? dark
-                    ? "drop-shadow(0 0 14px rgba(184,224,98,0.7))"
-                    : "drop-shadow(0 0 12px rgba(196,146,90,0.55))"
+                  ? laserGlow
                   : selectedId
                     ? "drop-shadow(0 0 0 rgba(0,0,0,0))"
-                    : dark
-                      ? "drop-shadow(0 0 8px rgba(184,224,98,0.28))"
-                      : "drop-shadow(0 0 8px rgba(196,146,90,0.28))",
+                    : idleGlow,
               },
               transition: selectedId
                 ? { duration: 0.2 }
@@ -789,7 +798,7 @@ export function BuildingMap({
                           rx={room.w / 2}
                           ry={room.h / 2}
                           fill="none"
-                          stroke={starStroke}
+                          stroke={laser}
                           strokeWidth={haloW}
                           filter="url(#map-inner-halo)"
                           initial={false}
@@ -812,7 +821,7 @@ export function BuildingMap({
                           height={room.h}
                           rx={6}
                           fill="none"
-                          stroke={starStroke}
+                          stroke={laser}
                           strokeWidth={haloW}
                           filter="url(#map-inner-halo)"
                           initial={false}
@@ -872,7 +881,7 @@ export function BuildingMap({
                       rx={room.w / 2 + 6}
                       ry={room.h / 2 + 6}
                       fill="none"
-                      stroke={starStroke}
+                      stroke={laser}
                       className="pointer-events-none"
                       initial={{ opacity: 0, strokeWidth: 2 }}
                       animate={{
@@ -890,7 +899,7 @@ export function BuildingMap({
                       height={room.h + 10}
                       rx={9}
                       fill="none"
-                      stroke={starStroke}
+                      stroke={laser}
                       className="pointer-events-none"
                       initial={{ opacity: 0, strokeWidth: 2 }}
                       animate={{
@@ -928,6 +937,7 @@ export function BuildingMap({
         </motion.div>
           </motion.div>
         </AnimatePresence>
+      </motion.div>
       </div>
 
       <AnimatePresence initial={false}>
@@ -937,10 +947,16 @@ export function BuildingMap({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.34, ease: easeSoft }}
+            transition={{ duration: 0.42, ease: easeSoft }}
             className="overflow-hidden"
           >
-            <div className="surface-card mt-4 rounded-2xl border-2 p-4">
+            <motion.div
+              initial={{ y: 28, scale: 0.96, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 16, scale: 0.98, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 26 }}
+              className="surface-card mt-4 rounded-2xl border-2 border-laser/50 p-4"
+            >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-muted-soft">
@@ -1007,7 +1023,7 @@ export function BuildingMap({
                         }
                         className={`w-full cursor-pointer rounded-xl border-2 px-3 py-2 text-left transition ${
                           highlighted
-                            ? "border-star bg-star/15 ring-2 ring-star/40"
+                            ? "border-laser bg-laser/15 ring-2 ring-laser/50"
                             : "btn-chip hover:brightness-105"
                         }`}
                       >
@@ -1037,7 +1053,11 @@ export function BuildingMap({
                         <p className="display-font text-sm font-bold text-card-ink">
                           {block.title}
                         </p>
-                        <p className="mt-1 text-[11px] font-extrabold text-star">
+                        <p
+                          className={`mt-1 text-[11px] font-extrabold ${
+                            highlighted ? "text-laser" : "text-star"
+                          }`}
+                        >
                           Open in schedule →
                         </p>
                       </button>
@@ -1047,7 +1067,7 @@ export function BuildingMap({
                 </ul>
               )}
             </div>
-            </div>
+            </motion.div>
           </motion.div>
         ) : (
           <motion.p

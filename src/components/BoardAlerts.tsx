@@ -127,7 +127,7 @@ function LeaderTakeover({
           onClick={onDismiss}
           className="relative mt-6 rounded-2xl bg-star px-5 py-2.5 text-sm font-extrabold text-on-star shadow-md"
         >
-          {alert.mine ? "We did it!" : "Let’s go!"}
+          {alert.mine ? "We did it!" : "What a climb!"}
         </button>
       </motion.div>
     </motion.div>
@@ -142,6 +142,8 @@ function TeamTakeover({
   onDismiss: () => void;
 }) {
   const climbed = alert.direction !== "down";
+  const comeback =
+    alert.detail ?? "Shake it off — the next score can send you back up.";
 
   return (
     <motion.div
@@ -180,7 +182,7 @@ function TeamTakeover({
           animate={{ y: climbed ? [0, -10, 0] : [0, 8, 0], scale: [1, 1.12, 1] }}
           transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
         >
-          {climbed ? "🚀" : "📉"}
+          {climbed ? "🚀" : "💪"}
         </motion.span>
 
         <h2
@@ -189,9 +191,14 @@ function TeamTakeover({
         >
           {alert.title}
         </h2>
-        {alert.detail ? (
+        {climbed && alert.detail ? (
           <p className="mt-2 text-base font-bold text-muted sm:text-lg">
             {alert.detail}
+          </p>
+        ) : null}
+        {!climbed ? (
+          <p className="mt-2 text-base font-bold text-muted sm:text-lg">
+            {comeback}
           </p>
         ) : null}
 
@@ -200,7 +207,7 @@ function TeamTakeover({
           onClick={onDismiss}
           className="mt-5 rounded-2xl bg-star px-5 py-2.5 text-sm font-extrabold text-on-star"
         >
-          Nice
+          {climbed ? "Nice" : "We'll bounce back"}
         </button>
       </motion.div>
     </motion.div>
