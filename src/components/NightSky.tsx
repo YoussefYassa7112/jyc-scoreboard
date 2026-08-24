@@ -70,11 +70,7 @@ export function NightSky() {
     let raf = 0;
     let lastSpawn = 0;
     let running = true;
-    // Ambient backdrop: 30fps is indistinguishable here and halves the cost of
-    // a full-viewport repaint, which competes with scrolling on a phone.
-    const frameMs = 1000 / 30;
     let lastDraw = 0;
-    let backdrop: CanvasGradient | null = null;
 
     const measure = () => {
       const nextW = window.innerWidth;
@@ -88,8 +84,7 @@ export function NightSky() {
     const applySize = (nextW: number, nextH: number) => {
       width = nextW;
       height = nextH;
-      backdrop = null;
-      const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
@@ -121,26 +116,16 @@ export function NightSky() {
       });
     };
 
+    // Every frame, at the display's rate — the shooting stars are the point, and
+    // anything less reads as stepping. The sky gradient is a CSS background on
+    // the canvas instead of a per-frame full-viewport fill, so a frame is now
+    // just the stars, four beams and the odd shooter.
     const draw = (now: number) => {
       if (!running) return;
-      if (now - lastDraw < frameMs) {
-        raf = requestAnimationFrame(draw);
-        return;
-      }
-      const step = lastDraw === 0 ? 1 / 30 : Math.min(0.1, (now - lastDraw) / 1000);
+      const step = lastDraw === 0 ? 1 / 60 : Math.min(0.05, (now - lastDraw) / 1000);
       lastDraw = now;
       const t = now / 1000;
       ctx.clearRect(0, 0, width, height);
-
-      if (!backdrop) {
-        backdrop = ctx.createLinearGradient(0, 0, 0, height);
-        backdrop.addColorStop(0, "#070b18");
-        backdrop.addColorStop(0.45, "#101b36");
-        backdrop.addColorStop(0.75, "#1a2744");
-        backdrop.addColorStop(1, "#13261c");
-      }
-      ctx.fillStyle = backdrop;
-      ctx.fillRect(0, 0, width, height);
 
       for (const star of stars) {
         const alpha =
@@ -177,26 +162,41 @@ export function NightSky() {
         ctx.stroke();
       }
 
-      if (now - lastSpawn > 2200) {
+      if (now - lastSpawn > 1700) {
         spawnShooter();
         lastSpawn = now;
       }
 
       shooters = shooters.filter((s) => s.life < s.maxLife);
+      ctx.lineCap = "round";
       for (const s of shooters) {
         s.life += step;
         s.x += s.vx * step;
         s.y += s.vy * step;
         const fade = 1 - s.life / s.maxLife;
-        ctx.strokeStyle = `rgba(255, 236, 179, ${fade})`;
-        ctx.lineWidth = 2;
+
+        // Tail tapers to nothing via a gradient stroke; the head glow is a
+        // radial fill. Both stay crisp at any DPR, unlike ctx.shadowBlur.
+        const tailX = s.x - s.vx * 0.15;
+        const tailY = s.y - s.vy * 0.15;
+        const trail = ctx.createLinearGradient(tailX, tailY, s.x, s.y);
+        trail.addColorStop(0, "rgba(255,236,179,0)");
+        trail.addColorStop(0.55, `rgba(255,240,198,${0.34 * fade})`);
+        trail.addColorStop(1, `rgba(255,250,232,${0.95 * fade})`);
+        ctx.strokeStyle = trail;
+        ctx.lineWidth = 2.6;
         ctx.beginPath();
-        ctx.moveTo(s.x, s.y);
-        ctx.lineTo(s.x - s.vx * 0.08, s.y - s.vy * 0.08);
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(s.x, s.y);
         ctx.stroke();
-        ctx.fillStyle = `rgba(255,255,255,${fade})`;
+
+        const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 8);
+        halo.addColorStop(0, `rgba(255,255,255,${fade})`);
+        halo.addColorStop(0.3, `rgba(255,244,214,${0.5 * fade})`);
+        halo.addColorStop(1, "rgba(255,240,200,0)");
+        ctx.fillStyle = halo;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, 2.2, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -236,7 +236,13 @@ export function NightSky() {
       className={`pointer-events-none fixed inset-0 z-0 h-lvh w-screen transition-opacity ease-in-out ${
         theme === "dark" ? "opacity-100" : "opacity-0"
       }`}
-      style={{ transitionDuration: "var(--bg-fade)" }}
+      style={{
+        transitionDuration: "var(--bg-fade)",
+        // Painted behind the bitmap, so clearRect reveals it. Keeps the sky out
+        // of the frame loop entirely.
+        backgroundImage:
+          "linear-gradient(to bottom, #070b18 0%, #101b36 45%, #1a2744 75%, #13261c 100%)",
+      }}
     />
   );
 }

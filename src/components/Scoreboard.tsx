@@ -544,20 +544,25 @@ export function Scoreboard() {
                     ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
                     : "py-3 text-sm sm:py-2.5 sm:text-base"
                 } ${
-                  active
-                    ? "text-on-star"
-                    : "btn-chip cursor-pointer hover:brightness-105"
+                  active ? "" : "btn-chip cursor-pointer hover:brightness-105"
                 }`}
                 aria-current={active ? "page" : undefined}
               >
                 {active ? (
                   <motion.span
                     layoutId="board-tab-pill"
-                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    transition={{ duration: 0.17, ease: easeSoft }}
                     className="absolute inset-0 rounded-xl bg-star shadow-sm"
                   />
                 ) : null}
-                <span className="relative z-10">{item.label}</span>
+                <span
+                  data-active={active}
+                  className={`board-tab-label relative z-10 ${
+                    active ? "text-on-star" : "text-star"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </button>
             );
           })}
