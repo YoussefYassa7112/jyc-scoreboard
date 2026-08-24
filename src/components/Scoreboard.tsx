@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { easeSoft } from "@/lib/motion";
 import {
   announceDueReminders,
   useEventReminders,
@@ -45,18 +46,20 @@ const TABS: { id: BoardTab; label: string }[] = [
   { id: "schedule", label: "Schedule" },
 ];
 
-/**
- * Panels travel in the direction of the tab you moved toward. This used to be
- * an AnimatePresence `mode="wait"` swap, which forced the outgoing panel to
- * finish a 200ms exit *before* the incoming one was allowed to mount — so the
- * expensive mount started a fifth of a second after the tap and every bit of
- * work spent making the highlight instant was spent against a gate. The slide
- * is now a CSS keyframe that replays when the panel goes display:none -> flex
- * (see .board-panel in globals.css), and panels are kept alive once visited.
- */
-/** `none` has no keyframe rule, so the first paint does not slide in. */
-const PANEL_DIR = { none: "none", forward: "forward", back: "back" } as const;
-type PanelDir = (typeof PANEL_DIR)[keyof typeof PANEL_DIR];
+/** Panels travel in the direction of the tab you moved toward. */
+const panelVariants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    x: direction >= 0 ? 72 : -72,
+    scale: 0.97,
+  }),
+  center: { opacity: 1, x: 0, scale: 1 },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction >= 0 ? -48 : 48,
+    scale: 0.98,
+  }),
+};
 
 type StandingsResponse = {
   standings: StandingRow[];
@@ -86,37 +89,9 @@ export function Scoreboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [staleCache, setStaleCache] = useState(false);
-  // The nav paints from `tab`; the panel mounts from `panelTab` a frame later.
-  // Mounting a panel is heavy — on a throttled phone the standings panel costs
-  // ~1.5s of main-thread work — and while that sits in the same commit as the
-  // highlight the browser cannot paint the new tab colours until it finishes.
-  // That is the delay that reads as the label lagging behind the tap.
   const [tab, setTab] = useState<BoardTab>("standings");
-  const [panelTab, setPanelTab] = useState<BoardTab>("standings");
-  // Panels are mounted on first visit and then kept, so only the first tap on
-  // Map or Schedule ever pays a mount. Standings starts mounted because it is
-  // what a camper scanning the QR lands on.
-  const [mountedTabs, setMountedTabs] = useState<BoardTab[]>(["standings"]);
-  // Mirror so the click handler can tell a repeat visit from a first one
-  // without waiting for the deferred state it is about to schedule.
-  const mountedTabsRef = useRef(mountedTabs);
-  mountedTabsRef.current = mountedTabs;
-  const panelFrame = useRef(0);
-  const panelTimer = useRef(0);
-  const navRef = useRef<HTMLElement>(null);
-  const panelsRef = useRef<HTMLDivElement>(null);
-  // Tracks the tab the camper just asked for, which the deferred state has not
-  // caught up to yet, so a fast second tap still gets its slide direction right.
-  //
-  // The nav also *renders* from this ref rather than from `tab`. The click
-  // handler writes `data-active` straight to the DOM for an immediate paint,
-  // but React re-renders this component roughly once a second from the
-  // standings poll — and a render that still read the old `tab` would put the
-  // stale value back on the attribute and snap the highlight backwards. Reading
-  // the ref means any render landing inside that window agrees with the DOM.
-  const pendingTab = useRef<BoardTab>("standings");
-  const presenting = presentationOn && panelTab === "standings";
-  const [panelDir, setPanelDir] = useState<PanelDir>(PANEL_DIR.none);
+  const presenting = presentationOn && tab === "standings";
+  const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
     roomId: string;
@@ -132,8 +107,6 @@ export function Scoreboard() {
     fromRoomId?: string;
   } | null>(null);
   const isDark = theme === "dark";
-  const presentationOnRef = useRef(presentationOn);
-  presentationOnRef.current = presentationOn;
 
   const [alerts, setAlerts] = useState<BoardAlert[]>([]);
   const [toasts, setToasts] = useState<AdminToast[]>([]);
@@ -274,98 +247,26 @@ export function Scoreboard() {
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
 
-  // Move the highlight on the DOM, then let React catch up two frames later.
-  // A setState inside a click handler renders synchronously in that same task,
-  // so the browser cannot paint until the render finishes — on a phone that is
-  // long enough to read as the colour lagging behind the tap. Writing the
-  // attributes directly keeps the handler cheap. Two frames because a rAF
-  // callback still runs before the paint it precedes, so it takes a second one
-  // to be sure the new highlight actually reached the screen first.
-  //
-  // Everything written here is opacity- or display-driven, so the whole visual
-  // switch — pill, both label colours, and the panel swap — lands in one
-  // compositor frame without waiting on the main thread.
-  const goToTab = useCallback(
-    (next: BoardTab, opts?: { clearScheduleFocus?: boolean }) => {
-      const current = pendingTab.current;
-      if (current === next && opts?.clearScheduleFocus !== true) return;
-
-      const from = TABS.findIndex((t) => t.id === current);
-      const to = TABS.findIndex((t) => t.id === next);
-      const dir: PanelDir = to >= from ? PANEL_DIR.forward : PANEL_DIR.back;
-      const leavingMap = current === "map" && next !== "map";
-      pendingTab.current = next;
-
-      navRef.current
-        ?.querySelectorAll<HTMLElement>("[data-tab]")
-        .forEach((el) => {
-          el.dataset.active = String(el.dataset.tab === next);
-        });
-
-      // Reveal the target panel in the same task as the highlight — but only
-      // once it has actually been visited before. On a first visit the panel
-      // element exists while its contents do not, so flipping it here would
-      // blank the board for the two frames until React commits. In that one
-      // case the outgoing panel stays put and React swaps both at once, which
-      // is what it always did. The highlight moves instantly either way.
-      if (mountedTabsRef.current.includes(next)) {
-        panelsRef.current
-          ?.querySelectorAll<HTMLElement>("[data-panel]")
-          .forEach((el) => {
-            const active = el.dataset.panel === next;
-            // Only stamp the direction on a panel that is actually arriving.
-            // Rewriting it on the panel already on screen would change which
-            // keyframe rule matches and replay the slide under the camper.
-            if (active && el.dataset.active !== "true") el.dataset.dir = dir;
-            el.dataset.active = String(active);
-          });
-      }
-
-      let committed = false;
-      const commit = () => {
-        if (committed) return;
-        committed = true;
-        if (opts?.clearScheduleFocus) setScheduleFocus(null);
-        if (leavingMap) setMapFocus(null);
-        // Presentation is a standings-only view. Map and Schedule stay normal.
-        if (next !== "standings" && presentationOnRef.current) {
-          setPresentationMode(false);
-        }
-        setPanelDir(dir);
-        setMountedTabs((current) =>
-          current.includes(next) ? current : [...current, next],
-        );
-        setTab(next);
-        setPanelTab(next);
-      };
-
-      cancelAnimationFrame(panelFrame.current);
-      window.clearTimeout(panelTimer.current);
-      panelFrame.current = requestAnimationFrame(() => {
-        panelFrame.current = requestAnimationFrame(commit);
-      });
-      // rAF does not fire while a tab is backgrounded or otherwise not
-      // compositing, and without a backstop the nav would sit on the new tab
-      // while the panel kept showing the old one — visibly out of sync the
-      // moment the camper looks back. The timer only ever wins when the frames
-      // never came; `commit` is idempotent either way.
-      panelTimer.current = window.setTimeout(commit, 120);
-    },
-    [],
-  );
-
-  useEffect(
-    () => () => {
-      cancelAnimationFrame(panelFrame.current);
-      window.clearTimeout(panelTimer.current);
-    },
-    [],
-  );
+  function goToTab(next: BoardTab) {
+    const from = TABS.findIndex((t) => t.id === tab);
+    const to = TABS.findIndex((t) => t.id === next);
+    if (tab === "map" && next !== "map") setMapFocus(null);
+    // Presentation is a standings-only view. Map and Schedule stay normal.
+    if (next !== "standings" && presentationOn) setPresentationMode(false);
+    setTabDirection(to >= from ? 1 : -1);
+    setTab(next);
+    // Pointer taps leave focus on the button; on mobile that can paint the
+    // browser's default focus ring as a stray rectangle above the nav.
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }
 
   useEffect(() => {
     if (!presentationOn) return;
-    goToTab("standings", { clearScheduleFocus: true });
-  }, [presentationOn, goToTab]);
+    setScheduleFocus(null);
+    setTab("standings");
+  }, [presentationOn]);
 
   const clearMapFocus = useCallback(() => setMapFocus(null), []);
   const clearScheduleFocus = useCallback(() => setScheduleFocus(null), []);
@@ -642,61 +543,67 @@ export function Scoreboard() {
           }
         />
 
+        <LayoutGroup id="board-tabs">
         <nav
-          ref={navRef}
-          className="panel flex shrink-0 gap-1 rounded-2xl p-1.5 sm:gap-1.5"
+          className="panel flex shrink-0 gap-1 overflow-hidden rounded-2xl p-1.5 sm:gap-1.5"
           aria-label="Scoreboard sections"
         >
           {TABS.map((item) => {
-            // Read the ref, not `tab`. See the note on pendingTab: a poll-driven
-            // render between the tap and the deferred setState would otherwise
-            // write the previous tab back onto data-active.
-            const active = pendingTab.current === item.id;
+            const active = tab === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                data-tab={item.id}
-                data-active={active ? "true" : "false"}
                 onClick={() => {
                   // Manual tab changes should never reuse a leftover map→schedule
                   // scroll/highlight intent.
-                  goToTab(item.id, { clearScheduleFocus: true });
+                  setScheduleFocus(null);
+                  goToTab(item.id);
                 }}
-                className={`board-tab display-font flex-1 rounded-xl px-2 font-extrabold sm:px-3 ${
+                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold outline-none transition-colors sm:px-3 ${
                   presenting
                     ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
                     : "py-3 text-sm sm:py-2.5 sm:text-base"
+                } ${
+                  active
+                    ? "text-on-star"
+                    : "btn-chip cursor-pointer hover:brightness-105"
                 }`}
                 aria-current={active ? "page" : undefined}
-                aria-label={item.label}
               >
-                {/* Every visual state is pre-painted and swapped by opacity off
-                    data-active, so pill and label change in the same compositor
-                    frame no matter how busy the main thread is. Both label
-                    copies are aria-hidden; the button carries the real name. */}
-                <span className="board-tab-pill absolute bg-star shadow-sm" />
-                <span className="board-tab-label" aria-hidden>
-                  <span className="board-tab-label-on">{item.label}</span>
-                  <span className="board-tab-label-off">{item.label}</span>
-                </span>
+                {active ? (
+                  <motion.span
+                    layoutId="board-tab-pill"
+                    transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    className="absolute inset-0 rounded-xl bg-star shadow-sm"
+                  />
+                ) : null}
+                <span className="relative z-10">{item.label}</span>
               </button>
             );
           })}
         </nav>
+        </LayoutGroup>
 
-        <div ref={panelsRef} className="contents">
-          <div
-            data-panel="standings"
-            data-active={panelTab === "standings" ? "true" : "false"}
-            data-dir={panelDir}
-            className={`board-panel ${
+        <AnimatePresence mode="wait" custom={tabDirection} initial={false}>
+          <motion.div
+            key={tab}
+            custom={tabDirection}
+            variants={panelVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              duration: tab === "map" ? 0.48 : 0.28,
+              ease: easeSoft,
+            }}
+            className={`flex flex-col ${
               presenting
                 ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
                 : "gap-5 md:gap-7"
             }`}
           >
-        {presenting ? (
+        {tab === "standings" && presenting ? (
           <>
             {loading && !data ? (
               <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
@@ -734,7 +641,7 @@ export function Scoreboard() {
           </>
         ) : null}
 
-        {!presenting ? (
+        {tab === "standings" && !presenting ? (
         <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
           <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
             ✨
@@ -767,17 +674,8 @@ export function Scoreboard() {
         </section>
         ) : null}
 
-          </div>
-
-          <div
-            data-panel="map"
-            data-active={panelTab === "map" ? "true" : "false"}
-            data-dir={panelDir}
-            className="board-panel gap-5 md:gap-7"
-          >
-        {mountedTabs.includes("map") ? (
+        {tab === "map" ? (
           <BuildingMap
-            active={panelTab === "map"}
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
             focusArrivalNonce={mapFocus?.arrivalNonce}
@@ -796,17 +694,9 @@ export function Scoreboard() {
             }}
           />
         ) : null}
-          </div>
 
-          <div
-            data-panel="schedule"
-            data-active={panelTab === "schedule" ? "true" : "false"}
-            data-dir={panelDir}
-            className="board-panel gap-5 md:gap-7"
-          >
-        {mountedTabs.includes("schedule") ? (
+        {tab === "schedule" ? (
           <CampSchedule
-            active={panelTab === "schedule"}
             teams={data?.standings ?? []}
             rosterAuthoritative={!staleCache && data != null}
             remindersOn={remindersOn}
@@ -837,13 +727,13 @@ export function Scoreboard() {
             }}
           />
         ) : null}
-          </div>
-        </div>
+          </motion.div>
+        </AnimatePresence>
 
         {presenting ? null : (
           <div
-            className={panelTab === "standings" ? "mt-5 md:mt-7" : "hidden"}
-            aria-hidden={panelTab !== "standings"}
+            className={tab === "standings" ? "mt-5 md:mt-7" : "hidden"}
+            aria-hidden={tab !== "standings"}
           >
             <OrbitArena standings={data?.standings ?? []} />
           </div>
