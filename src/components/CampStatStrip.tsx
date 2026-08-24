@@ -24,7 +24,7 @@ function Chip({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm ${
+      className={`rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm ${
         compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3 sm:py-2.5"
       }`}
     >
@@ -80,7 +80,7 @@ export function CampStatStrip({ standings, layout = "bar" }: Props) {
   if (inset) {
     return (
       <section aria-label="Camp stats" className="shrink-0">
-        <div className="grid min-w-0 grid-cols-3 gap-1.5 sm:grid-cols-5">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
           <Chip
             compact
             label="Leader"

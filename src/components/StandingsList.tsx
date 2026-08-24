@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { needsDarkText } from "@/lib/utils";
 import type { StandingRow } from "@/lib/standings";
 
@@ -60,9 +60,10 @@ export function StandingsList({ standings, presentation = false }: Props) {
   const leaderScore = standings[0]?.score ?? 0;
 
   return (
-    <ul className={`flex min-w-0 flex-col ${presentation ? "gap-1 pt-0 sm:gap-2" : "gap-3 pt-2"}`}>
-      <AnimatePresence initial={false}>
-        {standings.map((team, index) => {
+    <LayoutGroup>
+      <ul className={`flex flex-col ${presentation ? "gap-2 pt-0" : "gap-3 pt-2"}`}>
+        <AnimatePresence initial={false}>
+          {standings.map((team, index) => {
             const dark = needsDarkText(team.color);
             const topThree = team.rank <= 3;
             const isFirst = team.rank === 1;
@@ -78,12 +79,16 @@ export function StandingsList({ standings, presentation = false }: Props) {
             return (
               <motion.li
                 key={team.id}
-                layout="position"
+                layout
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{
-                  layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] },
+                  layout: {
+                    type: "spring",
+                    stiffness: 380,
+                    damping: 32,
+                  },
                   opacity: { duration: 0.2 },
                 }}
                 className={`relative overflow-hidden rounded-2xl border-2 shadow-md ${
@@ -125,16 +130,16 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   className="relative w-full cursor-pointer text-left"
                 >
                 <div
-                  className={`relative flex w-full min-w-0 items-center ${
+                  className={`relative flex w-full items-center ${
                     presentation
-                      ? "gap-2 py-1.5 pl-4 pr-2.5 sm:gap-3 sm:py-3 sm:pl-6 sm:pr-4"
+                      ? "gap-2.5 py-2.5 pl-5 pr-3 sm:gap-3 sm:py-3 sm:pl-6 sm:pr-4"
                       : "gap-3 py-3 pl-5 pr-3 sm:gap-4 sm:py-4 sm:pl-6 sm:pr-5"
                   }`}
                 >
                   <div
                     className={`display-font relative flex shrink-0 items-center justify-center rounded-xl font-bold ${
                       presentation
-                        ? "h-8 w-8 text-sm sm:h-12 sm:w-12 sm:text-xl"
+                        ? "h-10 w-10 text-lg sm:h-12 sm:w-12 sm:text-xl"
                         : "h-12 w-12 text-xl sm:h-14 sm:w-14 sm:text-2xl"
                     }`}
                     style={{
@@ -164,35 +169,30 @@ export function StandingsList({ standings, presentation = false }: Props) {
 
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`display-font min-w-0 font-bold text-card-ink ${
+                      className={`display-font font-bold text-card-ink ${
                         presentation
-                          ? "break-words text-sm leading-tight sm:text-lg md:text-xl"
+                          ? "break-words text-base leading-tight sm:text-lg md:text-xl"
                           : "truncate text-lg sm:text-2xl md:text-3xl"
                       }`}
                     >
                       {team.name}
                     </p>
                     {presentation ? (
-                      <>
-                        <p className="mt-0.5 text-[10px] font-extrabold text-muted-soft sm:hidden">
-                          {open ? "Tap to hide" : "Tap for gaps"}
-                        </p>
-                        <p className="mt-0.5 hidden text-[11px] font-bold text-muted-soft sm:block sm:text-xs">
-                          <span
-                            className={
-                              team.campGroup === "red"
-                                ? "text-[#C45C26]"
-                                : team.campGroup === "green"
-                                  ? "text-[#2F8F4E]"
-                                  : ""
-                            }
-                          >
-                            {group ?? "Ungrouped"}
-                          </span>
-                          {" · "}
-                          {cabin}
-                        </p>
-                      </>
+                      <p className="mt-0.5 text-[11px] font-bold text-muted-soft sm:text-xs">
+                        <span
+                          className={
+                            team.campGroup === "red"
+                              ? "text-[#C45C26]"
+                              : team.campGroup === "green"
+                                ? "text-[#2F8F4E]"
+                                : ""
+                          }
+                        >
+                          {group ?? "Ungrouped"}
+                        </span>
+                        {" · "}
+                        {cabin}
+                      </p>
                     ) : (
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
                         Rank #{team.rank}
@@ -201,20 +201,16 @@ export function StandingsList({ standings, presentation = false }: Props) {
                         {team.rank === 3 ? " · 3rd place" : ""}
                       </p>
                     )}
-                    <div
-                      className={`${presentation ? "hidden sm:grid" : "grid"} transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-                        open ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
-                      }`}
-                    >
-                      <p className="mt-0.5 min-h-0 overflow-hidden text-[11px] font-bold leading-snug text-muted sm:text-xs">
+                    {!open ? (
+                      <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
                         {preview}
                         <span className="ml-1 font-extrabold text-muted-soft">
                           · tap for more
                         </span>
                       </p>
-                    </div>
+                    ) : null}
                     {presentation ? (
-                      <div className="mt-1 hidden h-1.5 overflow-hidden rounded-full bg-chip sm:block">
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-chip">
                         <div
                           className="h-full rounded-full transition-[width] duration-500"
                           style={{
@@ -237,7 +233,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                     }}
                     className={`display-font shrink-0 font-bold tabular-nums leading-none text-card-ink ${
                       presentation
-                        ? "text-xl sm:text-3xl md:text-4xl"
+                        ? "text-[1.45rem] sm:text-3xl md:text-4xl"
                         : "text-[1.65rem] sm:text-4xl md:text-5xl"
                     }`}
                   >
@@ -245,47 +241,47 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   </motion.div>
                 </div>
 
-                <div
-                  className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-                    open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                  }`}
-                >
-                  <div
-                    className="min-h-0 overflow-hidden"
-                    inert={!open || undefined}
-                    aria-hidden={!open}
-                  >
-                    <div
-                      className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
-                        presentation ? "pl-4 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
-                      }`}
+                <AnimatePresence initial={false}>
+                  {open ? (
+                    <motion.div
+                      key="chase"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="overflow-hidden"
                     >
-                      {lines.map((line) => (
-                        <p
-                          key={line}
-                          className="text-sm font-extrabold leading-snug text-card-ink"
-                        >
-                          {line}
-                        </p>
-                      ))}
-                      {ahead && team.score < ahead.score ? (
-                        <p className="text-xs font-bold text-muted-soft">
-                          One score bump from {ahead.name} and you swap places.
-                        </p>
-                      ) : null}
-                      {presentation ? null : (
+                      <div
+                        className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
+                          presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
+                        }`}
+                      >
+                        {lines.map((line) => (
+                          <p
+                            key={line}
+                            className="text-sm font-extrabold leading-snug text-card-ink"
+                          >
+                            {line}
+                          </p>
+                        ))}
+                        {ahead && team.score < ahead.score ? (
+                          <p className="text-xs font-bold text-muted-soft">
+                            One score bump from {ahead.name} and you swap places.
+                          </p>
+                        ) : null}
                         <p className="text-xs font-extrabold text-muted-soft">
                           Tap to hide
                         </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
                 </button>
               </motion.li>
             );
           })}
-      </AnimatePresence>
-    </ul>
+        </AnimatePresence>
+      </ul>
+    </LayoutGroup>
   );
 }

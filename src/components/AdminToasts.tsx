@@ -19,7 +19,7 @@ type Props = {
 export function AdminToasts({ toasts, onDismiss }: Props) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-3 top-[var(--board-chrome)] z-[95] flex flex-col gap-2 sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[22rem]"
+      className="pointer-events-none fixed inset-x-3 top-[max(0.5rem,env(safe-area-inset-top))] z-[95] flex flex-col gap-2 pr-[4.75rem] sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[22rem] sm:pr-0 sm:top-[max(0.75rem,env(safe-area-inset-top))]"
       aria-live="polite"
     >
       <AnimatePresence>

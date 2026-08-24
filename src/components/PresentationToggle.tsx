@@ -30,7 +30,7 @@ export function PresentationToggle() {
           ? "Exit presentation (Esc)"
           : "Presentation mode — full standings stats and orbit"
       }
-      className={`flex h-10 shrink-0 items-center gap-1 rounded-full border-2 px-2.5 shadow-lg sm:h-11 sm:gap-1.5 sm:px-3 ${
+      className={`flex h-11 items-center gap-1.5 rounded-full border-2 px-3 shadow-lg ${
         on
           ? "border-star bg-star text-on-star"
           : "border-saddle/25 bg-cloud/90 text-ink dark:border-white/20 dark:bg-[#152038]/90"

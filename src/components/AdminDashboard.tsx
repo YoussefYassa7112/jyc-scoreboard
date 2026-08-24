@@ -559,7 +559,7 @@ export function AdminDashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <main className="relative min-h-dvh px-4 pb-6 pt-[calc(var(--board-chrome)+0.75rem)] sm:px-6 sm:pb-8 md:px-8">
+    <main className="relative min-h-dvh px-4 pb-6 pt-16 sm:px-6 sm:pb-8 sm:pt-8 md:px-8">
       {theme !== "dark" ? <SkyDecor /> : null}
 
       <motion.div

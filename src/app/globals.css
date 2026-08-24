@@ -295,16 +295,6 @@ body {
   overscroll-behavior-x: none;
 }
 
-:root {
-  --board-chrome: calc(env(safe-area-inset-top, 0px) + 5.35rem);
-}
-
-@media (min-width: 640px) {
-  :root {
-    --board-chrome: calc(env(safe-area-inset-top, 0px) + 1.5rem);
-  }
-}
-
 html {
   color-scheme: light;
   transition:
@@ -576,12 +566,6 @@ html.dark .schedule-done {
 .sky-floaters {
   opacity: 1;
   transition: opacity var(--bg-fade) ease-out;
-}
-
-html.presentation,
-html.presentation body {
-  height: 100dvh;
-  overflow: hidden;
 }
 
 html.presentation .sky-floaters {
