@@ -102,6 +102,7 @@ export function Scoreboard() {
   const mountedTabsRef = useRef(mountedTabs);
   mountedTabsRef.current = mountedTabs;
   const panelFrame = useRef(0);
+  const panelTimer = useRef(0);
   const navRef = useRef<HTMLElement>(null);
   const panelsRef = useRef<HTMLDivElement>(null);
   // Tracks the tab the camper just asked for, which the deferred state has not
@@ -320,28 +321,46 @@ export function Scoreboard() {
           });
       }
 
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        if (opts?.clearScheduleFocus) setScheduleFocus(null);
+        if (leavingMap) setMapFocus(null);
+        // Presentation is a standings-only view. Map and Schedule stay normal.
+        if (next !== "standings" && presentationOnRef.current) {
+          setPresentationMode(false);
+        }
+        setPanelDir(dir);
+        setMountedTabs((current) =>
+          current.includes(next) ? current : [...current, next],
+        );
+        setTab(next);
+        setPanelTab(next);
+      };
+
       cancelAnimationFrame(panelFrame.current);
+      window.clearTimeout(panelTimer.current);
       panelFrame.current = requestAnimationFrame(() => {
-        panelFrame.current = requestAnimationFrame(() => {
-          if (opts?.clearScheduleFocus) setScheduleFocus(null);
-          if (leavingMap) setMapFocus(null);
-          // Presentation is a standings-only view. Map and Schedule stay normal.
-          if (next !== "standings" && presentationOnRef.current) {
-            setPresentationMode(false);
-          }
-          setPanelDir(dir);
-          setMountedTabs((current) =>
-            current.includes(next) ? current : [...current, next],
-          );
-          setTab(next);
-          setPanelTab(next);
-        });
+        panelFrame.current = requestAnimationFrame(commit);
       });
+      // rAF does not fire while a tab is backgrounded or otherwise not
+      // compositing, and without a backstop the nav would sit on the new tab
+      // while the panel kept showing the old one — visibly out of sync the
+      // moment the camper looks back. The timer only ever wins when the frames
+      // never came; `commit` is idempotent either way.
+      panelTimer.current = window.setTimeout(commit, 120);
     },
     [],
   );
 
-  useEffect(() => () => cancelAnimationFrame(panelFrame.current), []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(panelFrame.current);
+      window.clearTimeout(panelTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!presentationOn) return;
