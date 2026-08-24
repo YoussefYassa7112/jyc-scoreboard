@@ -24,7 +24,9 @@ function Chip({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-saddle/15 bg-chip/80 backdrop-blur-sm ${
+      // min-w-0 matters: a grid track defaults to its content's minimum, and the
+      // nowrap value below would otherwise widen the row past the viewport.
+      className={`min-w-0 rounded-2xl border border-saddle/15 bg-chip/80 ${
         compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3 sm:py-2.5"
       }`}
     >

@@ -331,12 +331,17 @@ export function useEventReminders(
     }
 
     check();
-    const id = window.setInterval(check, CHECK_INTERVAL_MS);
+    let id = window.setInterval(check, CHECK_INTERVAL_MS);
+    // Backgrounded tabs stop polling entirely; returning re-checks immediately,
+    // so nothing due while away is missed.
     const onVis = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        window.clearInterval(id);
         return;
       }
       check();
+      window.clearInterval(id);
+      id = window.setInterval(check, CHECK_INTERVAL_MS);
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pageshow", onVis);

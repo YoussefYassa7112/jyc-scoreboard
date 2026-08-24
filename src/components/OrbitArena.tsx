@@ -181,6 +181,25 @@ interface Scene {
 }
 
 /**
+ * Element handles collected once per data change. The frame loop writes straight
+ * to these instead of building d3 selections 60 times a second.
+ */
+type PlanetHandle = {
+  node: OrbitNode;
+  g: SVGGElement;
+  wake: SVGCircleElement | null;
+  glow: SVGCircleElement | null;
+  body: SVGCircleElement | null;
+  label: SVGTextElement | null;
+};
+
+type DriftHandle = { el: SVGCircleElement; level: number };
+type StarHandle = { el: SVGCircleElement; twinkle: number };
+
+/** Ambient twinkle/drift refresh rate. Planets still move every frame. */
+const AMBIENT_MS = 1000 / 30;
+
+/**
  * Quantum orbit arena — continuous revolution.
  * One ring per distinct score; tied teams share an orbit.
  * Higher score => closer to Camp. Arena grows with unique scores.
@@ -192,10 +211,30 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const nodesRef = useRef<OrbitNode[]>([]);
+  const planetsRef = useRef<PlanetHandle[]>([]);
+  const driftRef = useRef<DriftHandle[]>([]);
+  const starsRef = useRef<StarHandle[]>([]);
+  const haloRef = useRef<SVGCircleElement | null>(null);
   const sizeRef = useRef({ current: 220, target: 220 });
-  const clockOrigin = useRef(performance.now());
+  const viewBoxRef = useRef("");
+  const visibleRef = useRef(false);
   const themeRef = useRef(theme);
   themeRef.current = theme;
+
+  // A hidden tab still holds this component mounted, so gate the loop on real
+  // visibility instead of letting it churn behind `display: none`.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        visibleRef.current = entries.some((entry) => entry.isIntersecting);
+      },
+      { rootMargin: "64px" },
+    );
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
 
   const dataKey = useMemo(
     () =>
@@ -275,6 +314,15 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     svg.selectAll("text.empty-orbit").remove();
     if (sizeRef.current.current < 2) sizeRef.current.current = size;
     svg.attr("preserveAspectRatio", "xMidYMid meet");
+    if (!viewBoxRef.current) {
+      const first = sizeRef.current.current;
+      viewBoxRef.current = `0 0 ${first.toFixed(1)} ${first.toFixed(1)}`;
+      svg.attr("viewBox", viewBoxRef.current);
+      scene.world.attr(
+        "transform",
+        `translate(${(first / 2).toFixed(1)},${(first / 2).toFixed(1)})`,
+      );
+    }
 
     const sky = scene.world.select("circle.sky").attr("r", maxOrbit + 28);
     if (!sky.attr("fill")) sky.attr("fill", skyFill);
@@ -469,6 +517,39 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
       .duration(900)
       .attr("opacity", 0)
       .remove();
+
+    const planetHandles: PlanetHandle[] = [];
+    merge.each(function (d) {
+      if (!d) return;
+      planetHandles.push({
+        node: d,
+        g: this,
+        wake: this.querySelector<SVGCircleElement>("circle.wake"),
+        glow: this.querySelector<SVGCircleElement>("circle.glow"),
+        body: this.querySelector<SVGCircleElement>("circle.body"),
+        label: this.querySelector<SVGTextElement>("text.label"),
+      });
+    });
+    planetsRef.current = planetHandles;
+
+    const driftHandles: DriftHandle[] = [];
+    ringMerge.each(function (d) {
+      const el = this.querySelector<SVGCircleElement>("circle.drift");
+      if (el && d) driftHandles.push({ el, level: d.level });
+    });
+    driftRef.current = driftHandles;
+
+    const starHandles: StarHandle[] = [];
+    scene.stars
+      .selectAll<SVGCircleElement, { twinkle: number }>("circle.star")
+      .each(function (d) {
+        starHandles.push({ el: this, twinkle: d?.twinkle ?? 0 });
+      });
+    starsRef.current = starHandles;
+
+    haloRef.current = scene.core
+      .select<SVGCircleElement>("circle.halo")
+      .node();
     // dataKey captures standings content; theme is painted in a separate lerp.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataKey, variant]);
@@ -484,73 +565,92 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     let last = performance.now();
     let frame = 0;
     let alive = true;
+    let elapsed = 0;
+    let lastAmbient = 0;
 
     function spin(now: number) {
       if (!alive) return;
       frame = window.requestAnimationFrame(spin);
 
+      // Parked: no work at all while off screen or backgrounded.
+      if (document.hidden || !visibleRef.current) {
+        last = now;
+        return;
+      }
+
       const scene = sceneRef.current;
-      const nodes = nodesRef.current;
       if (!scene) return;
 
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const t = (now - clockOrigin.current) / 1000;
+      elapsed += dt;
+      const t = elapsed;
       const ease = 1 - Math.exp(-dt * ORBIT_EASE);
 
       const sizeState = sizeRef.current;
-      sizeState.current += (sizeState.target - sizeState.current) * ease;
-      const size = sizeState.current;
-      scene.svg
-        .attr("viewBox", `0 0 ${size} ${size}`)
-        .attr("preserveAspectRatio", "xMidYMid meet");
-      scene.world.attr("transform", `translate(${size / 2},${size / 2})`);
-
-      const halo = scene.core.select("circle.halo");
-      if (!halo.empty()) {
-        halo
-          .attr("r", CORE_R + 11 + Math.sin(t * 1.7) * 3.5)
-          .attr("opacity", 0.42 + Math.sin(t * 1.7) * 0.16);
+      if (Math.abs(sizeState.target - sizeState.current) > 0.25) {
+        sizeState.current += (sizeState.target - sizeState.current) * ease;
+        if (Math.abs(sizeState.target - sizeState.current) <= 0.25) {
+          sizeState.current = sizeState.target;
+        }
+        const size = sizeState.current;
+        const viewBox = `0 0 ${size.toFixed(1)} ${size.toFixed(1)}`;
+        if (viewBox !== viewBoxRef.current) {
+          viewBoxRef.current = viewBox;
+          const svgEl = scene.svg.node();
+          svgEl?.setAttribute("viewBox", viewBox);
+          scene.world
+            .node()
+            ?.setAttribute(
+              "transform",
+              `translate(${(size / 2).toFixed(1)},${(size / 2).toFixed(1)})`,
+            );
+        }
       }
-      scene.stars
-        .selectAll<SVGCircleElement, { twinkle: number }>("circle.star")
-        .attr(
-          "opacity",
-          (d) =>
-            0.18 + (0.45 + 0.35 * Math.sin(t * 1.4 + d.twinkle)) * 0.55,
+
+      if (now - lastAmbient >= AMBIENT_MS) {
+        lastAmbient = now;
+        const halo = haloRef.current;
+        if (halo) {
+          const pulse = Math.sin(t * 1.7);
+          halo.setAttribute("r", String(CORE_R + 11 + pulse * 3.5));
+          halo.setAttribute("opacity", String(0.42 + pulse * 0.16));
+        }
+        for (const star of starsRef.current) {
+          const alpha =
+            0.18 + (0.45 + 0.35 * Math.sin(t * 1.4 + star.twinkle)) * 0.55;
+          star.el.setAttribute("opacity", alpha.toFixed(3));
+        }
+        for (const drift of driftRef.current) {
+          const dir = drift.level % 2 === 0 ? 1 : -1;
+          drift.el.setAttribute(
+            "stroke-dashoffset",
+            (dir * t * (14 + drift.level * 5)).toFixed(1),
+          );
+        }
+      }
+
+      const planets = planetsRef.current;
+      if (planets.length === 0) return;
+
+      for (const handle of planets) {
+        const d = handle.node;
+        d.orbit += (d.targetOrbit - d.orbit) * ease;
+        d.speed += (d.targetSpeed - d.speed) * ease;
+        d.bodyR += (d.targetBodyR - d.bodyR) * ease;
+        d.angle += d.speed * dt;
+
+        const x = Math.cos(d.angle) * d.orbit;
+        const y = Math.sin(d.angle) * d.orbit;
+        handle.g.setAttribute(
+          "transform",
+          `translate(${x.toFixed(2)},${y.toFixed(2)})`,
         );
-
-      scene.rings
-        .selectAll<SVGCircleElement, { level: number }>("circle.drift")
-        .attr("stroke-dashoffset", (d) => {
-          if (!d) return 0;
-          const dir = d.level % 2 === 0 ? 1 : -1;
-          return dir * t * (14 + d.level * 5);
-        });
-
-      if (nodes.length === 0) return;
-
-      for (const node of nodes) {
-        node.orbit += (node.targetOrbit - node.orbit) * ease;
-        node.speed += (node.targetSpeed - node.speed) * ease;
-        node.bodyR += (node.targetBodyR - node.bodyR) * ease;
+        handle.wake?.setAttribute("r", (d.bodyR + 11).toFixed(2));
+        handle.glow?.setAttribute("r", (d.bodyR + 6).toFixed(2));
+        handle.body?.setAttribute("r", d.bodyR.toFixed(2));
+        handle.label?.setAttribute("dy", (d.bodyR + 14).toFixed(2));
       }
-
-      scene.planets
-        .selectAll<SVGGElement, OrbitNode>("g.planet")
-        .each(function (d) {
-          if (!d) return;
-          const a = d.angle + t * d.speed;
-          const x = Math.cos(a) * d.orbit;
-          const y = Math.sin(a) * d.orbit;
-          d3.select(this).attr("transform", `translate(${x},${y})`);
-          d3.select(this).select("circle.wake").attr("r", d.bodyR + 11);
-          d3.select(this).select("circle.glow").attr("r", d.bodyR + 6);
-          d3.select(this).select("circle.body").attr("r", d.bodyR);
-          d3.select(this)
-            .select("text.label")
-            .attr("dy", d.bodyR + 14);
-        });
     }
 
     frame = window.requestAnimationFrame(spin);
@@ -566,15 +666,17 @@ export function OrbitArena({ standings, variant = "board", children }: Props) {
     <section
       className={`panel toy-box relative flex flex-col rounded-3xl ${
         stage
-          ? "h-auto min-h-0 p-2 sm:p-3 md:h-full md:overflow-hidden"
+          ? "h-auto min-h-0 min-w-0 overflow-hidden p-2 sm:p-3 md:h-full"
           : "overflow-hidden p-3 sm:p-5"
       }`}
     >
+      {/* Stage sizing is width-driven, never a fixed w-96: a fixed width sets the
+          grid track's minimum and pushes the card past a narrow phone. */}
       <div
         ref={wrapRef}
         className={
           stage
-            ? "relative mx-auto aspect-square h-96 w-96 max-h-[50dvh] max-w-full min-h-0 md:aspect-auto md:h-auto md:max-h-none md:w-full md:flex-1"
+            ? "relative mx-auto aspect-square min-h-0 w-full max-h-[46dvh] md:aspect-auto md:h-auto md:max-h-none md:flex-1"
             : "mx-auto w-full max-w-lg overflow-hidden"
         }
       >
@@ -603,16 +705,6 @@ function ensureDefs(
   let defs = svg.select<SVGDefsElement>("defs.orbit-defs");
   if (defs.empty()) {
     defs = svg.append("defs").attr("class", "orbit-defs");
-    const glow = defs.append("filter").attr("id", "orbit-glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
-    glow.append("feGaussianBlur").attr("stdDeviation", 6).attr("result", "blur");
-    glow
-      .append("feMerge")
-      .selectAll("feMergeNode")
-      .data(["blur", "SourceGraphic"])
-      .enter()
-      .append("feMergeNode")
-      .attr("in", (d) => d);
-
     const grad = defs.append("radialGradient").attr("id", "camp-core");
     grad.append("stop").attr("class", "core-inner").attr("offset", "0%");
     grad.append("stop").attr("class", "core-mid").attr("offset", "55%");
@@ -703,13 +795,14 @@ function paintCore(
   campHalo: string,
 ) {
   if (core.select("circle.body").empty()) {
+    // No SVG blur filter here on purpose: the halo's radius pulses every frame,
+    // and a filtered element re-rasterises on every one of those writes.
     core
       .append("circle")
       .attr("class", "halo")
       .attr("fill", "none")
-      .attr("stroke-width", 2.4)
-      .attr("filter", "url(#orbit-glow)");
-    core.append("circle").attr("class", "body").attr("r", CORE_R).attr("filter", "url(#orbit-glow)");
+      .attr("stroke-width", 3.4);
+    core.append("circle").attr("class", "body").attr("r", CORE_R);
     core
       .append("text")
       .attr("class", "camp-label")

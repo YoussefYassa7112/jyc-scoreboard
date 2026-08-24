@@ -626,10 +626,13 @@ export function BuildingMap({
             className="max-h-[min(70dvh,36rem)] overflow-auto overscroll-contain p-1.5 sm:p-3 [touch-action:pan-x_pan-y]"
             ref={mapScrollRef}
           >
+        {/* Width, not transform: the parent pans by scrolling, so the zoomed map
+            has to actually occupy the wider box. Kept short since every frame of
+            a width animation relayouts the SVG. */}
         <motion.div
           initial={false}
           animate={{ width: `${zoom * 100}%` }}
-          transition={{ duration: 0.38, ease: easeSoft }}
+          transition={{ duration: 0.22, ease: easeSoft }}
           className="mx-auto origin-top"
         >
         <svg
@@ -715,21 +718,18 @@ export function BuildingMap({
                 strokeWidth: active ? 3.6 : 2.8,
               },
               whileTap: { scale: 0.97 },
+              // Idle rooms hold a static outline. This used to breathe on an
+              // infinite loop, but that animated `filter` on every room at once
+              // (12 on the basement floor) and repainted the map every frame.
               animate: {
-                strokeWidth: active
-                  ? 3.2
-                  : selectedId
-                    ? 1.4
-                    : [1.7, 2.8, 1.7],
+                strokeWidth: active ? 3.2 : selectedId ? 1.4 : 2.2,
                 filter: active
                   ? laserGlow
                   : selectedId
                     ? "drop-shadow(0 0 0 rgba(0,0,0,0))"
                     : idleGlow,
               },
-              transition: selectedId
-                ? { duration: 0.2 }
-                : { duration: 2.2, repeat: Infinity, ease: "easeInOut" as const },
+              transition: { duration: 0.2 },
               onClick: (e: MouseEvent) => {
                 e.stopPropagation();
                 onRoomActivate(room);
@@ -791,8 +791,10 @@ export function BuildingMap({
                       clipPath={`url(#map-halo-clip-${room.id})`}
                       className="pointer-events-none"
                     >
+                      {/* Static opacity: this stroke is behind a Gaussian blur,
+                          and pulsing it re-rasterised the filter every frame. */}
                       {ellipse ? (
-                        <motion.ellipse
+                        <ellipse
                           cx={cx}
                           cy={cy}
                           rx={room.w / 2}
@@ -801,20 +803,10 @@ export function BuildingMap({
                           stroke={laser}
                           strokeWidth={haloW}
                           filter="url(#map-inner-halo)"
-                          initial={false}
-                          animate={{
-                            opacity: dark
-                              ? [0.5, 0.82, 0.5]
-                              : [0.38, 0.62, 0.38],
-                          }}
-                          transition={{
-                            duration: 2.4,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
+                          opacity={dark ? 0.72 : 0.54}
                         />
                       ) : (
-                        <motion.rect
+                        <rect
                           x={room.x}
                           y={room.y}
                           width={room.w}
@@ -824,17 +816,7 @@ export function BuildingMap({
                           stroke={laser}
                           strokeWidth={haloW}
                           filter="url(#map-inner-halo)"
-                          initial={false}
-                          animate={{
-                            opacity: dark
-                              ? [0.5, 0.82, 0.5]
-                              : [0.38, 0.62, 0.38],
-                          }}
-                          transition={{
-                            duration: 2.4,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
+                          opacity={dark ? 0.72 : 0.54}
                         />
                       )}
                     </g>

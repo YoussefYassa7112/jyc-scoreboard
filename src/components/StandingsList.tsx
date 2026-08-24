@@ -56,6 +56,28 @@ function chaseLines(team: StandingRow, standings: StandingRow[], index: number) 
 }
 
 /**
+ * Presenting squeezes camp, cabin and the chase onto one line in a narrow
+ * column, so the chase is stated by rank instead of by name — the name is
+ * already on the row above the one it points at. Full wording lives in the
+ * drawer.
+ */
+function chaseSummary(
+  team: StandingRow,
+  standings: StandingRow[],
+  index: number,
+) {
+  const { ahead, behind } = teamMeta(team, standings, index);
+  if (index === 0) {
+    return behind ? `Leading by ${team.score - behind.score}` : "In the lead";
+  }
+  if (!ahead) return "";
+  const gap = ahead.score - team.score;
+  return gap === 0
+    ? `Tied with #${ahead.rank}`
+    : `${gap} to catch #${ahead.rank}`;
+}
+
+/**
  * The drawer height comes from a measured pixel value instead of `height: auto`
  * so a single CSS transition owns the resize. Framer-motion is deliberately kept
  * away from this box — two animators on one height is what made it stutter.
@@ -104,7 +126,11 @@ export function StandingsList({ standings, presentation = false }: Props) {
 
   return (
     <LayoutGroup>
-      <ul className={`flex flex-col ${presentation ? "gap-2 pt-0" : "gap-3 pt-2"}`}>
+      <ul
+        className={`flex flex-col ${
+          presentation ? "gap-1.5 pt-0" : "gap-3 pt-2"
+        }`}
+      >
         <AnimatePresence initial={false}>
           {standings.map((team, index) => {
             const dark = needsDarkText(team.color);
@@ -118,7 +144,9 @@ export function StandingsList({ standings, presentation = false }: Props) {
             const vsLeader =
               leaderScore > 0 ? Math.max(8, (team.score / leaderScore) * 100) : 0;
             const lines = chaseLines(team, standings, index);
-            const preview = lines[0] ?? "";
+            const preview = presentation
+              ? chaseSummary(team, standings, index)
+              : (lines[0] ?? "");
 
             return (
               <motion.li
@@ -145,16 +173,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                 }`}
               >
                 {isFirst ? (
-                  <motion.div
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                    animate={{ x: ["-120%", "120%"] }}
-                    transition={{
-                      duration: 2.8,
-                      repeat: Infinity,
-                      repeatDelay: 2.2,
-                      ease: "easeInOut",
-                    }}
-                  />
+                  <div className="rank-shimmer pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
                 ) : null}
 
                 <div
@@ -178,7 +197,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                 <div
                   className={`relative flex w-full items-center ${
                     presentation
-                      ? "gap-2.5 py-2.5 pl-5 pr-3 sm:gap-3 sm:py-3 sm:pl-6 sm:pr-4"
+                      ? "gap-2.5 py-2 pl-5 pr-3 sm:gap-3 sm:pl-6 sm:pr-4"
                       : "gap-3 py-3 pl-5 pr-3 sm:gap-4 sm:py-4 sm:pl-6 sm:pr-5"
                   }`}
                 >
@@ -196,20 +215,9 @@ export function StandingsList({ standings, presentation = false }: Props) {
                   >
                     {team.rank}
                     {badge ? (
-                      <motion.span
-                        className="absolute -right-2 -top-2 text-base sm:text-lg"
-                        animate={{
-                          y: [0, -3, 0],
-                          rotate: [-8, 8, -8],
-                        }}
-                        transition={{
-                          duration: 2.2,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
-                      >
+                      <span className="rank-badge-bob absolute -right-2 -top-2 text-base sm:text-lg">
                         {badge}
-                      </motion.span>
+                      </span>
                     ) : null}
                   </div>
 
@@ -217,45 +225,55 @@ export function StandingsList({ standings, presentation = false }: Props) {
                     <p
                       className={`display-font font-bold text-card-ink ${
                         presentation
-                          ? "break-words text-base leading-tight sm:text-lg md:text-xl"
+                          ? "truncate text-base leading-tight sm:text-lg"
                           : "truncate text-lg sm:text-2xl md:text-3xl"
                       }`}
                     >
                       {team.name}
                     </p>
+                    {/* Presenting keeps camp, cabin and the chase on one line so
+                        the top of the table fits a screen without scrolling. */}
                     {presentation ? (
-                      <p className="mt-0.5 text-[11px] font-bold text-muted-soft sm:text-xs">
+                      <p className="mt-0.5 truncate text-[11px] font-bold sm:text-xs">
                         <span
                           className={
                             team.campGroup === "red"
                               ? "text-[#C45C26]"
                               : team.campGroup === "green"
                                 ? "text-[#2F8F4E]"
-                                : ""
+                                : "text-muted-soft"
                           }
                         >
                           {group ?? "Ungrouped"}
                         </span>
-                        {" · "}
-                        {cabin}
+                        <span className="text-muted-soft">
+                          {" · "}
+                          {cabin}
+                        </span>
+                        <span className="text-muted">
+                          {" · "}
+                          {preview}
+                        </span>
                       </p>
                     ) : (
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
-                        Rank #{team.rank}
-                        {isFirst ? " · 1st place" : ""}
-                        {team.rank === 2 ? " · 2nd place" : ""}
-                        {team.rank === 3 ? " · 3rd place" : ""}
-                      </p>
+                      <>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-soft sm:text-sm">
+                          Rank #{team.rank}
+                          {isFirst ? " · 1st place" : ""}
+                          {team.rank === 2 ? " · 2nd place" : ""}
+                          {team.rank === 3 ? " · 3rd place" : ""}
+                        </p>
+                        {/* Wording never changes on toggle: a row that reflows at
+                            the same moment as the drawer reads as a double jump.
+                            The caret carries the open/closed state instead. */}
+                        <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
+                          {preview}
+                          <span className="ml-1 font-extrabold text-muted-soft">
+                            · tap for details
+                          </span>
+                        </p>
+                      </>
                     )}
-                    {/* Wording never changes on toggle: a row that reflows at the
-                        same moment as the drawer reads as a double jump. The
-                        caret carries the open/closed state instead. */}
-                    <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted sm:text-xs">
-                      {preview}
-                      <span className="ml-1 font-extrabold text-muted-soft">
-                        · tap for details
-                      </span>
-                    </p>
                     {presentation ? (
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-chip">
                         <div
@@ -280,7 +298,7 @@ export function StandingsList({ standings, presentation = false }: Props) {
                     }}
                     className={`display-font shrink-0 font-bold tabular-nums leading-none text-card-ink ${
                       presentation
-                        ? "text-[1.45rem] sm:text-3xl md:text-4xl"
+                        ? "text-xl sm:text-2xl"
                         : "text-[1.65rem] sm:text-4xl md:text-5xl"
                     }`}
                   >

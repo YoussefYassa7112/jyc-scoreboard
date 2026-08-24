@@ -70,6 +70,11 @@ export function NightSky() {
     let raf = 0;
     let lastSpawn = 0;
     let running = true;
+    // Ambient backdrop: 30fps is indistinguishable here and halves the cost of
+    // a full-viewport repaint, which competes with scrolling on a phone.
+    const frameMs = 1000 / 30;
+    let lastDraw = 0;
+    let backdrop: CanvasGradient | null = null;
 
     const measure = () => {
       const nextW = window.innerWidth;
@@ -83,7 +88,8 @@ export function NightSky() {
     const applySize = (nextW: number, nextH: number) => {
       width = nextW;
       height = nextH;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      backdrop = null;
+      const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
@@ -117,15 +123,23 @@ export function NightSky() {
 
     const draw = (now: number) => {
       if (!running) return;
+      if (now - lastDraw < frameMs) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      const step = lastDraw === 0 ? 1 / 30 : Math.min(0.1, (now - lastDraw) / 1000);
+      lastDraw = now;
       const t = now / 1000;
       ctx.clearRect(0, 0, width, height);
 
-      const grad = ctx.createLinearGradient(0, 0, 0, height);
-      grad.addColorStop(0, "#070b18");
-      grad.addColorStop(0.45, "#101b36");
-      grad.addColorStop(0.75, "#1a2744");
-      grad.addColorStop(1, "#13261c");
-      ctx.fillStyle = grad;
+      if (!backdrop) {
+        backdrop = ctx.createLinearGradient(0, 0, 0, height);
+        backdrop.addColorStop(0, "#070b18");
+        backdrop.addColorStop(0.45, "#101b36");
+        backdrop.addColorStop(0.75, "#1a2744");
+        backdrop.addColorStop(1, "#13261c");
+      }
+      ctx.fillStyle = backdrop;
       ctx.fillRect(0, 0, width, height);
 
       for (const star of stars) {
@@ -137,8 +151,10 @@ export function NightSky() {
         ctx.fill();
       }
 
+      // The glow is a second wide translucent pass rather than ctx.shadowBlur,
+      // which would blur-rasterise four strokes on every single frame.
       for (const laser of lasers) {
-        laser.t += 1 / 60;
+        laser.t += step;
         const y = laser.ny * height;
         const cycle = ((laser.t - laser.delay) * laser.speed) % (width + 200);
         const x = cycle - 100;
@@ -147,14 +163,18 @@ export function NightSky() {
         g.addColorStop(0.5, "rgba(125,211,252,0.85)");
         g.addColorStop(1, "rgba(56,189,248,0)");
         ctx.strokeStyle = g;
-        ctx.lineWidth = 2;
-        ctx.shadowColor = "#38bdf8";
-        ctx.shadowBlur = 12;
+        ctx.lineWidth = 7;
+        ctx.globalAlpha = 0.18;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x + laser.width, y);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + laser.width, y);
+        ctx.stroke();
       }
 
       if (now - lastSpawn > 2200) {
@@ -164,9 +184,9 @@ export function NightSky() {
 
       shooters = shooters.filter((s) => s.life < s.maxLife);
       for (const s of shooters) {
-        s.life += 1 / 60;
-        s.x += s.vx / 60;
-        s.y += s.vy / 60;
+        s.life += step;
+        s.x += s.vx * step;
+        s.y += s.vy * step;
         const fade = 1 - s.life / s.maxLife;
         ctx.strokeStyle = `rgba(255, 236, 179, ${fade})`;
         ctx.lineWidth = 2;
@@ -191,6 +211,7 @@ export function NightSky() {
       }
       if (!running) {
         running = true;
+        lastDraw = 0;
         raf = requestAnimationFrame(draw);
       }
     };

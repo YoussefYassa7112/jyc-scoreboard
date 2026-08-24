@@ -123,20 +123,14 @@ function BlockCard({
   const live = status === "live";
 
   return (
+    // No `layout` here: the clock ticks once a second, and a layout animation
+    // would re-measure every card in the day on each of those renders. The
+    // highlight reads from the ring below instead of a scale keyframe.
     <motion.article
-      layout
       id={`schedule-block-${block.id}`}
       initial={{ opacity: 0, y: 10 }}
-      animate={
-        highlighted && !done
-          ? {
-              opacity: 1,
-              y: 0,
-              scale: [1, 1.02, 1, 1.015, 1],
-            }
-          : { opacity: 1, y: 0, scale: 1 }
-      }
-      transition={highlighted && !done ? { duration: 2.2, ease: "easeInOut" } : springSnappy}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springSnappy}
       className={`relative overflow-hidden rounded-2xl border border-l-4 p-3.5 text-card-ink shadow-sm sm:p-4 ${
         done
           ? "schedule-done border-[#8a8178]/40 border-l-[#8a8178] bg-[#ebe4da] dark:bg-card"
@@ -181,14 +175,10 @@ function BlockCard({
           ) : null}
         </AnimatePresence>
         {live ? (
-          <motion.span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md"
-            animate={{ scale: [1, 1.08, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-          >
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md">
             <span className="live-dot h-1.5 w-1.5 rounded-full bg-white" />
             Live
-          </motion.span>
+          </span>
         ) : null}
       </div>
       {live && endsInMs != null ? (

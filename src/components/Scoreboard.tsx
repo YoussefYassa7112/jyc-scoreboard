@@ -46,18 +46,20 @@ const TABS: { id: BoardTab; label: string }[] = [
   { id: "schedule", label: "Schedule" },
 ];
 
-/** Panels travel in the direction of the tab you moved toward. */
+/**
+ * Panels travel in the direction of the tab you moved toward. Translate and
+ * opacity only — scaling a whole tab panel re-rasterises it on every frame,
+ * which is what made the map and schedule swap feel heavy.
+ */
 const panelVariants = {
   enter: (direction: number) => ({
     opacity: 0,
-    x: direction >= 0 ? 72 : -72,
-    scale: 0.97,
+    x: direction >= 0 ? 40 : -40,
   }),
-  center: { opacity: 1, x: 0, scale: 1 },
+  center: { opacity: 1, x: 0 },
   exit: (direction: number) => ({
     opacity: 0,
-    x: direction >= 0 ? -48 : 48,
-    scale: 0.98,
+    x: direction >= 0 ? -28 : 28,
   }),
 };
 
@@ -389,7 +391,7 @@ export function Scoreboard() {
     <main
       className={`relative overflow-x-hidden ${
         presenting
-          ? "flex min-h-dvh flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.65rem,env(safe-area-inset-top))] sm:px-5 md:h-dvh md:overflow-hidden md:px-6 md:py-4"
+          ? "flex min-h-dvh flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.65rem,env(safe-area-inset-top))] sm:px-5 md:h-dvh md:overflow-hidden md:px-6 md:py-3"
           : "min-h-dvh px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
       }`}
     >
@@ -398,17 +400,19 @@ export function Scoreboard() {
       <div
         className={`relative z-10 mx-auto flex w-full flex-col ${
           presenting
-            ? "min-h-0 max-w-7xl flex-1 gap-3 md:gap-3"
+            ? "min-h-0 max-w-7xl flex-1 gap-3 md:gap-2"
             : "max-w-3xl gap-5 md:max-w-5xl md:gap-7"
         }`}
       >
-        <ControlDock />
+        {/* Presenting has to fit one screen, so the dock rides in the header
+            row instead of costing its own band above it. */}
+        {presenting ? null : <ControlDock />}
 
         {presenting ? (
-          <header className="shrink-0">
-            <div className="flex flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
+          <header className="flex shrink-0 flex-col gap-2 md:flex-row md:items-start md:gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
               <div className="min-w-0 shrink-0">
-                <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs">
+                <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs md:hidden">
                   Welcome to the JYC
                 </p>
                 <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
@@ -437,6 +441,11 @@ export function Scoreboard() {
                 compact
                 className="mt-0 min-w-0 w-full max-w-none min-[880px]:flex-1"
               />
+            </div>
+            {/* Phone keeps the dock on its own row; from md up it tucks into the
+                header row so the whole board still fits one screen. */}
+            <div className="order-first flex shrink-0 justify-end md:order-none">
+              <ControlDock />
             </div>
           </header>
         ) : (
@@ -530,8 +539,10 @@ export function Scoreboard() {
                   setScheduleFocus(null);
                   goToTab(item.id);
                 }}
-                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 sm:text-base ${
-                  presenting ? "py-2 text-sm sm:py-2" : "py-3 text-sm sm:py-2.5"
+                className={`display-font relative flex-1 rounded-xl px-2 font-extrabold transition-colors sm:px-3 ${
+                  presenting
+                    ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
+                    : "py-3 text-sm sm:py-2.5 sm:text-base"
                 } ${
                   active
                     ? "text-on-star"
@@ -560,10 +571,7 @@ export function Scoreboard() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{
-              duration: tab === "map" ? 0.48 : 0.28,
-              ease: easeSoft,
-            }}
+            transition={{ duration: 0.2, ease: easeSoft }}
             className={`flex flex-col ${
               presenting
                 ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
@@ -591,11 +599,11 @@ export function Scoreboard() {
             ) : null}
 
             {data && data.standings.length > 0 ? (
-              <div className="grid min-h-0 items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
-                <section className="panel toy-box relative order-2 min-h-0 overflow-hidden rounded-3xl p-3 sm:p-4 md:order-1 md:h-full md:overflow-y-auto">
+              <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
+                <section className="panel toy-box relative order-2 min-h-0 min-w-0 overflow-hidden rounded-3xl p-3 md:order-1 md:h-full md:overflow-y-auto">
                   <StandingsList standings={data.standings} presentation />
                 </section>
-                <div className="order-1 min-h-0 w-full md:order-2 md:h-full">
+                <div className="order-1 min-h-0 min-w-0 md:order-2 md:h-full">
                   <OrbitArena standings={data.standings} variant="stage">
                     <CampStatStrip
                       standings={data.standings}
@@ -707,13 +715,9 @@ export function Scoreboard() {
         )}
 
         {presenting ? null : (
-          <motion.p
-            className="mx-auto w-fit max-w-[min(100%,22rem)] rounded-full bg-cloud/90 px-3.5 py-1.5 text-center text-xs font-semibold text-muted shadow-sm sm:max-w-xl sm:text-sm dark:bg-[#152038]/90 dark:text-slate-300"
-            animate={{ opacity: [0.78, 1, 0.78] }}
-            transition={{ duration: 3.5, repeat: Infinity }}
-          >
+          <p className="qr-breathe mx-auto w-fit max-w-[min(100%,22rem)] rounded-full bg-cloud/90 px-3.5 py-1.5 text-center text-xs font-semibold text-muted shadow-sm sm:max-w-xl sm:text-sm dark:bg-[#152038]/90 dark:text-slate-300">
             Scan the camp QR anytime to check who&apos;s leading the adventure
-          </motion.p>
+          </p>
         )}
       </div>
 
