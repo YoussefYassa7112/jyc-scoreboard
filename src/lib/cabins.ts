@@ -7,8 +7,8 @@ export type CabinInfo = {
 };
 
 export const campCabins: CabinInfo[] = [
-  { id: 1, group: "red", label: "Mina N. + Christina F." },
-  { id: 2, group: "red", label: "Valerie G. + Youssef" },
+  { id: 1, group: "red", label: "Lina N. + Christina" },
+  { id: 2, group: "red", label: "Valera G. + Youssef" },
   { id: 3, group: "red", label: "Karine A. + Mickel S." },
   { id: 4, group: "red", label: "Robert M. + Imy S." },
   { id: 5, group: "green", label: "Carol H. + Fady" },
