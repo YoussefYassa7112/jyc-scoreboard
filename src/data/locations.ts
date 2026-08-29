@@ -44,8 +44,8 @@ export const campLocations: CampLocation[] = [
   {
     id: "outside",
     label: "Outside",
-    floorId: "outdoor",
-    roomId: "peninsula-area",
+    floorId: "north-shore",
+    roomId: "outdoor",
   },
   {
     id: "arbre",
@@ -92,8 +92,8 @@ export const campLocations: CampLocation[] = [
   {
     id: "open",
     label: "Open",
-    floorId: "outdoor",
-    roomId: "peninsula-area",
+    floorId: "north-shore",
+    roomId: "outdoor",
   },
   {
     id: "bus",
@@ -104,8 +104,8 @@ export const campLocations: CampLocation[] = [
   {
     id: "on-the-go",
     label: "On the go",
-    floorId: "outdoor",
-    roomId: "peninsula-area",
+    floorId: "north-shore",
+    roomId: "outdoor",
   },
   {
     id: "lake",
