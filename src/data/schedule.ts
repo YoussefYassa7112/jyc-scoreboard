@@ -45,9 +45,9 @@ export const campDays: CampDay[] = [
       {
         id: "d1-arrival",
         title: "Arrival",
-        time: "10:00 – 10:30",
-        location: "B1 — All Churches · B4 — St George",
-        locationIds: ["r1-churches", "b4-stgeorge"],
+        time: "10:00 – 10:30 AM",
+        location: "Your church's meeting spot",
+        locationIds: ["r1-churches"],
         note: "Buses with Seguin & Viola",
         group: "all",
         section: "morning",
@@ -55,7 +55,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-registration",
         title: "Registration & Check-in",
-        time: "10:00 – 11:00",
+        time: "10:00 – 11:00 AM",
         location: "B1-4 (In Bus)",
         locationIds: ["bus"],
         group: "all",
@@ -64,7 +64,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-opening",
         title: "Opening Ceremony + Verse + Hymns",
-        time: "11:00 – 12:00",
+        time: "11:00 AM – 12:00 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "all",
@@ -73,7 +73,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-icebreaker",
         title: "Activity (JYC) Ice-breaker (shirts)",
-        time: "12:00 – 1:00",
+        time: "12:00 – 1:00 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "all",
@@ -84,7 +84,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "1:00 – 1:45",
+        time: "1:00 – 1:45 PM",
         location: "B1-B Salle Le Nordet",
         locationIds: ["nordet"],
         group: "red",
@@ -94,7 +94,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-lunch-a",
         title: "Lunch",
-        time: "1:00 – 1:45",
+        time: "1:00 – 1:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "red",
@@ -104,7 +104,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-lunch-b",
         title: "Lunch",
-        time: "2:00 – 2:45",
+        time: "2:00 – 2:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "red",
@@ -114,7 +114,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic1-b",
         title: "Topic 1: What the world is telling you to be",
-        time: "2:00 – 2:45",
+        time: "2:00 – 2:45 PM",
         location: "B1-B Salle Le Bivouac",
         locationIds: ["bivouac"],
         group: "red",
@@ -124,7 +124,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "3:00 – 4:00",
+        time: "3:00 – 4:00 PM",
         location: "Outside · BabyFoot in B1 — Caf",
         locationIds: ["outside", "caf"],
         group: "red",
@@ -137,7 +137,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "4:00 – 4:45",
+        time: "4:00 – 4:45 PM",
         location: "B1-B Salle Le Nordet",
         locationIds: ["nordet"],
         group: "red",
@@ -147,7 +147,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-snack-a",
         title: "Snack",
-        time: "4:00 – 4:45",
+        time: "4:00 – 4:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "red",
@@ -157,7 +157,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-snack-b",
         title: "Snack",
-        time: "5:00 – 5:45",
+        time: "5:00 – 5:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "red",
@@ -167,7 +167,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic2-b",
         title: "Topic 2: What God created us to be",
-        time: "5:00 – 5:45",
+        time: "5:00 – 5:45 PM",
         location: "B1-B Salle Le Bivouac",
         locationIds: ["bivouac"],
         group: "red",
@@ -177,7 +177,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-arbre",
         title: "Arbre en Arbre",
-        time: "6:00 – 7:00",
+        time: "6:00 – 7:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "red",
@@ -186,7 +186,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-bible",
         title: "Bible Study #1",
-        time: "7:00 – 8:00",
+        time: "7:00 – 8:00 PM",
         location: "Open",
         locationIds: ["open"],
         note: "Bring Bible, pen & notebook",
@@ -196,7 +196,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-supper",
         title: "Supper",
-        time: "8:00 – 9:00",
+        time: "8:00 – 9:00 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "red",
@@ -207,7 +207,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-lunch-a",
         title: "Lunch",
-        time: "1:00 – 1:45",
+        time: "1:00 – 1:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "green",
@@ -217,7 +217,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "1:00 – 1:45",
+        time: "1:00 – 1:45 PM",
         location: "B1-B Salle Le Bivouac",
         locationIds: ["bivouac"],
         group: "green",
@@ -227,7 +227,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic1-b",
         title: "Topic 1: What the world is telling you to be",
-        time: "2:00 – 2:45",
+        time: "2:00 – 2:45 PM",
         location: "B1-B Salle Le Nordet",
         locationIds: ["nordet"],
         group: "green",
@@ -237,7 +237,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-lunch-b",
         title: "Lunch",
-        time: "2:00 – 2:45",
+        time: "2:00 – 2:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "green",
@@ -247,7 +247,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-arbre",
         title: "Arbre en Arbre",
-        time: "3:00 – 4:00",
+        time: "3:00 – 4:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "green",
@@ -256,7 +256,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-snack-a",
         title: "Snack",
-        time: "4:00 – 4:45",
+        time: "4:00 – 4:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "green",
@@ -266,7 +266,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "4:00 – 4:45",
+        time: "4:00 – 4:45 PM",
         location: "B1-B Salle Le Bivouac",
         locationIds: ["bivouac"],
         group: "green",
@@ -276,7 +276,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic2-b",
         title: "Topic 2: What God created us to be",
-        time: "5:00 – 5:45",
+        time: "5:00 – 5:45 PM",
         location: "B1-B Salle Le Nordet",
         locationIds: ["nordet"],
         group: "green",
@@ -286,7 +286,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-snack-b",
         title: "Snack",
-        time: "5:00 – 5:45",
+        time: "5:00 – 5:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "green",
@@ -296,7 +296,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "6:00 – 7:00",
+        time: "6:00 – 7:00 PM",
         location: "BabyFoot in B1 — Caf · Outside",
         locationIds: ["caf", "outside"],
         group: "green",
@@ -309,7 +309,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-supper",
         title: "Supper",
-        time: "7:00 – 8:00",
+        time: "7:00 – 8:00 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "green",
@@ -318,7 +318,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-bible",
         title: "Bible Study #1",
-        time: "8:00 – 9:00",
+        time: "8:00 – 9:00 PM",
         location: "Open",
         locationIds: ["open"],
         note: "Bring Bible, pen & notebook",
@@ -329,7 +329,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-compline",
         title: "Gathering | Compline Prayer",
-        time: "9:00 – 9:30",
+        time: "9:00 – 9:30 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "all",
@@ -338,7 +338,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-campfire",
         title: "Camp Fire",
-        time: "9:30 – 10:30",
+        time: "9:30 – 10:30 PM",
         location: "Camp fire",
         locationIds: ["campfire"],
         group: "all",
@@ -347,7 +347,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-chill",
         title: "Chill Time in Rooms / Snacks",
-        time: "10:30 – 11:00",
+        time: "10:30 – 11:00 PM",
         location: "Rooms",
         locationIds: ["rooms"],
         group: "all",

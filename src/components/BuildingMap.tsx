@@ -25,6 +25,7 @@ import {
 } from "@/data/floors";
 import { getScheduleDays } from "@/lib/schedule-demo";
 import { blocksAtRoom } from "@/lib/schedule-time";
+import { scrollToTarget } from "@/lib/scroll";
 
 type BuildingMapProps = {
   /**
@@ -478,7 +479,9 @@ export function BuildingMap({
     if (!panelActive || !focusArrivalNonce || !focusRoomId) return;
     setSpotlightKey(focusArrivalNonce);
     const timer = window.setTimeout(() => {
-      wrapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Aim at the top of the map panel, not its centre — the panel is taller
+      // than the viewport, so centring it scrolled straight past the top.
+      scrollToTarget(wrapRef.current);
     }, 320);
     return () => window.clearTimeout(timer);
   }, [panelActive, focusArrivalNonce, focusRoomId]);
@@ -610,8 +613,8 @@ export function BuildingMap({
                   : "This map is tappable — tap any room"}
           </p>
         </div>
-        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-          {floor.parentFloorId ? (
+        {floor.parentFloorId ? (
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <button
               type="button"
               onClick={() => goToFloor(floor.parentFloorId!)}
@@ -621,35 +624,8 @@ export function BuildingMap({
                   indoor plans were parented to Camp site 1 instead. */}
               ← {getFloor(floor.parentFloorId).label}
             </button>
-          ) : null}
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={() => setZoom((z) => Math.max(0.9, +(z - 0.25).toFixed(2)))}
-            className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
-            className="btn-soft cursor-pointer rounded-xl border px-0 text-lg font-extrabold min-h-11 min-w-11"
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setZoom(1);
-              clearSelection();
-              mapScrollRef.current?.scrollTo({ top: 0, left: 0 });
-            }}
-            className="btn-soft cursor-pointer rounded-xl border px-3 text-xs font-extrabold min-h-11"
-          >
-            Reset
-          </button>
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {tabFloors.length > 1 ? (
@@ -718,6 +694,39 @@ export function BuildingMap({
           ))}
         </div>
       ) : null}
+
+      {/* Zoom sits directly above the map rather than up in the header. On a
+          phone the header, the floor tabs and the legend all stack, which left
+          these three buttons most of a screen away from the thing they zoom. */}
+      <div className="mt-3 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => setZoom((z) => Math.max(0.9, +(z - 0.25).toFixed(2)))}
+          className="btn-soft min-h-11 min-w-11 cursor-pointer rounded-xl border px-0 text-lg font-extrabold"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
+          className="btn-soft min-h-11 min-w-11 cursor-pointer rounded-xl border px-0 text-lg font-extrabold"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setZoom(1);
+            clearSelection();
+            mapScrollRef.current?.scrollTo({ top: 0, left: 0 });
+          }}
+          className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-extrabold"
+        >
+          Reset
+        </button>
+      </div>
 
       <div style={{ perspective: 1100 }}>
       <motion.div

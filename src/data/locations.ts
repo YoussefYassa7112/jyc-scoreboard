@@ -72,9 +72,11 @@ export const campLocations: CampLocation[] = [
   },
   {
     id: "r1-churches",
-    label: "B1 — All Churches",
-    floorId: "north-shore",
-    roomId: "central",
+    label: "Church meeting spot",
+    // Everyone arrives at whichever spot their own church gathers at, so there
+    // is no single room to open — a button here would send every camper to the
+    // same wrong place.
+    offMapNote: "Meet where your own church gathers — B1 All Churches or B4 St-George",
   },
   {
     id: "rooms",

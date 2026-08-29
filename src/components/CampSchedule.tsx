@@ -45,6 +45,7 @@ import {
   type ScheduleTrack,
 } from "@/lib/schedule-time";
 import { springSnappy } from "@/lib/motion";
+import { scrollToTarget } from "@/lib/scroll";
 import { NowNextBoard, type UpcomingLane } from "./NowNextBoard";
 import { RemindMeToggle } from "./RemindMeToggle";
 
@@ -502,9 +503,9 @@ export function CampSchedule({
 
     const timer = window.setTimeout(() => {
       if (pendingScroll.current?.token !== pending.token) return;
-      document
-        .getElementById(`schedule-block-${pending.blockId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollToTarget(
+        document.getElementById(`schedule-block-${pending.blockId}`),
+      );
       pendingScroll.current = null;
       consumedRef.current?.();
     }, 250);

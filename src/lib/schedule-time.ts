@@ -309,6 +309,18 @@ export function eventDateTimes(
   if (!range) return null;
   let startMin = range.startMin;
   let endMin = range.endMin;
+
+  // Without an AM/PM marker the clock parser can only guess, and it guesses PM
+  // for 1-7 only — so a bare "9:00 - 9:30" on an evening block silently became
+  // 9am, which put Compline and the campfire in the middle of the morning and
+  // made "Happening now" and "Coming up next" wrong for the whole of day 1.
+  // The times now spell out AM/PM, and this catches any that stop doing so.
+  const spellsOutMeridiem = /(AM|PM)/i.test(block.time ?? "");
+  if (block.section === "evening" && !spellsOutMeridiem && startMin < 12 * 60) {
+    startMin += 12 * 60;
+    endMin += 12 * 60;
+  }
+
   // "12:00 AM" on an evening block is midnight at the *end* of that camp day,
   // not 00:00 at the start (which would land 10 hours before Arrival).
   if (block.section === "evening" && startMin < 4 * 60) {
