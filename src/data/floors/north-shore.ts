@@ -1,16 +1,16 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — north shore, opened from the "North shore" pin on the camp
- * overview.
+ * Detail map — north shore, reached from the "North shore" pin on the camp
+ * overview and from its own tab.
  *
- * This is the original camp-grounds plan, kept as-is apart from the edits the
- * overview made necessary: the Arbre en Arbre forest and the campfire now have
- * their own areas reached from their own pins, and B4 is replaced by the two
- * dorms that actually sit on this shore.
+ * This is the original camp-grounds plan. Arbre en Arbre and the camp fire are
+ * gone because they are their own areas now, reached from their own pins, and
+ * B4 is replaced by the two dorms that actually sit on this shore.
  *
- * Layout follows the survey photo — going down the shoreline it reads
- * Dorm 1 → CENTRAL → Dorm 2, with the lake north and the road south.
+ * Layout: lake north, road south, CENTRAL on the east with the open field
+ * beside it, the two dorms across the bottom, and the volleyball court in
+ * front of Dorm 1.
  */
 export const northShoreFloor: FloorPlan = {
   id: "north-shore",
@@ -18,7 +18,6 @@ export const northShoreFloor: FloorPlan = {
   siteTitle: "P'tit Bonheur",
   banner: "NORTH SHORE",
   parentFloorId: "outdoor",
-  showInTabs: false,
   viewBox: { w: 1060, h: 720 },
   outline: "M30,30 H1030 V690 H30 Z",
   rooms: [
@@ -34,39 +33,16 @@ export const northShoreFloor: FloorPlan = {
       h: 150,
     },
     {
-      id: "volleyball",
-      name: "Volleyball area",
-      labelLines: ["Volleyball"],
-      blurb: "Volleyball court west of the main field.",
-      kind: "activity",
-      x: 280,
-      y: 230,
-      w: 70,
-      h: 200,
-      labelRotate: -90,
-    },
-    {
       id: "outdoor",
       name: "Outdoor area",
       labelLines: ["Outdoor", "area"],
       blurb: "Open field in the middle of camp — ice-breakers and big games.",
       kind: "outdoor",
-      x: 370,
-      y: 220,
-      w: 280,
-      h: 280,
+      x: 350,
+      y: 225,
+      w: 260,
+      h: 250,
       shape: "ellipse",
-    },
-    {
-      id: "dorm-1",
-      name: "Dorm 1",
-      labelLines: ["Dorm 1"],
-      blurb: "Cabin at the north end of the shore, nearest the dock.",
-      kind: "building",
-      x: 720,
-      y: 215,
-      w: 220,
-      h: 105,
     },
     {
       id: "central",
@@ -75,25 +51,47 @@ export const northShoreFloor: FloorPlan = {
       blurb:
         "Main building — cafeteria upstairs, basement downstairs. Topics, baby foot, vespers & liturgy happen here.",
       kind: "building",
-      x: 720,
-      y: 360,
-      w: 220,
-      h: 170,
+      x: 700,
+      y: 230,
+      w: 240,
+      h: 180,
       linksTo: [
         { floorId: "cafeteria", roomId: "cafeteria", label: "Open Cafeteria" },
         { floorId: "basement", roomId: "nordet", label: "Open Basement" },
       ],
     },
     {
+      id: "volleyball",
+      name: "Volleyball area",
+      labelLines: ["Volleyball"],
+      blurb: "Volleyball court in front of Dorm 1.",
+      kind: "activity",
+      x: 100,
+      y: 365,
+      w: 190,
+      h: 115,
+    },
+    {
+      id: "dorm-1",
+      name: "Dorm 1",
+      labelLines: ["Dorm 1"],
+      blurb: "Cabin at the west end of the shore, behind the volleyball court.",
+      kind: "building",
+      x: 80,
+      y: 505,
+      w: 230,
+      h: 105,
+    },
+    {
       id: "dorm-2",
       name: "Dorm 2",
       labelLines: ["Dorm 2"],
-      blurb: "Cabin south of CENTRAL, toward the road.",
+      blurb: "Cabin at the east end of the shore, below CENTRAL.",
       kind: "building",
-      x: 720,
-      y: 548,
-      w: 220,
-      h: 90,
+      x: 700,
+      y: 505,
+      w: 240,
+      h: 105,
     },
     {
       id: "dock",
@@ -111,8 +109,6 @@ export const northShoreFloor: FloorPlan = {
   decorations: [
     { type: "dock", x: 800, y: 155, w: 70, h: 28 },
     {
-      // Nudged down from y=640 so it clears Dorm 2, which sits lower than the
-      // B4 block it replaced.
       type: "road",
       x: 50,
       y: 652,
@@ -121,26 +117,29 @@ export const northShoreFloor: FloorPlan = {
       label: "Chem. du Lac Quenouille",
     },
     {
-      // The west side keeps its trees now that the forest room has moved to
-      // its own Arbre en Arbre map — it reads as woods rather than a gap.
+      // Re-scattered for this layout — every spot sits in a gap between rooms
+      // rather than under one. Checked against the room rects.
       type: "trees",
       spots: [
-        { x: 80, y: 400 },
-        { x: 130, y: 430 },
-        { x: 90, y: 480 },
-        { x: 170, y: 500 },
-        { x: 220, y: 450 },
-        { x: 260, y: 520 },
-        { x: 340, y: 540 },
-        { x: 400, y: 508 },
-        { x: 695, y: 508 },
-        { x: 680, y: 560 },
-        { x: 980, y: 250 },
-        { x: 1000, y: 320 },
-        { x: 990, y: 480 },
-        { x: 960, y: 560 },
-        { x: 70, y: 600 },
-        { x: 1000, y: 600 },
+        { x: 55, y: 250 },
+        { x: 58, y: 330 },
+        { x: 52, y: 430 },
+        { x: 62, y: 620 },
+        { x: 150, y: 265 },
+        { x: 235, y: 300 },
+        { x: 320, y: 300 },
+        { x: 318, y: 420 },
+        { x: 360, y: 560 },
+        { x: 430, y: 600 },
+        { x: 500, y: 555 },
+        { x: 570, y: 600 },
+        { x: 640, y: 560 },
+        { x: 650, y: 250 },
+        { x: 660, y: 430 },
+        { x: 975, y: 255 },
+        { x: 1000, y: 330 },
+        { x: 985, y: 450 },
+        { x: 965, y: 600 },
       ],
     },
   ],

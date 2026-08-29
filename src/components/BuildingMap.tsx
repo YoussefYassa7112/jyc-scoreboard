@@ -583,7 +583,10 @@ export function BuildingMap({
       </div>
 
       {tabFloors.length > 1 ? (
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        // Wrapping flex rather than a fixed 3-column grid: the tab count grows
+        // as areas get their own maps, and grid-cols-3 left a fourth tab
+        // stranded alone on a second row. Two-up on a phone, one row from sm.
+        <div className="mt-3 flex flex-wrap gap-2">
           {tabFloors.map((f) => {
             const active = f.id === floorId;
             return (
@@ -591,7 +594,7 @@ export function BuildingMap({
                 key={f.id}
                 type="button"
                 onClick={() => goToFloor(f.id)}
-                className={`min-h-11 cursor-pointer rounded-xl px-2 py-2 text-sm font-extrabold transition sm:px-3.5 ${
+                className={`min-h-11 grow basis-[calc(50%-0.25rem)] cursor-pointer rounded-xl px-2 py-2 text-sm font-extrabold transition sm:basis-0 sm:px-3.5 ${
                   active
                     ? "bg-star text-on-star shadow-sm"
                     : "btn-chip"
