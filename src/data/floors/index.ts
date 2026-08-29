@@ -19,12 +19,16 @@ export type {
 export { kindLabel } from "./types";
 
 /** All floors — including detail maps hidden from tabs. */
+/**
+ * Order drives the tab strip: overview first, then the outdoor areas roughly
+ * as you meet them walking the site, then the two indoor plans inside CENTRAL.
+ */
 export const floors: FloorPlan[] = [
   outdoorFloor,
-  arbreEnArbreFloor,
   northShoreFloor,
   peninsulaFloor,
   campfireFloor,
+  arbreEnArbreFloor,
   basementFloor,
   cafeteriaFloor,
 ];
