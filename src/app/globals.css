@@ -755,6 +755,304 @@ html.dark .sky-floaters {
   transition: transform 240ms cubic-bezier(0.32, 0.72, 0.3, 1);
 }
 
+/* Expanded chase metrics panel */
+.chase-panel {
+  --chase-accent: var(--star);
+  border-top: 2px solid color-mix(in srgb, var(--chase-accent) 28%, var(--panel-border));
+  background:
+    radial-gradient(
+      ellipse 120% 80% at 12% 0%,
+      color-mix(in srgb, var(--chase-accent) 16%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--chase-accent) 8%, var(--chip)) 0%,
+      var(--card) 100%
+    );
+}
+
+.chase-panel-inner {
+  padding: 0.75rem 0.85rem 0.85rem 1.25rem;
+  animation: chase-panel-in 280ms cubic-bezier(0.32, 0.72, 0.3, 1) both;
+}
+
+@media (min-width: 640px) {
+  .chase-panel-inner {
+    padding: 0.85rem 1rem 1rem 1.5rem;
+  }
+}
+
+.chase-panel-compact {
+  padding-top: 0.65rem;
+  padding-bottom: 0.75rem;
+}
+
+@keyframes chase-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chase-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.chase-camp-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1.5px solid var(--panel-border);
+  background: var(--chip);
+  padding: 0.15rem 0.55rem;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chase-camp-badge-muted {
+  color: var(--muted-soft);
+}
+
+.chase-cabin {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted-soft);
+}
+
+.chase-orbit-block {
+  margin-bottom: 0.75rem;
+}
+
+.chase-orbit-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+}
+
+.chase-orbit-score {
+  font-size: 0.95rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--card-ink);
+}
+
+.chase-orbit-rail {
+  position: relative;
+  height: 0.85rem;
+  border-radius: 999px;
+  border: 2px solid var(--panel-border);
+  background: var(--chip);
+  overflow: visible;
+}
+
+.chase-orbit-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--chase-accent) 72%, #fff8ee),
+    var(--chase-accent)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: width 500ms cubic-bezier(0.32, 0.72, 0.3, 1);
+}
+
+.chase-orbit-gap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--star) 22%, transparent),
+    color-mix(in srgb, var(--star) 22%, transparent) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.85;
+  animation: chase-gap-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes chase-gap-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.chase-orbit-marker {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  border: 2px solid var(--card);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 6px var(--toy-shadow);
+}
+
+.chase-orbit-you {
+  background: var(--chase-accent);
+}
+
+.chase-orbit-target {
+  background: var(--star);
+}
+
+.chase-orbit-summit {
+  position: absolute;
+  top: 50%;
+  right: -0.15rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 2px solid var(--panel-border);
+  background: var(--card);
+  font-size: 0.62rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 8px var(--toy-shadow);
+}
+
+.chase-orbit-hint {
+  margin-top: 0.4rem;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--muted-soft);
+}
+
+.chase-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+.chase-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+  border-radius: 1rem;
+  border: 2px solid var(--panel-border);
+  background: color-mix(in srgb, var(--card) 88%, var(--chip));
+  padding: 0.45rem 0.55rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chase-accent) 12%, transparent);
+}
+
+.chase-metric-hero {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--chase-accent) 14%, var(--card)),
+    var(--card)
+  );
+  border-color: color-mix(in srgb, var(--chase-accent) 35%, var(--panel-border));
+}
+
+.chase-metric-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.chase-metric-value {
+  width: 100%;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--card-ink);
+}
+
+.chase-panel-compact .chase-metric-value {
+  font-size: 1rem;
+}
+
+.chase-metric-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+}
+
+.chase-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chase-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  border-radius: 0.85rem;
+  border: 2px solid var(--panel-border);
+  border-left: 4px solid var(--chase-accent);
+  background: var(--card);
+  padding: 0.45rem 0.6rem;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--toy-shadow) 65%, transparent);
+}
+
+.chase-card-icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.chase-card-text {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--card-ink);
+}
+
+.chase-panel-compact .chase-card-text {
+  font-size: 0.78rem;
+}
+
+.chase-tip {
+  margin-top: 0.55rem;
+  border-radius: 0.75rem;
+  border: 2px dashed color-mix(in srgb, var(--star) 45%, var(--panel-border));
+  background: color-mix(in srgb, var(--star) 10%, var(--chip));
+  padding: 0.45rem 0.6rem;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 /* Floating dock that holds the theme switch and the Present button */
 .control-dock {
   background: var(--panel);

@@ -26,6 +26,12 @@ function teamMeta(team: StandingRow, standings: StandingRow[], index: number) {
   return { ahead, behind, leader, group, cabin };
 }
 
+function groupAccent(group: StandingRow["campGroup"]) {
+  if (group === "red") return "#C45C26";
+  if (group === "green") return "#2F8F4E";
+  return undefined;
+}
+
 function chaseLines(team: StandingRow, standings: StandingRow[], index: number) {
   const { ahead, behind, leader } = teamMeta(team, standings, index);
   if (index === 0) {
@@ -53,6 +59,226 @@ function chaseLines(team: StandingRow, standings: StandingRow[], index: number) 
     );
   }
   return lines;
+}
+
+function chaseIcon(line: string, isFirst: boolean) {
+  if (isFirst && line.startsWith("Leading")) return "👑";
+  if (isFirst && line === "In the lead") return "👑";
+  if (line.startsWith("Tied")) return "🤝";
+  if (line.includes("to catch 1st")) return "🏔️";
+  if (line.includes("to catch")) return "🎯";
+  if (line.includes("ahead of")) return "🛡️";
+  return "✨";
+}
+
+function ChaseDetails({
+  team,
+  standings,
+  index,
+  compact,
+}: {
+  team: StandingRow;
+  standings: StandingRow[];
+  index: number;
+  compact?: boolean;
+}) {
+  const { ahead, behind, leader, group, cabin } = teamMeta(
+    team,
+    standings,
+    index,
+  );
+  const isFirst = index === 0;
+  const lines = chaseLines(team, standings, index);
+  const summit = standings[0]?.score ?? 0;
+  const scale = Math.max(summit, team.score, 1);
+  const youPct = (team.score / scale) * 100;
+  const aheadPct = ahead ? (ahead.score / scale) * 100 : 100;
+  const gapToAhead =
+    ahead && team.score < ahead.score ? ahead.score - team.score : 0;
+  const gapToFirst =
+    leader && leader.id !== team.id ? leader.score - team.score : 0;
+  const cushion =
+    behind && team.score > behind.score ? team.score - behind.score : 0;
+  const groupColor = groupAccent(team.campGroup);
+
+  return (
+    <div
+      className="chase-panel"
+      style={{ "--chase-accent": team.color } as React.CSSProperties}
+    >
+      <div className={`chase-panel-inner ${compact ? "chase-panel-compact" : ""}`}>
+        <div className="chase-header">
+          {group ? (
+            <span
+              className="chase-camp-badge"
+              style={
+                groupColor
+                  ? {
+                      color: groupColor,
+                      borderColor: `${groupColor}55`,
+                      backgroundColor: `${groupColor}18`,
+                    }
+                  : undefined
+              }
+            >
+              {group} camp
+            </span>
+          ) : (
+            <span className="chase-camp-badge chase-camp-badge-muted">
+              Ungrouped
+            </span>
+          )}
+          <span className="chase-cabin">{cabin}</span>
+        </div>
+
+        <div className="chase-orbit-block">
+          <div className="chase-orbit-labels">
+            <span>{isFirst ? "Summit" : "Your orbit"}</span>
+            <span className="chase-orbit-score display-font tabular-nums">
+              {team.score}
+              {!isFirst && summit > 0 ? (
+                <span className="text-muted-soft"> / {summit}</span>
+              ) : null}
+            </span>
+          </div>
+          <div className="chase-orbit-rail" aria-hidden>
+            <div
+              className="chase-orbit-fill"
+              style={{ width: `${Math.max(youPct, 6)}%` }}
+            />
+            {!isFirst && gapToAhead > 0 ? (
+              <div
+                className="chase-orbit-gap"
+                style={{
+                  left: `${youPct}%`,
+                  width: `${Math.max(aheadPct - youPct, 2)}%`,
+                }}
+              />
+            ) : null}
+            <div
+              className="chase-orbit-marker chase-orbit-you"
+              style={{ left: `${Math.min(Math.max(youPct, 4), 96)}%` }}
+              title={`${team.name}: ${team.score}`}
+            />
+            {!isFirst && ahead ? (
+              <div
+                className="chase-orbit-marker chase-orbit-target"
+                style={{ left: `${Math.min(aheadPct, 98)}%` }}
+                title={`#${ahead.rank} ${ahead.name}`}
+              />
+            ) : null}
+            <div className="chase-orbit-summit" title={`#1 · ${summit} pts`}>
+              {isFirst ? "👑" : "🏔️"}
+            </div>
+          </div>
+          {!isFirst && ahead ? (
+            <p className="chase-orbit-hint">
+              <span className="font-extrabold text-card-ink">#{ahead.rank}</span>
+              {" · "}
+              {ahead.name}
+              {gapToAhead > 0 ? ` · ${gapToAhead} pts up` : ""}
+            </p>
+          ) : isFirst && behind ? (
+            <p className="chase-orbit-hint">
+              <span className="font-extrabold text-card-ink">#{behind.rank}</span>
+              {" · "}
+              {behind.name}
+              {" · "}
+              {cushion} pts behind you
+            </p>
+          ) : null}
+        </div>
+
+        <div className="chase-metrics">
+          {isFirst ? (
+            <>
+              <div className="chase-metric chase-metric-hero">
+                <span className="chase-metric-icon" aria-hidden>
+                  👑
+                </span>
+                <span className="chase-metric-value display-font">
+                  {cushion || "—"}
+                </span>
+                <span className="chase-metric-label">
+                  {cushion ? "pt lead" : "On top"}
+                </span>
+              </div>
+              {behind ? (
+                <div className="chase-metric">
+                  <span className="chase-metric-icon" aria-hidden>
+                    👀
+                  </span>
+                  <span className="chase-metric-value display-font truncate">
+                    {behind.name}
+                  </span>
+                  <span className="chase-metric-label">Chasing you</span>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {gapToAhead > 0 ? (
+                <div className="chase-metric">
+                  <span className="chase-metric-icon" aria-hidden>
+                    🎯
+                  </span>
+                  <span className="chase-metric-value display-font">
+                    +{gapToAhead}
+                  </span>
+                  <span className="chase-metric-label">
+                    to #{ahead?.rank ?? "—"}
+                  </span>
+                </div>
+              ) : null}
+              {gapToFirst > 0 && leader?.id !== ahead?.id ? (
+                <div className="chase-metric">
+                  <span className="chase-metric-icon" aria-hidden>
+                    🏔️
+                  </span>
+                  <span className="chase-metric-value display-font">
+                    +{gapToFirst}
+                  </span>
+                  <span className="chase-metric-label">to 1st</span>
+                </div>
+              ) : null}
+              {cushion > 0 ? (
+                <div className="chase-metric">
+                  <span className="chase-metric-icon" aria-hidden>
+                    🛡️
+                  </span>
+                  <span className="chase-metric-value display-font">
+                    {cushion}
+                  </span>
+                  <span className="chase-metric-label">
+                    cushion vs #{behind?.rank}
+                  </span>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        <ul className="chase-cards">
+          {lines.map((line) => (
+            <li key={line} className="chase-card">
+              <span className="chase-card-icon" aria-hidden>
+                {chaseIcon(line, isFirst)}
+              </span>
+              <span className="chase-card-text">{line}</span>
+            </li>
+          ))}
+        </ul>
+
+        {ahead && team.score < ahead.score ? (
+          <p className="chase-tip">
+            One score bump from{" "}
+            <span className="font-extrabold text-card-ink">{ahead.name}</span> and
+            you swap places.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -326,25 +552,12 @@ export const StandingsList = memo(function StandingsList({
                   open={open}
                   onClose={() => setOpenId(null)}
                 >
-                  <div
-                    className={`space-y-1.5 border-t border-saddle/15 pb-3 pr-3 ${
-                      presentation ? "pl-5 pt-2 sm:pl-6" : "pl-5 pt-2.5 sm:pl-6"
-                    }`}
-                  >
-                    {lines.map((line) => (
-                      <p
-                        key={line}
-                        className="text-sm font-extrabold leading-snug text-card-ink"
-                      >
-                        {line}
-                      </p>
-                    ))}
-                    {ahead && team.score < ahead.score ? (
-                      <p className="text-xs font-bold text-muted-soft">
-                        One score bump from {ahead.name} and you swap places.
-                      </p>
-                    ) : null}
-                  </div>
+                  <ChaseDetails
+                    team={team}
+                    standings={standings}
+                    index={index}
+                    compact={presentation}
+                  />
                 </ChaseDrawer>
               </motion.li>
             );
