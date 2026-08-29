@@ -67,6 +67,21 @@ function pinRadius(room: MapRoom) {
   return Math.max(18, room.w / 2);
 }
 
+/** Pin height in viewBox units at scale 1 (head radius + shaft). */
+const BASE_PIN_UNITS = 80;
+/** How tall a pin should look on screen, whatever the map is scaled to. */
+const TARGET_PIN_PX = 30;
+
+/**
+ * Never above 1: the overview pin positions are spaced for scale 1, and going
+ * past it widens the label pills until "Arbre en Arbre" runs into "North
+ * shore". A phone therefore keeps the size it already had (~25px) and only
+ * wider screens scale down, which is the case that actually looked wrong.
+ */
+function clampPinScale(scale: number) {
+  return Math.min(1, Math.max(0.4, scale));
+}
+
 function roomFill(
   kind: RoomKind,
   dark: boolean,
@@ -401,6 +416,7 @@ export function BuildingMap({
   const dark = theme === "dark";
   const wrapRef = useRef<HTMLElement>(null);
   const mapScrollRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const onFocusClearedRef = useRef(onFocusCleared);
   onFocusClearedRef.current = onFocusCleared;
   const mountedRef = useRef(true);
@@ -458,6 +474,37 @@ export function BuildingMap({
   }, [highlightBlockId, selectedId]);
 
   const floor = useMemo(() => getFloor(floorId), [floorId]);
+
+  /**
+   * Pins are drawn in viewBox units, but the map is about 320px wide on a
+   * phone and around 950px on a desktop — so an unscaled pin renders roughly
+   * three times bigger there, which read as far too heavy. Measure what a unit
+   * is actually worth and scale the pins to a constant on-screen size instead.
+   * Measuring the <svg> rather than its container means the zoom buttons are
+   * accounted for too, so pins hold their size as the map zooms, the way map
+   * pins normally behave.
+   */
+  const [pinScale, setPinScale] = useState(1);
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = el.getBoundingClientRect().width;
+      if (!width) return;
+      const pxPerUnit = width / floor.viewBox.w;
+      const next = clampPinScale(TARGET_PIN_PX / (BASE_PIN_UNITS * pxPerUnit));
+      // Threshold so a few stray sub-pixel resize callbacks during the zoom
+      // width animation cannot loop us through renders.
+      setPinScale((current) =>
+        Math.abs(current - next) > 0.02 ? next : current,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [floor.viewBox.w]);
   const aerial = Boolean(floor.backgroundImage);
   const overview = aerial && floor.rooms.every((r) => r.marker === "pin");
   const selected = useMemo(
@@ -679,6 +726,7 @@ export function BuildingMap({
           className="mx-auto origin-top"
         >
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${floor.viewBox.w} ${floor.viewBox.h}`}
           className="mx-auto block h-auto w-full"
           role="img"
@@ -764,12 +812,26 @@ export function BuildingMap({
             const fill = roomFill(room.kind, dark, active, dimmed, aerial);
             const stroke = active ? laser : wall;
             // The overview photo is dark green and navy in BOTH themes, so pins
-            // use a fixed warm amber rather than the theme accent — `--star` is
-            // a dark brown in daylight and disappeared straight into the trees.
-            const pinColor = active ? laser : "#ffc53d";
-            const pinStroke = "#1a120c";
-            const pillFill = dark ? "#0f172a" : "#fff8ee";
-            const pillInk = dark ? "#f8fafc" : "#2a1f14";
+            // use a fixed colour rather than the theme accent — `--star` is a
+            // dark brown in daylight and disappeared straight into the trees.
+            //
+            // Classic map-pin red. Measured against the photo it sits on, red
+            // alone runs 2.8–4.0:1 — under the 3:1 floor over the brighter
+            // ground by North shore — where the amber it replaces ran 6.6–9.6.
+            // So the silhouette is carried by a cream outline instead, which
+            // measures 9.9–14.4:1 on the same backgrounds; the red is then free
+            // to be the colour rather than the thing doing the work. A
+            // near-black outline could not do this job: on dark forest it is
+            // only 1.2–1.8:1 and simply vanishes.
+            const pinColor = active ? laser : "#ef4444";
+            const pinOutline = "#fff8ee";
+            const pinDot = "#1a120c";
+            // The photo is dark in both themes, so the pill stays light in both
+            // rather than following the theme — a navy pill on a night-time
+            // satellite image is unreadable.
+            const pillFill = "#fff8ee";
+            const pillInk = "#2a1f14";
+            const pillBorder = active ? laser : "#1a120c";
             const haloW = Math.max(
               10,
               Math.min(24, Math.min(room.w, room.h) * 0.22),
@@ -812,23 +874,20 @@ export function BuildingMap({
             };
 
             if (isPin) {
-              // The overview viewBox is 1024 wide but renders around 360px on a
-              // phone, so one unit is about a third of a CSS pixel. Everything
-              // here is sized in those units — a "26px" label is really ~9px on
-              // screen, which is why these numbers look so large.
-              // Sizing is driven by how small a unit actually is on a phone.
-              // The board caps at max-w-3xl, so inside the page padding and the
-              // panel padding the map is roughly 320px wide against a 1024-unit
-              // viewBox — about 0.31 CSS px per unit. A 30-unit label is
-              // therefore ~9px on screen, and a 80-unit pin ~25px.
+              // Every dimension is multiplied by pinScale, which is measured
+              // from the rendered SVG so the pin lands at TARGET_PIN_PX no
+              // matter how wide the map is. The base numbers below are the
+              // phone case (scale ~1); on a desktop the scale drops to roughly
+              // 0.4 and the whole marker shrinks with it.
+              const s = pinScale;
               const label = room.labelLines[0] ?? room.name;
-              const FONT = 30;
-              const pillH = 44;
-              const pillW = label.length * 15.5 + 60;
-              const pillY = 10;
+              const FONT = 30 * s;
+              const pillH = 44 * s;
+              const pillW = (label.length * 15.5 + 60) * s;
+              const pillY = 10 * s;
               const tipY = 0;
-              const headY = -54;
-              const headR = 26;
+              const headY = -54 * s;
+              const headR = 26 * s;
 
               return (
                 <g key={room.id}>
@@ -839,7 +898,7 @@ export function BuildingMap({
                     y={cy + headY - headR - 6}
                     width={Math.max(pinR * 2, pillW)}
                     height={-headY + headR + pillY + pillH + 12}
-                    rx={16}
+                    rx={16 * s}
                     fill="transparent"
                     className="map-room cursor-pointer"
                     style={{ cursor: "pointer" }}
@@ -867,19 +926,19 @@ export function BuildingMap({
                       <circle
                         cx={0}
                         cy={headY}
-                        r={headR + 8}
+                        r={headR + 8 * s}
                         fill="none"
                         stroke={pinColor}
-                        strokeWidth={5}
+                        strokeWidth={5 * s}
                       />
                     </g>
 
                     {/* Ground shadow so the pin reads as sitting on the photo */}
                     <ellipse
                       cx={0}
-                      cy={tipY + 3}
-                      rx={11}
-                      ry={4}
+                      cy={tipY + 3 * s}
+                      rx={11 * s}
+                      ry={4 * s}
                       fill="#000"
                       opacity={0.45}
                     />
@@ -889,13 +948,13 @@ export function BuildingMap({
                       style={{ transform: active ? "scale(1.12)" : "scale(1)" }}
                     >
                       <path
-                        d={`M0,${tipY} C-8,-16 -${headR},-30 -${headR},${headY} A${headR},${headR} 0 1,1 ${headR},${headY} C${headR},-30 8,-16 0,${tipY} Z`}
+                        d={`M0,${tipY} C${-8 * s},${-16 * s} ${-headR},${-30 * s} ${-headR},${headY} A${headR},${headR} 0 1,1 ${headR},${headY} C${headR},${-30 * s} ${8 * s},${-16 * s} 0,${tipY} Z`}
                         fill={pinColor}
-                        stroke={pinStroke}
-                        strokeWidth={4}
+                        stroke={pinOutline}
+                        strokeWidth={4 * s}
                         strokeLinejoin="round"
                       />
-                      <circle cx={0} cy={headY} r={9} fill={pinStroke} />
+                      <circle cx={0} cy={headY} r={9 * s} fill={pinDot} />
                     </g>
 
                     {/* Label pill: solid, not outlined text. The satellite photo
@@ -908,11 +967,11 @@ export function BuildingMap({
                         height={pillH}
                         rx={pillH / 2}
                         fill={pillFill}
-                        stroke={active ? laser : pinStroke}
-                        strokeWidth={active ? 4 : 2.5}
+                        stroke={pillBorder}
+                        strokeWidth={(active ? 4 : 2.5) * s}
                       />
                       <text
-                        x={-9}
+                        x={-9 * s}
                         y={pillY + pillH / 2}
                         textAnchor="middle"
                         dominantBaseline="central"
@@ -925,12 +984,12 @@ export function BuildingMap({
                       </text>
                       {/* "explore" affordance */}
                       <text
-                        x={pillW / 2 - 20}
+                        x={pillW / 2 - 20 * s}
                         y={pillY + pillH / 2}
                         textAnchor="middle"
                         dominantBaseline="central"
                         fill={active ? laser : pinColor}
-                        fontSize={FONT + 4}
+                        fontSize={FONT + 4 * s}
                         fontWeight={800}
                         className="select-none"
                       >
@@ -944,14 +1003,14 @@ export function BuildingMap({
                       key={`spotlight-${spotlightKey}`}
                       cx={cx}
                       cy={cy + headY}
-                      r={headR + 14}
+                      r={headR + 14 * s}
                       fill="none"
                       stroke={laser}
                       className="pointer-events-none"
-                      initial={{ opacity: 0, strokeWidth: 3 }}
+                      initial={{ opacity: 0, strokeWidth: 3 * s }}
                       animate={{
                         opacity: [0, 0.95, 0.1, 0.95, 0],
-                        strokeWidth: [3, 12, 5, 12, 3],
+                        strokeWidth: [3 * s, 12 * s, 5 * s, 12 * s, 3 * s],
                       }}
                       transition={{ duration: 2, ease: "easeInOut" }}
                     />
