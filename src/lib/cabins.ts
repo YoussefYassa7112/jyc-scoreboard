@@ -6,16 +6,30 @@ export type CabinInfo = {
   label: string;
 };
 
+/**
+ * From the 2026 camp schedule sheet. The sheet groups cabins by language —
+ * English (cabins 1-4) and French (cabins 5-8) — which is exactly how `red`
+ * and `green` are already split here, confirmed by the leader names lining up
+ * in order. The internal values stay red/green because that is what the teams
+ * table stores; the language is carried alongside for display, since campers
+ * looking for their group will be looking for "English" or "French".
+ */
 export const campCabins: CabinInfo[] = [
-  { id: 1, group: "red", label: "Lina N. + Christina" },
-  { id: 2, group: "red", label: "Valera G. + Youssef" },
+  { id: 1, group: "red", label: "Mina N. + Christina F." },
+  { id: 2, group: "red", label: "Valera G. + Youssef Y." },
   { id: 3, group: "red", label: "Karine A. + Mickel S." },
   { id: 4, group: "red", label: "Robert M. + Imy S." },
-  { id: 5, group: "green", label: "Carol H. + Fady" },
+  { id: 5, group: "green", label: "Carol H. + Julie" },
   { id: 6, group: "green", label: "Mark T. + Yoanna S." },
   { id: 7, group: "green", label: "Jean N. + Carole Y." },
   { id: 8, group: "green", label: "Maria E. + Gab N." },
 ];
+
+/** What the schedule sheet calls each track. */
+export const groupLanguage: Record<"red" | "green", string> = {
+  red: "English",
+  green: "French",
+};
 
 export function cabinsForGroup(group: "red" | "green"): CabinInfo[] {
   return campCabins.filter((cabin) => cabin.group === group);

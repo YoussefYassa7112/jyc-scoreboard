@@ -8,6 +8,13 @@ export type CampLocation = {
   label: string;
   floorId?: string;
   roomId?: string;
+  /**
+   * Set on places the maps do not cover — either because they are not a place
+   * at all ("On the go") or because we have no plan for that building yet (B4).
+   * A block whose locations are all like this shows this line instead of a
+   * "see it on the map" button that would only lead somewhere wrong.
+   */
+  offMapNote?: string;
 };
 
 export const campLocations: CampLocation[] = [
@@ -56,14 +63,12 @@ export const campLocations: CampLocation[] = [
   {
     id: "b4-common",
     label: "B4-B Common Area",
-    floorId: "north-shore",
-    roomId: "dorm-2",
+    offMapNote: "B4 building — no map for it yet",
   },
   {
     id: "b4-stgeorge",
     label: "B4 — St-George",
-    floorId: "north-shore",
-    roomId: "dorm-2",
+    offMapNote: "B4 building — no map for it yet",
   },
   {
     id: "r1-churches",
@@ -74,8 +79,7 @@ export const campLocations: CampLocation[] = [
   {
     id: "rooms",
     label: "Rooms",
-    floorId: "north-shore",
-    roomId: "dorm-1",
+    offMapNote: "Your own cabin",
   },
   {
     id: "chapel",
@@ -92,20 +96,17 @@ export const campLocations: CampLocation[] = [
   {
     id: "open",
     label: "Open",
-    floorId: "north-shore",
-    roomId: "outdoor",
+    offMapNote: "Spot announced on the day",
   },
   {
     id: "bus",
     label: "B1-4 (In Bus)",
-    floorId: "north-shore",
-    roomId: "central",
+    offMapNote: "On the buses — no fixed spot on the map",
   },
   {
     id: "on-the-go",
     label: "On the go",
-    floorId: "north-shore",
-    roomId: "outdoor",
+    offMapNote: "Handed out as you move between activities",
   },
   {
     id: "lake",
@@ -183,6 +184,23 @@ export function mappedLocations(ids: string[] | undefined): CampLocation[] {
     out.push(loc);
   }
   return out;
+}
+
+/**
+ * Note for a block whose locations are all off-map. Returns null as soon as one
+ * of them can be opened on a map, since then the button is the better answer.
+ */
+export function offMapNoteFor(ids: string[] | undefined): string | null {
+  if (!ids?.length) return null;
+  if (mappedLocations(ids).length > 0) return null;
+  const notes: string[] = [];
+  for (const id of ids) {
+    const loc = byId.get(id);
+    if (!loc) continue;
+    const note = loc.offMapNote ?? loc.label;
+    if (!notes.includes(note)) notes.push(note);
+  }
+  return notes.length ? notes.join(" · ") : null;
 }
 
 export function locationForRoom(

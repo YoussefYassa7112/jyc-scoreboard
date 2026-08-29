@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { getLocation, mappedLocations } from "@/data/locations";
+import { getLocation, mappedLocations, offMapNoteFor } from "@/data/locations";
 import {
   campDays,
   greenCabins,
@@ -125,6 +125,8 @@ function BlockCard({
 }) {
   // Color by the event's own group — Everyone stays blue even on Red/Green.
   const colors = chromeClasses(accent);
+  // Where an event happens when none of its locations are on a map.
+  const offMapNote = offMapNoteFor(block.locationIds);
   const done = status === "done";
   const live = status === "live";
 
@@ -206,9 +208,14 @@ function BlockCard({
       {block.note ? (
         <p className="mt-1 text-sm font-semibold text-muted-soft">{block.note}</p>
       ) : null}
-      {onViewMap && (block.locationIds?.length || block.location) ? (
+      {/* A button only appears when the map can actually take you somewhere.
+          "On the go", "Open", the buses and the B4 building are either not
+          places at all or buildings we have no plan for, and a button there
+          used to open the map on whatever room the id happened to point at.
+          Those now read as a note saying where the thing actually happens. */}
+      {onViewMap && mapSpots && mapSpots.length > 0 ? (
         <div className="relative z-10 mt-3 flex flex-wrap gap-2">
-          {mapSpots && mapSpots.length > 1 ? (
+          {mapSpots.length > 1 ? (
             mapSpots.map((spot) => (
               <button
                 key={spot.id}
@@ -222,13 +229,18 @@ function BlockCard({
           ) : (
             <button
               type="button"
-              onClick={() => onViewMap(mapSpots?.[0]?.id)}
+              onClick={() => onViewMap(mapSpots[0].id)}
               className="btn-cta min-h-11 cursor-pointer rounded-xl bg-star px-3 py-2.5 text-xs font-extrabold"
             >
               See where this is on the map →
             </button>
           )}
         </div>
+      ) : offMapNote ? (
+        <p className="mt-3 flex items-start gap-1.5 text-xs font-bold text-muted-soft">
+          <span aria-hidden>📍</span>
+          <span>{offMapNote}</span>
+        </p>
       ) : null}
       {block.details?.length ? (
         <ul className="mt-2 space-y-1.5">
