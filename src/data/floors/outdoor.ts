@@ -1,143 +1,92 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Camp grounds at Le P'tit Bonheur (Lac Quenouille).
- * North = lake, south = road, east = CENTRAL building.
+ * Pin tap-target diameter in SVG units. The overview viewBox is 1024 wide but
+ * renders around 360px on a phone, so one SVG unit is roughly a third of a CSS
+ * pixel — a target has to be generous here to be comfortably tappable.
+ */
+const PIN = 96;
+
+/**
+ * Camp overview — one pin per general area. Tapping a pin opens that area's
+ * detailed map. Individual buildings live on those detail floors, not here.
+ *
+ * viewBox matches public/map/camp-overview.jpg (1024×714).
+ *
+ * Pin coordinates come from the annotated survey photo
+ * (public/map/grounds-aerial.jpg). Both images are the same satellite frame —
+ * verified by landmark alignment to within a pixel — so the hand-drawn boxes
+ * on the annotated copy transfer here 1:1. Area pins sit at the centroid of
+ * the spots they cover:
+ *
+ *   Arbre en Arbre (219,116)
+ *   North shore    dorm 1 (478,105) · cafeteria (508,149) · dorm 2 (485,193)
+ *   Camp fire      (220,301)
+ *   Peninsula      baignade (645,449) · dorm 3 (716,509)
  */
 export const outdoorFloor: FloorPlan = {
   id: "outdoor",
-  label: "Grounds",
-  siteTitle: "P'tit Bonheur",
-  banner: "CAMP GROUNDS",
-  viewBox: { w: 1060, h: 720 },
-  outline: "M30,30 H1030 V690 H30 Z",
+  label: "Overview",
+  siteTitle: "Le P'tit Bonheur",
+  banner: "CAMP OVERVIEW",
+  viewBox: { w: 1024, h: 714 },
+  outline: "M0,0 H1024 V714 H0 Z",
+  backgroundImage: { href: "/map/camp-overview.jpg" },
   rooms: [
     {
-      id: "lake",
-      name: "Lac Quenouille",
-      labelLines: ["Lake"],
-      blurb: "Lac Quenouille — swimming and shoreline activities.",
-      kind: "water",
-      x: 50,
-      y: 48,
-      w: 960,
-      h: 150,
-    },
-    {
-      id: "forest",
-      name: "Forest activities",
-      labelLines: ["Forest", "activities"],
-      blurb: "Woods on the west side — Arbre en Arbre and forest games.",
-      kind: "outdoor",
-      x: 50,
-      y: 220,
-      w: 210,
-      h: 150,
-    },
-    {
-      id: "volleyball",
-      name: "Volleyball area",
-      labelLines: ["Volleyball"],
-      blurb: "Volleyball court between the forest and the main field.",
+      id: "arbre-area",
+      name: "Arbre en Arbre",
+      labelLines: ["Arbre en Arbre"],
+      blurb: "Treetop obstacle course in the woods above the road.",
       kind: "activity",
-      x: 280,
-      y: 230,
-      w: 70,
-      h: 200,
-      labelRotate: -90,
+      marker: "pin",
+      x: 219,
+      y: 116,
+      w: PIN,
+      h: PIN,
+      detailFloorId: "arbre-en-arbre",
     },
     {
-      id: "outdoor",
-      name: "Outdoor area",
-      labelLines: ["Outdoor", "area"],
-      blurb: "Open field in the middle of camp — ice-breakers and big games.",
-      kind: "outdoor",
-      x: 370,
-      y: 220,
-      w: 280,
-      h: 280,
-      shape: "ellipse",
+      id: "north-shore-area",
+      name: "North shore",
+      labelLines: ["North shore"],
+      blurb:
+        "Dorm 1, Dorm 2, and the cafeteria — topics, baby foot, vespers & liturgy.",
+      kind: "building",
+      marker: "pin",
+      x: 492,
+      y: 149,
+      w: PIN,
+      h: PIN,
+      detailFloorId: "north-shore",
     },
     {
-      id: "campfire",
-      name: "Camp Fire",
-      labelLines: ["Camp Fire"],
-      blurb: "Campfire pit on the east side, near CENTRAL.",
+      id: "campfire-area",
+      name: "Camp fire",
+      labelLines: ["Camp fire"],
+      blurb: "Campfire clearing in the woods.",
       kind: "activity",
-      x: 680,
-      y: 220,
-      w: 200,
-      h: 110,
+      marker: "pin",
+      x: 220,
+      y: 301,
+      w: PIN,
+      h: PIN,
+      detailFloorId: "campfire",
     },
     {
-      id: "central",
-      name: "CENTRAL",
-      labelLines: ["CENTRAL", "Caf + Basement"],
-      blurb: "Main building — cafeteria upstairs, basement downstairs. All Churches meet here.",
+      id: "peninsula-area",
+      name: "Peninsula",
+      labelLines: ["Peninsula"],
+      blurb: "Baignade (swimming) and Dorm 3 · Le P'tit Bonheur.",
       kind: "building",
-      x: 720,
-      y: 360,
-      w: 220,
-      h: 170,
-      linksTo: [
-        { floorId: "cafeteria", roomId: "cafeteria", label: "Open Cafeteria" },
-        { floorId: "basement", roomId: "nordet", label: "Open Basement" },
-      ],
-    },
-    {
-      id: "b4",
-      name: "B4",
-      labelLines: ["B4"],
-      blurb: "B4 cabins — common area and St-George.",
-      kind: "building",
-      x: 470,
-      y: 520,
-      w: 190,
-      h: 100,
-    },
-    {
-      id: "dock",
-      name: "Dock",
-      labelLines: ["Dock"],
-      blurb: "L-shaped dock on the lake, north of CENTRAL.",
-      kind: "water",
-      x: 780,
-      y: 168,
-      w: 90,
-      h: 42,
+      marker: "pin",
+      x: 690,
+      y: 485,
+      w: PIN,
+      h: PIN,
+      detailFloorId: "peninsula",
     },
   ],
   exits: [],
-  decorations: [
-    { type: "dock", x: 800, y: 155, w: 70, h: 28 },
-    {
-      type: "road",
-      x: 50,
-      y: 640,
-      w: 960,
-      h: 36,
-      label: "Chem. du Lac Quenouille",
-    },
-    {
-      type: "trees",
-      spots: [
-        { x: 80, y: 400 },
-        { x: 130, y: 430 },
-        { x: 90, y: 480 },
-        { x: 170, y: 500 },
-        { x: 220, y: 450 },
-        { x: 260, y: 520 },
-        { x: 340, y: 540 },
-        { x: 400, y: 508 },
-        { x: 695, y: 508 },
-        { x: 680, y: 560 },
-        { x: 980, y: 250 },
-        { x: 1000, y: 320 },
-        { x: 990, y: 480 },
-        { x: 960, y: 560 },
-        { x: 70, y: 600 },
-        { x: 1000, y: 600 },
-      ],
-    },
-  ],
+  decorations: [],
 };

@@ -38,6 +38,15 @@ export type MapRoom = {
   labelRotate?: number;
   /** Jump to another floor (stairs, main building) */
   linksTo?: RoomLink[];
+  /** Overview pin → open this detail floor on tap */
+  detailFloorId?: string;
+  /** Optional room to highlight when opening the detail floor */
+  detailRoomId?: string;
+  /**
+   * `region` — colored room on SVG floor plans.
+   * `pin` — map pin on the camp overview photo (x/y = center, w = tap diameter).
+   */
+  marker?: "region" | "pin";
 };
 
 export type ExitMarker = {
@@ -61,6 +70,11 @@ export type FloorDecoration =
   | { type: "road"; x: number; y: number; w: number; h: number; label: string }
   | { type: "dock"; x: number; y: number; w: number; h: number };
 
+export type FloorBackgroundImage = {
+  href: string;
+  opacity?: number;
+};
+
 export type FloorPlan = {
   id: string;
   /** Tab / heading label shown in the UI */
@@ -71,6 +85,12 @@ export type FloorPlan = {
   banner: string;
   viewBox: { w: number; h: number };
   outline: string;
+  /** Satellite or photo underlay — rooms draw as tappable overlays */
+  backgroundImage?: FloorBackgroundImage;
+  /** Return here from a detail map (e.g. camp overview) */
+  parentFloorId?: string;
+  /** Hide from the floor tab bar — reached via overview pins */
+  showInTabs?: boolean;
   rooms: MapRoom[];
   exits: ExitMarker[];
   decorations: FloorDecoration[];

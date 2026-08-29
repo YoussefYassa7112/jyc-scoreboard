@@ -7,8 +7,8 @@ import type { FloorPlan } from "./types";
 export const cafeteriaFloor: FloorPlan = {
   id: "cafeteria",
   label: "Cafeteria",
-  siteTitle: "CENTRAL",
-  banner: "CENTRAL — CAFETERIA",
+  siteTitle: "Main lodge",
+  banner: "MAIN LODGE — CAFETERIA",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",
   rooms: [
@@ -27,7 +27,7 @@ export const cafeteriaFloor: FloorPlan = {
       id: "cafeteria",
       name: "Cafeteria",
       labelLines: ["Cafeteria"],
-      blurb: "Main dining hall — meals, topics, and indoor gatherings.",
+      blurb: "Main dining hall — meals, topics, baby foot, and indoor gatherings.",
       kind: "activity",
       x: 50,
       y: 170,

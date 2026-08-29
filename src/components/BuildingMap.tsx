@@ -17,6 +17,7 @@ import {
   floors,
   getFloor,
   kindLabel,
+  tabFloors,
   type FloorDecoration,
   type MapRoom,
   type RoomKind,
@@ -62,14 +63,22 @@ const kindFillDark: Record<RoomKind, string> = {
   building: "#3a2e1c",
 };
 
+function pinRadius(room: MapRoom) {
+  return Math.max(18, room.w / 2);
+}
+
 function roomFill(
   kind: RoomKind,
   dark: boolean,
   active: boolean,
   dimmed: boolean,
+  aerial = false,
 ) {
-  if (active) return dark ? "#16344c" : "#ffe4ea";
-  if (dimmed) return dark ? "#152038" : "#f3efe6";
+  if (active) return dark ? "rgba(22, 52, 76, 0.92)" : "rgba(255, 228, 234, 0.94)";
+  if (dimmed) return dark ? "rgba(21, 32, 56, 0.35)" : "rgba(243, 239, 230, 0.45)";
+  if (aerial) {
+    return dark ? "rgba(30, 45, 68, 0.58)" : "rgba(255, 248, 238, 0.78)";
+  }
   return dark ? kindFillDark[kind] : kindFillLight[kind];
 }
 
@@ -449,6 +458,8 @@ export function BuildingMap({
   }, [highlightBlockId, selectedId]);
 
   const floor = useMemo(() => getFloor(floorId), [floorId]);
+  const aerial = Boolean(floor.backgroundImage);
+  const overview = aerial && floor.rooms.every((r) => r.marker === "pin");
   const selected = useMemo(
     () => floor.rooms.find((r) => r.id === selectedId) ?? null,
     [floor.rooms, selectedId],
@@ -481,6 +492,16 @@ export function BuildingMap({
   }
 
   function onRoomActivate(room: MapRoom) {
+    if (room.detailFloorId) {
+      goToFloor(room.detailFloorId, {
+        keepSelection: Boolean(room.detailRoomId),
+      });
+      if (room.detailRoomId) setSelectedId(room.detailRoomId);
+      else setSelectedId(null);
+      setHighlightBlockId(null);
+      setSpotlightKey(Date.now());
+      return;
+    }
     if (selectedId === room.id) {
       setSelectedId(null);
       setHighlightBlockId(null);
@@ -514,10 +535,23 @@ export function BuildingMap({
             {floor.siteTitle ?? "CENTRAL"} · {floor.label}
           </h2>
           <p className="mt-1 text-sm font-extrabold text-star">
-            This map is tappable — tap any room
+            {overview
+              ? "Tap an area pin to open its detailed map"
+              : floor.parentFloorId
+                ? "Detailed area map — tap a room or go back to overview"
+                : "This map is tappable — tap any room"}
           </p>
         </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+          {floor.parentFloorId ? (
+            <button
+              type="button"
+              onClick={() => goToFloor(floor.parentFloorId!)}
+              className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-extrabold"
+            >
+              ← Overview
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label="Zoom out"
@@ -548,9 +582,9 @@ export function BuildingMap({
         </div>
       </div>
 
-      {floors.length > 1 ? (
+      {tabFloors.length > 1 ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {floors.map((f) => {
+          {tabFloors.map((f) => {
             const active = f.id === floorId;
             return (
               <button
@@ -576,25 +610,27 @@ export function BuildingMap({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {(
-          [...new Set(floor.rooms.map((r) => r.kind))] as RoomKind[]
-        ).map((kind) => (
-          <span
-            key={kind}
-            className="inline-flex items-center gap-1.5 rounded-full border border-saddle/15 px-2.5 py-1 text-[11px] font-bold text-muted"
-          >
+      {!overview ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(
+            [...new Set(floor.rooms.map((r) => r.kind))] as RoomKind[]
+          ).map((kind) => (
             <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{
-                backgroundColor: dark ? kindFillDark[kind] : kindFillLight[kind],
-                boxShadow: `inset 0 0 0 1px ${wall}`,
-              }}
-            />
-            {kindLabel[kind]}
-          </span>
-        ))}
-      </div>
+              key={kind}
+              className="inline-flex items-center gap-1.5 rounded-full border border-saddle/15 px-2.5 py-1 text-[11px] font-bold text-muted"
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor: dark ? kindFillDark[kind] : kindFillLight[kind],
+                  boxShadow: `inset 0 0 0 1px ${wall}`,
+                }}
+              />
+              {kindLabel[kind]}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <div style={{ perspective: 1100 }}>
       <motion.div
@@ -612,7 +648,9 @@ export function BuildingMap({
               👆
             </span>
             <p className="display-font text-sm font-extrabold text-on-star sm:text-base">
-              Tap a colored room on the map
+              {overview
+                ? "Tap an area pin to explore"
+                : "Tap a colored room on the map"}
             </p>
           </div>
         ) : null}
@@ -663,46 +701,70 @@ export function BuildingMap({
           <rect
             width={floor.viewBox.w}
             height={floor.viewBox.h}
-            fill={floorBg}
+            fill={aerial ? "transparent" : floorBg}
             rx={12}
             onClick={clearSelection}
           />
 
+          {floor.backgroundImage ? (
+            <image
+              href={floor.backgroundImage.href}
+              x={0}
+              y={0}
+              width={floor.viewBox.w}
+              height={floor.viewBox.h}
+              preserveAspectRatio="xMidYMid slice"
+              opacity={floor.backgroundImage.opacity ?? 1}
+              className="pointer-events-none"
+            />
+          ) : null}
+
           <text
             x={floor.viewBox.w / 2}
-            y={28}
+            y={aerial ? 22 : 28}
             textAnchor="middle"
             fill={ink}
             stroke={dark ? "#0b1224" : "#fff8ee"}
-            strokeWidth={4}
+            strokeWidth={aerial ? 5 : 4}
             paintOrder="stroke"
-            fontSize={16}
+            fontSize={aerial ? 13 : 16}
             fontWeight={800}
-            style={{ letterSpacing: "0.16em" }}
+            style={{ letterSpacing: "0.14em" }}
             className="pointer-events-none"
           >
             {floor.banner}
           </text>
 
-          <path
-            d={floor.outline}
-            fill={dark ? "#152038" : "#fff8ee"}
-            onClick={clearSelection}
-          />
+          {!aerial ? (
+            <path
+              d={floor.outline}
+              fill={dark ? "#152038" : "#fff8ee"}
+              onClick={clearSelection}
+            />
+          ) : null}
 
-          {floor.rooms.map((room) => {
+          {floor.rooms.map((room, roomIndex) => {
             const active = selectedId === room.id;
             const dimmed = Boolean(selectedId && !active);
-            const fontSize = labelFontSize(room);
+            const isPin = room.marker === "pin";
+            const fontSize = isPin ? 10 : labelFontSize(room);
             const blockY = labelBlockY(room, fontSize);
             const lineH = fontSize * 1.2;
             const startY =
               blockY - ((room.labelLines.length - 1) * lineH) / 2;
-            const cx = room.x + room.w / 2;
-            const cy = room.y + room.h / 2;
-            const ellipse = room.shape === "ellipse";
-            const fill = roomFill(room.kind, dark, active, dimmed);
+            const cx = isPin ? room.x : room.x + room.w / 2;
+            const cy = isPin ? room.y : room.y + room.h / 2;
+            const pinR = isPin ? pinRadius(room) : 0;
+            const ellipse = !isPin && room.shape === "ellipse";
+            const fill = roomFill(room.kind, dark, active, dimmed, aerial);
             const stroke = active ? laser : wall;
+            // The overview photo is dark green and navy in BOTH themes, so pins
+            // use a fixed warm amber rather than the theme accent — `--star` is
+            // a dark brown in daylight and disappeared straight into the trees.
+            const pinColor = active ? laser : "#ffc53d";
+            const pinStroke = "#1a120c";
+            const pillFill = dark ? "#0f172a" : "#fff8ee";
+            const pillInk = dark ? "#f8fafc" : "#2a1f14";
             const haloW = Math.max(
               10,
               Math.min(24, Math.min(room.w, room.h) * 0.22),
@@ -718,9 +780,6 @@ export function BuildingMap({
                 strokeWidth: active ? 3.6 : 2.8,
               },
               whileTap: { scale: 0.97 },
-              // Idle rooms hold a static outline. This used to breathe on an
-              // infinite loop, but that animated `filter` on every room at once
-              // (12 on the basement floor) and repainted the map every frame.
               animate: {
                 strokeWidth: active ? 3.2 : selectedId ? 1.4 : 2.2,
                 filter: active
@@ -743,9 +802,158 @@ export function BuildingMap({
               },
               tabIndex: 0,
               role: "button" as const,
-              "aria-label": room.name,
+              "aria-label": `${room.name} — explore this area`,
               "aria-pressed": active,
             };
+
+            if (isPin) {
+              // The overview viewBox is 1024 wide but renders around 360px on a
+              // phone, so one unit is about a third of a CSS pixel. Everything
+              // here is sized in those units — a "26px" label is really ~9px on
+              // screen, which is why these numbers look so large.
+              // Sizing is driven by how small a unit actually is on a phone.
+              // The board caps at max-w-3xl, so inside the page padding and the
+              // panel padding the map is roughly 320px wide against a 1024-unit
+              // viewBox — about 0.31 CSS px per unit. A 30-unit label is
+              // therefore ~9px on screen, and a 80-unit pin ~25px.
+              const label = room.labelLines[0] ?? room.name;
+              const FONT = 30;
+              const pillH = 44;
+              const pillW = label.length * 15.5 + 60;
+              const pillY = 10;
+              const tipY = 0;
+              const headY = -54;
+              const headR = 26;
+
+              return (
+                <g key={room.id}>
+                  {/* One hit area covering pin and label, so the whole marker
+                      is tappable rather than just the teardrop. */}
+                  <rect
+                    x={cx - Math.max(pinR, pillW / 2)}
+                    y={cy + headY - headR - 6}
+                    width={Math.max(pinR * 2, pillW)}
+                    height={-headY + headR + pillY + pillH + 12}
+                    rx={16}
+                    fill="transparent"
+                    className="map-room cursor-pointer"
+                    style={{ cursor: "pointer" }}
+                    onClick={shared.onClick}
+                    onKeyDown={shared.onKeyDown}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={shared["aria-label"]}
+                    aria-pressed={active}
+                  />
+
+                  <g
+                    transform={`translate(${cx},${cy})`}
+                    className="pointer-events-none"
+                    aria-hidden
+                    opacity={dimmed ? 0.45 : 1}
+                  >
+                    {/* Attention pulse. A scaling/fading <g> rather than an
+                        animated filter or radius — this stays on the
+                        compositor and never re-rasterises the photo under it.
+                        Paused via prefers-reduced-motion in globals.css. */}
+                    <g
+                      className={`map-pin-pulse map-pin-pulse-${(roomIndex % 4) + 1}`}
+                    >
+                      <circle
+                        cx={0}
+                        cy={headY}
+                        r={headR + 8}
+                        fill="none"
+                        stroke={pinColor}
+                        strokeWidth={5}
+                      />
+                    </g>
+
+                    {/* Ground shadow so the pin reads as sitting on the photo */}
+                    <ellipse
+                      cx={0}
+                      cy={tipY + 3}
+                      rx={11}
+                      ry={4}
+                      fill="#000"
+                      opacity={0.45}
+                    />
+
+                    <g
+                      className="map-pin-body"
+                      style={{ transform: active ? "scale(1.12)" : "scale(1)" }}
+                    >
+                      <path
+                        d={`M0,${tipY} C-8,-16 -${headR},-30 -${headR},${headY} A${headR},${headR} 0 1,1 ${headR},${headY} C${headR},-30 8,-16 0,${tipY} Z`}
+                        fill={pinColor}
+                        stroke={pinStroke}
+                        strokeWidth={4}
+                        strokeLinejoin="round"
+                      />
+                      <circle cx={0} cy={headY} r={9} fill={pinStroke} />
+                    </g>
+
+                    {/* Label pill: solid, not outlined text. The satellite photo
+                        is dark and busy, and stroked text disappeared into it. */}
+                    <g className="map-pin-label">
+                      <rect
+                        x={-pillW / 2}
+                        y={pillY}
+                        width={pillW}
+                        height={pillH}
+                        rx={pillH / 2}
+                        fill={pillFill}
+                        stroke={active ? laser : pinStroke}
+                        strokeWidth={active ? 4 : 2.5}
+                      />
+                      <text
+                        x={-9}
+                        y={pillY + pillH / 2}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill={pillInk}
+                        fontSize={FONT}
+                        fontWeight={800}
+                        className="select-none"
+                      >
+                        {label}
+                      </text>
+                      {/* "explore" affordance */}
+                      <text
+                        x={pillW / 2 - 20}
+                        y={pillY + pillH / 2}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill={active ? laser : pinColor}
+                        fontSize={FONT + 4}
+                        fontWeight={800}
+                        className="select-none"
+                      >
+                        ›
+                      </text>
+                    </g>
+                  </g>
+
+                  {active && spotlightKey ? (
+                    <motion.circle
+                      key={`spotlight-${spotlightKey}`}
+                      cx={cx}
+                      cy={cy + headY}
+                      r={headR + 14}
+                      fill="none"
+                      stroke={laser}
+                      className="pointer-events-none"
+                      initial={{ opacity: 0, strokeWidth: 3 }}
+                      animate={{
+                        opacity: [0, 0.95, 0.1, 0.95, 0],
+                        strokeWidth: [3, 12, 5, 12, 3],
+                      }}
+                      transition={{ duration: 2, ease: "easeInOut" }}
+                    />
+                  ) : null}
+                </g>
+              );
+            }
 
             return (
               <g key={room.id}>
@@ -907,14 +1115,16 @@ export function BuildingMap({
             <ExitBadge key={ex.id} x={ex.x} y={ex.y} rotate={ex.rotate} />
           ))}
 
-          <path
-            d={floor.outline}
-            fill="none"
-            stroke={wall}
-            strokeWidth={3.5}
-            strokeLinejoin="round"
-            className="pointer-events-none"
-          />
+          {!aerial ? (
+            <path
+              d={floor.outline}
+              fill="none"
+              stroke={wall}
+              strokeWidth={3.5}
+              strokeLinejoin="round"
+              className="pointer-events-none"
+            />
+          ) : null}
         </svg>
         </motion.div>
           </motion.div>
@@ -1058,7 +1268,10 @@ export function BuildingMap({
             animate={{ opacity: 1 }}
             className="mt-4 text-center text-sm font-extrabold text-star"
           >
-            Tap a room — rooms light up and open details
+            Tap {overview ? "an area pin" : "a room"} —{" "}
+            {overview
+              ? "opens the detailed map for that area"
+              : "rooms light up and open details"}
           </motion.p>
         )}
       </AnimatePresence>

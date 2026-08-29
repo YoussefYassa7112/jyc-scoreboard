@@ -7,8 +7,8 @@ import type { FloorPlan } from "./types";
 export const basementFloor: FloorPlan = {
   id: "basement",
   label: "Basement",
-  siteTitle: "CENTRAL",
-  banner: "CENTRAL — BASEMENT",
+  siteTitle: "Main lodge",
+  banner: "MAIN LODGE — BASEMENT",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",
   rooms: [
