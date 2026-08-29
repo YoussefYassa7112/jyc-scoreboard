@@ -2,16 +2,13 @@ import type { FloorPlan } from "./types";
 
 /**
  * Detail map — the peninsula, reached from the "Peninsula" pin on the camp
- * overview.
+ * overview and from its own tab.
  *
- * Laid out from the zoomed survey photo. Water sits west and north, the
- * built-up ground runs east. The two annotated spots are the baignade — the
- * swimming water, labelled Lake here — and Dorm 3 · Le P'tit Bonheur.
- *
- * The rest is read off the aerial rather than annotated: the long pier north
- * of the swimming area, the sandy strip along the shore, the boats pulled up
- * south of it, the open lawn in the middle, and the building cluster on the
- * east side. Names for those buildings are a best guess from the photo.
+ * Water sits west, the point runs east. Only the two annotated spots are
+ * named buildings: the baignade — the swimming water, labelled Lake here —
+ * and Dorm 3 · Le P'tit Bonheur, which sits out toward the east end. The
+ * shoreline details (pier, beach, boats) are read off the survey photo; the
+ * rest of the point is woods.
  */
 export const peninsulaFloor: FloorPlan = {
   id: "peninsula",
@@ -19,7 +16,6 @@ export const peninsulaFloor: FloorPlan = {
   siteTitle: "Le P'tit Bonheur",
   banner: "PENINSULA",
   parentFloorId: "outdoor",
-  showInTabs: false,
   viewBox: { w: 1060, h: 700 },
   outline: "M30,30 H1030 V670 H30 Z",
   rooms: [
@@ -50,7 +46,7 @@ export const peninsulaFloor: FloorPlan = {
       id: "beach",
       name: "Beach",
       labelLines: ["Beach"],
-      blurb: "Sandy strip between the water and the lawn.",
+      blurb: "Sandy strip between the water and the treeline.",
       kind: "outdoor",
       x: 60,
       y: 370,
@@ -69,49 +65,15 @@ export const peninsulaFloor: FloorPlan = {
       h: 95,
     },
     {
-      id: "field",
-      name: "Lawn",
-      labelLines: ["Lawn"],
-      blurb: "Open grass in the middle of the peninsula.",
-      kind: "outdoor",
-      x: 470,
-      y: 60,
-      w: 300,
-      h: 175,
-      shape: "ellipse",
-    },
-    {
-      id: "lodge",
-      name: "Main lodge",
-      labelLines: ["Main lodge"],
-      blurb: "Largest building on the peninsula, north-east of Dorm 3.",
-      kind: "building",
-      x: 800,
-      y: 60,
-      w: 200,
-      h: 175,
-    },
-    {
       id: "dorm-3",
       name: "Dorm 3 · Le P'tit Bonheur",
       labelLines: ["Dorm 3", "Le P'tit Bonheur"],
-      blurb: "Peninsula cabin — Le P'tit Bonheur.",
+      blurb: "Peninsula cabin — Le P'tit Bonheur, out toward the east end.",
       kind: "building",
-      x: 470,
-      y: 295,
-      w: 265,
-      h: 145,
-    },
-    {
-      id: "cabins",
-      name: "East cabins",
-      labelLines: ["East", "cabins"],
-      blurb: "Smaller buildings along the east side of the point.",
-      kind: "building",
-      x: 795,
-      y: 295,
-      w: 205,
-      h: 145,
+      x: 620,
+      y: 260,
+      w: 340,
+      h: 210,
     },
   ],
   exits: [],
@@ -126,26 +88,48 @@ export const peninsulaFloor: FloorPlan = {
       label: "Path along the point",
     },
     {
-      // Every spot checked against the room rects — none sit under a building.
+      // The point is mostly woods now that the buildings are down to Dorm 3.
+      // Every spot is checked against the room rects so nothing sits on a room.
       type: "trees",
       spots: [
-        { x: 450, y: 300 },
-        { x: 450, y: 400 },
-        { x: 450, y: 500 },
-        { x: 320, y: 500 },
-        { x: 380, y: 545 },
-        { x: 300, y: 580 },
+        // north-east, between the water and the top edge
+        { x: 470, y: 110 },
+        { x: 540, y: 80 },
+        { x: 610, y: 130 },
+        { x: 690, y: 90 },
+        { x: 760, y: 140 },
+        { x: 830, y: 95 },
+        { x: 900, y: 140 },
+        { x: 970, y: 100 },
+        { x: 520, y: 190 },
+        { x: 640, y: 215 },
+        { x: 740, y: 205 },
+        { x: 860, y: 200 },
+        { x: 960, y: 215 },
+        // the belt between the shore and Dorm 3
+        { x: 455, y: 290 },
+        { x: 500, y: 350 },
+        { x: 460, y: 420 },
+        { x: 520, y: 470 },
+        { x: 470, y: 540 },
+        { x: 550, y: 560 },
+        { x: 590, y: 300 },
+        { x: 580, y: 420 },
+        // east of Dorm 3, toward the tip
+        { x: 1000, y: 300 },
+        { x: 1005, y: 390 },
+        // south side, above the path
+        { x: 300, y: 520 },
+        { x: 360, y: 570 },
+        { x: 420, y: 510 },
+        { x: 300, y: 595 },
         { x: 45, y: 595 },
-        { x: 500, y: 500 },
-        { x: 580, y: 540 },
-        { x: 680, y: 500 },
-        { x: 770, y: 270 },
-        { x: 770, y: 480 },
-        { x: 785, y: 150 },
-        { x: 860, y: 500 },
-        { x: 950, y: 540 },
-        { x: 990, y: 580 },
-        { x: 1015, y: 520 },
+        { x: 650, y: 520 },
+        { x: 720, y: 560 },
+        { x: 800, y: 510 },
+        { x: 880, y: 555 },
+        { x: 950, y: 510 },
+        { x: 1000, y: 560 },
       ],
     },
   ],
