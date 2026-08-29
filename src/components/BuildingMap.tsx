@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +63,14 @@ const kindFillDark: Record<RoomKind, string> = {
   water: "#163044",
   building: "#3a2e1c",
 };
+
+/**
+ * useLayoutEffect warns when React renders on the server. This component only
+ * mounts behind the Map tab so it never does today, but the guard keeps that
+ * from becoming a console warning if the default tab ever changes.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 function pinRadius(room: MapRoom) {
   return Math.max(18, room.w / 2);
@@ -486,7 +495,12 @@ export function BuildingMap({
    */
   const [pinScale, setPinScale] = useState(1);
 
-  useEffect(() => {
+  // Layout effect, not a plain effect: pinScale starts at 1, which is the
+  // phone value, so on a desktop a plain effect would paint one frame of
+  // full-size pins before snapping them down to 0.4 — a visible jolt every
+  // time the map opens. useLayoutEffect measures and re-renders before the
+  // browser paints, so the first frame is already the right size.
+  useIsomorphicLayoutEffect(() => {
     const el = svgRef.current;
     if (!el) return;
     const measure = () => {
