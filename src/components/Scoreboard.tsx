@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AnimatePresence,
   LayoutGroup,
+  MotionConfig,
   motion,
   useReducedMotion,
 } from "framer-motion";
@@ -15,7 +16,6 @@ import {
 } from "@/lib/event-reminders";
 import { showLocalNotification } from "@/lib/notify";
 import {
-  easeSoft,
   presentChromeVariants,
   presentHeaderVariants,
   presentLayoutTransition,
@@ -58,21 +58,13 @@ const TABS: { id: BoardTab; label: string }[] = [
 ];
 
 /**
- * Panels travel in the direction of the tab you moved toward. Translate and
- * opacity only — scaling a whole tab panel re-rasterises it on every frame,
- * which is what made the map and schedule swap feel heavy.
+ * Panels used to swap through AnimatePresence `mode="wait"`, which forced the
+ * outgoing panel to finish a 200ms exit *before* the incoming one was allowed
+ * to mount — so the expensive mount started a fifth of a second after the tap.
+ * The slide is a CSS keyframe now (see .board-panel in globals.css) that
+ * replays when a panel goes display:none -> flex, and panels are kept alive
+ * once visited so switching back is a display flip rather than a React mount.
  */
-const panelVariants = {
-  enter: (direction: number) => ({
-    opacity: 0,
-    x: direction >= 0 ? 40 : -40,
-  }),
-  center: { opacity: 1, x: 0 },
-  exit: (direction: number) => ({
-    opacity: 0,
-    x: direction >= 0 ? -28 : 28,
-  }),
-};
 
 type StandingsResponse = {
   standings: StandingRow[];
@@ -110,19 +102,32 @@ export function Scoreboard() {
   // That is the delay that reads as the label lagging behind the tap.
   const [tab, setTab] = useState<BoardTab>("standings");
   const [panelTab, setPanelTab] = useState<BoardTab>("standings");
+  // Panels mount on first visit and are then kept, so only the first tap on
+  // Map or Schedule ever pays a mount. Standings starts mounted because it is
+  // what a camper scanning the QR lands on.
+  const [mountedTabs, setMountedTabs] = useState<BoardTab[]>(["standings"]);
+  const mountedTabsRef = useRef(mountedTabs);
+  mountedTabsRef.current = mountedTabs;
   const panelFrame = useRef(0);
+  const panelTimer = useRef(0);
   const navRef = useRef<HTMLElement>(null);
+  const panelsRef = useRef<HTMLDivElement>(null);
   // Tracks the tab the camper just asked for, which the deferred state has not
   // caught up to yet, so a fast second tap still gets its slide direction right.
+  //
+  // The nav also *renders* from this ref rather than from `tab`. The click
+  // handler writes `data-active` straight to the DOM for an immediate paint,
+  // but the standings poll re-renders this component about once a second — and
+  // a render still reading the old `tab` would put the stale value back on the
+  // attribute and snap the highlight backwards.
   const pendingTab = useRef<BoardTab>("standings");
   const presenting = presentationOn && panelTab === "standings";
   const prevPresentingRef = useRef(presenting);
   const [presentAnimDir, setPresentAnimDir] = useState(1);
   useEffect(() => {
-    if (prevPresentingRef.current !== presenting) {
-      setPresentAnimDir(presenting ? 1 : -1);
-      prevPresentingRef.current = presenting;
-    }
+    if (prevPresentingRef.current === presenting) return;
+    setPresentAnimDir(presenting ? 1 : -1);
+    prevPresentingRef.current = presenting;
   }, [presenting]);
   const presentMotion = reduceMotion
     ? { duration: 0 }
@@ -158,6 +163,8 @@ export function Scoreboard() {
   const pendingReveal = useRef<StandingsResponse | null>(null);
   const queuedAlerts = useRef<BoardAlert[]>([]);
   const lastEtag = useRef<string | null>(null);
+  /** Revision currently on screen, so byte-identical 200s are dropped. */
+  const lastAppliedRev = useRef<string | null>(null);
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const introReady = useIntroReady();
@@ -184,14 +191,27 @@ export function Scoreboard() {
     dropMissingMyTeam(pending.standings);
   }, []);
 
+  // Every timer this schedules is tracked so unmounting cannot leave a
+  // setState firing into a dead component.
+  const alertTimers = useRef<number[]>([]);
+  useEffect(
+    () => () => {
+      alertTimers.current.forEach((id) => window.clearTimeout(id));
+      alertTimers.current = [];
+    },
+    [],
+  );
+
   const pushAlerts = useCallback((incoming: BoardAlert[]) => {
     if (incoming.length === 0) return;
     setAlerts((current) => [...current, ...incoming].slice(-3));
     for (const alert of incoming) {
       const life = alert.kind === "leader" ? 12000 : 8000;
-      window.setTimeout(() => {
-        setAlerts((current) => current.filter((a) => a.id !== alert.id));
-      }, life);
+      alertTimers.current.push(
+        window.setTimeout(() => {
+          setAlerts((current) => current.filter((a) => a.id !== alert.id));
+        }, life),
+      );
     }
   }, []);
 
@@ -292,37 +312,76 @@ export function Scoreboard() {
   // to be sure the new highlight actually reached the screen first.
   const goToTab = useCallback(
     (next: BoardTab, opts?: { clearScheduleFocus?: boolean }) => {
+      const current = pendingTab.current;
+      const from = TABS.findIndex((t) => t.id === current);
+      const to = TABS.findIndex((t) => t.id === next);
+      const dir = to >= from ? 1 : -1;
+      const leavingMap = current === "map" && next !== "map";
+      pendingTab.current = next;
+
       navRef.current
         ?.querySelectorAll<HTMLElement>("[data-tab]")
         .forEach((el) => {
           el.dataset.active = String(el.dataset.tab === next);
         });
 
-      const current = pendingTab.current;
-      const from = TABS.findIndex((t) => t.id === current);
-      const to = TABS.findIndex((t) => t.id === next);
-      const leavingMap = current === "map" && next !== "map";
-      pendingTab.current = next;
+      // Reveal the target panel in the same task as the highlight, but only
+      // once it has been visited before. On a first visit the panel element
+      // exists while its contents do not, so flipping it here would blank the
+      // board until React commits. In that one case the outgoing panel stays
+      // put and React swaps both together.
+      if (mountedTabsRef.current.includes(next)) {
+        panelsRef.current
+          ?.querySelectorAll<HTMLElement>("[data-panel]")
+          .forEach((el) => {
+            const isNext = el.dataset.panel === next;
+            // Only stamp direction on a panel that is arriving; rewriting it on
+            // the one already on screen replays the slide under the camper.
+            if (isNext && el.dataset.active !== "true") {
+              el.dataset.dir = dir >= 0 ? "forward" : "back";
+            }
+            el.dataset.active = String(isNext);
+          });
+      }
+
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        if (opts?.clearScheduleFocus) setScheduleFocus(null);
+        if (leavingMap) setMapFocus(null);
+        // Presentation is a standings-only view. Map and Schedule stay normal.
+        if (next !== "standings" && presentationOnRef.current) {
+          setPresentationMode(false);
+        }
+        setTabDirection(dir);
+        setMountedTabs((tabs) => (tabs.includes(next) ? tabs : [...tabs, next]));
+        setTab(next);
+        setPanelTab(next);
+      };
 
       cancelAnimationFrame(panelFrame.current);
+      window.clearTimeout(panelTimer.current);
       panelFrame.current = requestAnimationFrame(() => {
-        panelFrame.current = requestAnimationFrame(() => {
-          if (opts?.clearScheduleFocus) setScheduleFocus(null);
-          if (leavingMap) setMapFocus(null);
-          // Presentation is a standings-only view. Map and Schedule stay normal.
-          if (next !== "standings" && presentationOnRef.current) {
-            setPresentationMode(false);
-          }
-          setTabDirection(to >= from ? 1 : -1);
-          setTab(next);
-          setPanelTab(next);
-        });
+        panelFrame.current = requestAnimationFrame(commit);
       });
+      // rAF does not fire while a tab is backgrounded or otherwise not
+      // compositing — iOS low-power mode included — and without a backstop the
+      // nav would sit on the new tab while the panel kept showing the old one,
+      // with nothing to recover it. `commit` is idempotent, so whichever fires
+      // first wins and the other is a no-op.
+      panelTimer.current = window.setTimeout(commit, 120);
     },
     [],
   );
 
-  useEffect(() => () => cancelAnimationFrame(panelFrame.current), []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(panelFrame.current);
+      window.clearTimeout(panelTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!presentationOn) return;
@@ -387,6 +446,19 @@ export function Scoreboard() {
         if (etag) lastEtag.current = etag;
         else if (json.rev) lastEtag.current = `"${json.rev}"`;
         if (!cancelled) {
+          // A 200 whose revision matches what is already on screen is a no-op.
+          // Applying it anyway re-renders the whole board and runs a
+          // synchronous JSON.stringify into localStorage once a second — main
+          // thread work landing on top of whatever the camper is tapping.
+          const unchanged =
+            json.rev != null && json.rev === lastAppliedRev.current;
+          if (unchanged) {
+            setStaleCache(false);
+            setError(null);
+            setLoading(false);
+            return;
+          }
+          lastAppliedRev.current = json.rev ?? null;
           trackStandings(json);
           if (!pendingReveal.current) writeStandingsCache(json);
           setStaleCache(false);
@@ -453,9 +525,20 @@ export function Scoreboard() {
         ? "Standings"
         : "Cached standings";
 
+  // Note on the missing `layout` prop below: framer animates *any* size change
+  // of the element it sits on, and this board's height changes on every tab
+  // switch — so the whole page slid vertically for the length of the layout
+  // transition each time a tab was tapped. It was there for the Present-mode
+  // transition, but Present is a rare projector action and tab taps are
+  // constant, so the trade was the wrong way round. Present still animates via
+  // the header/standings/chrome variants, which move opacity and translate
+  // rather than measuring layout; only its size change snaps now.
   return (
+    // The admin dashboard and the rank-alert overlays already honour
+    // prefers-reduced-motion; the camper board did not, so its confetti, orbit
+    // and panel springs ignored the OS setting entirely.
+    <MotionConfig reducedMotion="user">
     <motion.main
-      layout
       transition={presentMotion}
       className={`present-shell relative overflow-x-hidden ${
         presenting
@@ -467,7 +550,6 @@ export function Scoreboard() {
 
       <LayoutGroup id="scoreboard-present">
       <motion.div
-        layout
         transition={presentMotion}
         className={`relative z-10 mx-auto flex w-full flex-col ${
           presenting
@@ -630,7 +712,10 @@ export function Scoreboard() {
           aria-label="Scoreboard sections"
         >
           {TABS.map((item) => {
-            const active = tab === item.id;
+            // Read the ref, not `tab`: a poll-driven render between the tap and
+            // the deferred setState would otherwise write the previous tab back
+            // onto data-active and snap the highlight backwards.
+            const active = pendingTab.current === item.id;
             return (
               <button
                 key={item.id}
@@ -642,40 +727,43 @@ export function Scoreboard() {
                   // scroll/highlight intent.
                   goToTab(item.id, { clearScheduleFocus: true });
                 }}
-                className={`board-tab display-font relative flex-1 rounded-xl px-2 font-extrabold sm:px-3 ${
+                className={`board-tab display-font flex-1 rounded-xl px-2 font-extrabold sm:px-3 ${
                   presenting
                     ? "py-2 text-sm sm:text-base md:py-1.5 md:text-sm"
                     : "py-3 text-sm sm:py-2.5 sm:text-base"
                 }`}
                 aria-current={active ? "page" : undefined}
+                aria-label={item.label}
               >
-                {/* Both states are always in the DOM and swapped by CSS off
-                    data-active, so the highlight can move without React. */}
-                <span className="board-tab-pill absolute inset-0 rounded-xl bg-star shadow-sm" />
-                <span className="board-tab-label relative z-10">
-                  {item.label}
+                {/* Every visual state is pre-painted and swapped by opacity off
+                    data-active, so pill and label change in the same compositor
+                    frame however busy the main thread is. Colour cannot do that
+                    — it needs a main-thread repaint, which is what made the
+                    words trail the pill. Both label copies are aria-hidden; the
+                    button carries the accessible name. */}
+                <span className="board-tab-pill absolute bg-star shadow-sm" />
+                <span className="board-tab-label" aria-hidden>
+                  <span className="board-tab-label-on">{item.label}</span>
+                  <span className="board-tab-label-off">{item.label}</span>
                 </span>
               </button>
             );
           })}
         </nav>
 
-        <AnimatePresence mode="wait" custom={tabDirection} initial={false}>
-          <motion.div
-            key={panelTab}
-            custom={tabDirection}
-            variants={panelVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.2, ease: easeSoft }}
-            className={`flex flex-col ${
+        <div ref={panelsRef} className="contents">
+          <div
+            data-panel="standings"
+            data-active={panelTab === "standings" ? "true" : "false"}
+            data-dir={tabDirection >= 0 ? "forward" : "back"}
+            className={`board-panel ${
               presenting
                 ? "min-h-0 flex-1 gap-3 overflow-y-auto md:overflow-hidden"
                 : "gap-5 md:gap-7"
             }`}
           >
-        {panelTab === "standings" ? (
+        {/* standings panel */}
+        {true ? (
           <AnimatePresence mode="wait" custom={presentAnimDir} initial={false}>
             {presenting ? (
               <motion.div
@@ -764,8 +852,17 @@ export function Scoreboard() {
           </AnimatePresence>
         ) : null}
 
-        {panelTab === "map" ? (
+          </div>
+
+          <div
+            data-panel="map"
+            data-active={panelTab === "map" ? "true" : "false"}
+            data-dir={tabDirection >= 0 ? "forward" : "back"}
+            className="board-panel gap-5 md:gap-7"
+          >
+        {mountedTabs.includes("map") ? (
           <BuildingMap
+            active={panelTab === "map"}
             focusFloorId={mapFocus?.floorId}
             focusRoomId={mapFocus?.roomId}
             focusArrivalNonce={mapFocus?.arrivalNonce}
@@ -785,8 +882,17 @@ export function Scoreboard() {
           />
         ) : null}
 
-        {panelTab === "schedule" ? (
+          </div>
+
+          <div
+            data-panel="schedule"
+            data-active={panelTab === "schedule" ? "true" : "false"}
+            data-dir={tabDirection >= 0 ? "forward" : "back"}
+            className="board-panel gap-5 md:gap-7"
+          >
+        {mountedTabs.includes("schedule") ? (
           <CampSchedule
+            active={panelTab === "schedule"}
             teams={data?.standings ?? []}
             rosterAuthoritative={!staleCache && data != null}
             remindersOn={remindersOn}
@@ -817,19 +923,23 @@ export function Scoreboard() {
             }}
           />
         ) : null}
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        </div>
 
+        {/* Mount/unmount is tied to Present mode only. Tying it to the tab as
+            well meant every trip to Map or Schedule tore the orbit down and
+            rebuilt it — a height change that fed the layout animation above,
+            plus a full D3 re-setup on the way back. Hiding it keeps the arena
+            alive; its IntersectionObserver parks the frame loop while hidden. */}
         <AnimatePresence initial={false}>
-          {!presenting && panelTab === "standings" ? (
+          {!presenting ? (
             <motion.div
               key="orbit-footer"
-              layout
               variants={presentChromeVariants}
               initial={reduceMotion ? false : "hidden"}
               animate="show"
               exit="exit"
-              className="mt-5 md:mt-7"
+              className={panelTab === "standings" ? "mt-5 md:mt-7" : "hidden"}
               aria-hidden={panelTab !== "standings"}
             >
               <OrbitArena standings={data?.standings ?? []} />
@@ -841,7 +951,6 @@ export function Scoreboard() {
           {!presenting ? (
             <motion.p
               key="qr-footer"
-              layout
               variants={presentChromeVariants}
               initial={reduceMotion ? false : "hidden"}
               animate="show"
@@ -868,5 +977,6 @@ export function Scoreboard() {
         }
       />
     </motion.main>
+    </MotionConfig>
   );
 }

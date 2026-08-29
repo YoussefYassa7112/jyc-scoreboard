@@ -27,6 +27,12 @@ import { getScheduleDays } from "@/lib/schedule-demo";
 import { blocksAtRoom } from "@/lib/schedule-time";
 
 type BuildingMapProps = {
+  /**
+   * False while the camper is on another tab. The panel stays mounted so the
+   * chosen floor and zoom survive, but the arrival spotlight must not fire at
+   * something nobody is looking at.
+   */
+  active?: boolean;
   focusFloorId?: string | null;
   focusRoomId?: string | null;
   /** Bumped on every schedule→map jump so the room re-pulses on arrival */
@@ -414,6 +420,8 @@ function Decorations({
 }
 
 export function BuildingMap({
+  // Aliased: the room loop below has its own `active` for the selected room.
+  active: panelActive = true,
   focusFloorId,
   focusRoomId,
   focusArrivalNonce,
@@ -467,13 +475,13 @@ export function BuildingMap({
   // Arriving from a schedule card: bring the map into view, then flash the room
   // so it is obvious which building the event points at.
   useEffect(() => {
-    if (!focusArrivalNonce || !focusRoomId) return;
+    if (!panelActive || !focusArrivalNonce || !focusRoomId) return;
     setSpotlightKey(focusArrivalNonce);
     const timer = window.setTimeout(() => {
       wrapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 320);
     return () => window.clearTimeout(timer);
-  }, [focusArrivalNonce, focusRoomId]);
+  }, [panelActive, focusArrivalNonce, focusRoomId]);
 
   useEffect(() => {
     if (!highlightBlockId || !selectedId) return;
@@ -534,12 +542,6 @@ export function BuildingMap({
   const floorBg = dark ? "#0b1224" : "#faf6ee";
   const ink = dark ? "#e2e8f0" : "#2a1f14";
   const laser = dark ? "#38bdf8" : "#e11d48";
-  const laserGlow = dark
-    ? "drop-shadow(0 0 16px rgba(56,189,248,0.95))"
-    : "drop-shadow(0 0 14px rgba(225,29,72,0.7))";
-  const idleGlow = dark
-    ? "drop-shadow(0 0 8px rgba(184,224,98,0.4))"
-    : "drop-shadow(0 0 8px rgba(107,66,38,0.38))";
 
   function notifyFocusCleared() {
     if (!mountedRef.current) return;
@@ -598,9 +600,14 @@ export function BuildingMap({
           <p className="mt-1 text-sm font-extrabold text-star">
             {overview
               ? "Tap an area pin to open its detailed map"
-              : floor.parentFloorId
-                ? "Detailed area map — tap a room or go back to overview"
-                : "This map is tappable — tap any room"}
+              : floor.parentFloorId && floor.parentFloorId !== defaultFloorId
+                ? // A floor nested inside another area — the indoor plans. Name
+                  // that area, since "go back to overview" sent people looking
+                  // in the wrong place for the building they were standing in.
+                  `Inside ${getFloor(floor.parentFloorId).label} — tap a room to see what happens there`
+                : floor.parentFloorId
+                  ? "Detailed area map — tap a room, or go back to the overview"
+                  : "This map is tappable — tap any room"}
           </p>
         </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
@@ -610,7 +617,9 @@ export function BuildingMap({
               onClick={() => goToFloor(floor.parentFloorId!)}
               className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-extrabold"
             >
-              ← Overview
+              {/* Was hard-coded "← Overview", which became wrong the moment the
+                  indoor plans were parented to Camp site 1 instead. */}
+              ← {getFloor(floor.parentFloorId).label}
             </button>
           ) : null}
           <button
@@ -652,6 +661,13 @@ export function BuildingMap({
         <div className="mt-3 flex flex-wrap gap-2">
           {tabFloors.map((f) => {
             const active = f.id === floorId;
+            // Floors nested inside another area — the indoor plans — say which
+            // area that is. Areas parented to the overview say nothing, since
+            // "Overview" under every tab would be noise.
+            const parent =
+              f.parentFloorId && f.parentFloorId !== defaultFloorId
+                ? getFloor(f.parentFloorId).label
+                : null;
             return (
               <button
                 key={f.id}
@@ -664,6 +680,11 @@ export function BuildingMap({
                 }`}
               >
                 {f.label}
+                {parent ? (
+                  <span className="block text-[10px] font-bold leading-tight opacity-75">
+                    in {parent}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -720,16 +741,20 @@ export function BuildingMap({
             </p>
           </div>
         ) : null}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={floor.id}
-            initial={{ opacity: 0, x: 36 * floorDir }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -36 * floorDir }}
-            transition={{ duration: 0.34, ease: easeSoft }}
-            className="max-h-[min(70dvh,36rem)] overflow-auto overscroll-contain p-1.5 sm:p-3 [touch-action:pan-x_pan-y]"
-            ref={mapScrollRef}
-          >
+        {/* Was an AnimatePresence `mode="wait"` swap. That made every floor
+            change wait 340ms for the outgoing floor's exit before the new one
+            could mount — and worse, framer drives those animations with
+            requestAnimationFrame, so wherever rAF is throttled (a backgrounded
+            tab, iOS low-power mode) the exit never finished and the floor
+            simply never changed. The slide is a CSS keyframe now, keyed off the
+            floor id so it replays on each switch, and the new floor mounts
+            immediately. */}
+        <div
+          key={floor.id}
+          data-dir={floorDir >= 0 ? "forward" : "back"}
+          className="map-floor max-h-[min(70dvh,36rem)] overflow-auto overscroll-contain p-1.5 sm:p-3 [touch-action:pan-x_pan-y]"
+          ref={mapScrollRef}
+        >
         {/* Width, not transform: the parent pans by scrolling, so the zoomed map
             has to actually occupy the wider box. Kept short since every frame of
             a width animation relayouts the SVG. */}
@@ -750,21 +775,6 @@ export function BuildingMap({
             if (e.target === e.currentTarget) clearSelection();
           }}
         >
-          <defs>
-            <filter
-              id="map-inner-halo"
-              x="-50%"
-              y="-50%"
-              width="200%"
-              height="200%"
-            >
-              <feGaussianBlur stdDeviation="5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
           <rect
             width={floor.viewBox.w}
             height={floor.viewBox.h}
@@ -854,20 +864,22 @@ export function BuildingMap({
               fill,
               stroke,
               strokeWidth: active ? 3.2 : 1.6,
-              className: "cursor-pointer",
-              style: { outline: "none" as const, cursor: "pointer" },
+              className: "map-room cursor-pointer",
+              style: { cursor: "pointer" },
               initial: false as const,
               whileHover: {
                 strokeWidth: active ? 3.6 : 2.8,
               },
               whileTap: { scale: 0.97 },
+              // No `filter` here any more. A filtered SVG element is promoted
+              // to its own composited layer, and that layer was still being
+              // composited while the tab panel it lives in animated away —
+              // which is how a stray glow could survive onto another tab and
+              // stay there until something forced a full repaint. That is why
+              // only a theme toggle or a reload cleared it. Emphasis is stroke
+              // width plus the halo strokes below, neither of which needs one.
               animate: {
                 strokeWidth: active ? 3.2 : selectedId ? 1.4 : 2.2,
-                filter: active
-                  ? laserGlow
-                  : selectedId
-                    ? "drop-shadow(0 0 0 rgba(0,0,0,0))"
-                    : idleGlow,
               },
               transition: { duration: 0.2 },
               onClick: (e: MouseEvent) => {
@@ -883,7 +895,12 @@ export function BuildingMap({
               },
               tabIndex: 0,
               role: "button" as const,
-              "aria-label": `${room.name} — explore this area`,
+              // Only pins actually open another map. Saying "explore this area"
+              // on every room told a screen-reader user that CENTRAL, the dock
+              // and the lake each lead somewhere they do not.
+              "aria-label": room.detailFloorId
+                ? `${room.name} — explore this area`
+                : room.name,
               "aria-pressed": active,
             };
 
@@ -1077,33 +1094,60 @@ export function BuildingMap({
                       clipPath={`url(#map-halo-clip-${room.id})`}
                       className="pointer-events-none"
                     >
-                      {/* Static opacity: this stroke is behind a Gaussian blur,
-                          and pulsing it re-rasterised the filter every frame. */}
+                      {/* Was one stroke behind an feGaussianBlur. The blur put
+                          this room on its own composited layer, which is the
+                          layer that could outlive the panel and strand a glow
+                          on another tab. Two plain strokes — a wide faint one
+                          under a narrower brighter one — read as the same
+                          inner glow with no filter and no extra layer. */}
                       {ellipse ? (
-                        <ellipse
-                          cx={cx}
-                          cy={cy}
-                          rx={room.w / 2}
-                          ry={room.h / 2}
-                          fill="none"
-                          stroke={laser}
-                          strokeWidth={haloW}
-                          filter="url(#map-inner-halo)"
-                          opacity={dark ? 0.72 : 0.54}
-                        />
+                        <>
+                          <ellipse
+                            cx={cx}
+                            cy={cy}
+                            rx={room.w / 2}
+                            ry={room.h / 2}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW}
+                            opacity={dark ? 0.28 : 0.2}
+                          />
+                          <ellipse
+                            cx={cx}
+                            cy={cy}
+                            rx={room.w / 2}
+                            ry={room.h / 2}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW * 0.45}
+                            opacity={dark ? 0.5 : 0.36}
+                          />
+                        </>
                       ) : (
-                        <rect
-                          x={room.x}
-                          y={room.y}
-                          width={room.w}
-                          height={room.h}
-                          rx={6}
-                          fill="none"
-                          stroke={laser}
-                          strokeWidth={haloW}
-                          filter="url(#map-inner-halo)"
-                          opacity={dark ? 0.72 : 0.54}
-                        />
+                        <>
+                          <rect
+                            x={room.x}
+                            y={room.y}
+                            width={room.w}
+                            height={room.h}
+                            rx={6}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW}
+                            opacity={dark ? 0.28 : 0.2}
+                          />
+                          <rect
+                            x={room.x}
+                            y={room.y}
+                            width={room.w}
+                            height={room.h}
+                            rx={6}
+                            fill="none"
+                            stroke={laser}
+                            strokeWidth={haloW * 0.45}
+                            opacity={dark ? 0.5 : 0.36}
+                          />
+                        </>
                       )}
                     </g>
                   </>
@@ -1205,8 +1249,7 @@ export function BuildingMap({
           ) : null}
         </svg>
         </motion.div>
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </motion.div>
       </div>
 

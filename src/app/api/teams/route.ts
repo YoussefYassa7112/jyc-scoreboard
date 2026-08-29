@@ -14,6 +14,12 @@ function parseCampGroup(value: unknown): CampGroup | null {
 }
 
 export async function GET() {
+  // Staff-only: exposes cabin assignments and the staff names attached to them.
+  // Campers read the roster through /api/standings, which carries no such
+  // detail. Only the admin dashboard calls this.
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     await ensureCabinColumn();
     const db = getDb();

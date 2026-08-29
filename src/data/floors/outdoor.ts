@@ -20,9 +20,9 @@ const PIN = 96;
  * the spots they cover:
  *
  *   Arbre en Arbre (219,116)
- *   North shore    dorm 1 (478,105) · cafeteria (508,149) · dorm 2 (485,193)
+ *   Camp site 1    dorm 1 (478,105) · cafeteria (508,149) · dorm 2 (485,193)
  *   Camp fire      (220,301)
- *   Peninsula      baignade (645,449) · dorm 3 (716,509)
+ *   Camp site 2    baignade (645,449) · dorm 3 (716,509)
  */
 export const outdoorFloor: FloorPlan = {
   id: "outdoor",
@@ -48,8 +48,8 @@ export const outdoorFloor: FloorPlan = {
     },
     {
       id: "north-shore-area",
-      name: "North shore",
-      labelLines: ["North shore"],
+      name: "Camp site 1",
+      labelLines: ["Camp site 1"],
       blurb:
         "Dorm 1, Dorm 2, and the cafeteria — topics, baby foot, vespers & liturgy.",
       kind: "building",
@@ -75,8 +75,8 @@ export const outdoorFloor: FloorPlan = {
     },
     {
       id: "peninsula-area",
-      name: "Peninsula",
-      labelLines: ["Peninsula"],
+      name: "Camp site 2",
+      labelLines: ["Camp site 2"],
       blurb: "Baignade (swimming) and Dorm 3 · Le P'tit Bonheur.",
       kind: "building",
       marker: "pin",

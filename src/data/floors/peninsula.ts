@@ -1,8 +1,11 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — the peninsula, reached from the "Peninsula" pin on the camp
+ * Detail map — Camp site 2, reached from the "Camp site 2" pin on the camp
  * overview and from its own tab.
+ *
+ * The id stays `peninsula`: it is what locations.ts and the overview pin key
+ * off, and the point is still where this is.
  *
  * Water sits west, the point runs east. Only the two annotated spots are
  * named buildings: the baignade — the swimming water, labelled Lake here —
@@ -12,9 +15,9 @@ import type { FloorPlan } from "./types";
  */
 export const peninsulaFloor: FloorPlan = {
   id: "peninsula",
-  label: "Peninsula",
+  label: "Camp site 2",
   siteTitle: "Le P'tit Bonheur",
-  banner: "PENINSULA",
+  banner: "CAMP SITE 2",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 700 },
   outline: "M30,30 H1030 V670 H30 Z",
@@ -24,7 +27,7 @@ export const peninsulaFloor: FloorPlan = {
       name: "Lake — Baignade",
       labelLines: ["Lake"],
       blurb:
-        "The baignade — swimming water off the west shore of the peninsula.",
+        "The baignade — swimming water off the west shore of camp site 2.",
       kind: "water",
       x: 50,
       y: 50,
@@ -68,7 +71,7 @@ export const peninsulaFloor: FloorPlan = {
       id: "dorm-3",
       name: "Dorm 3 · Le P'tit Bonheur",
       labelLines: ["Dorm 3", "Le P'tit Bonheur"],
-      blurb: "Peninsula cabin — Le P'tit Bonheur, out toward the east end.",
+      blurb: "Camp site 2 cabin — Le P'tit Bonheur, out toward the east end.",
       kind: "building",
       x: 620,
       y: 260,

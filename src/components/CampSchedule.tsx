@@ -52,6 +52,12 @@ type TrackFilter = "overview" | "red" | "green";
 
 type Props = {
   teams: StandingRow[];
+  /**
+   * False while the camper is on another tab. The panel stays mounted so the
+   * chosen day and track survive a trip to the map, but a hidden schedule must
+   * not keep a 1s clock re-rendering ~60 cards behind display:none.
+   */
+  active?: boolean;
   /** True after a live standings fetch — missing teams were deleted, not offline. */
   rosterAuthoritative?: boolean;
   /** 15-minutes-before reminder opt-in, owned by the board */
@@ -319,6 +325,7 @@ function Section({
 
 export function CampSchedule({
   teams,
+  active = true,
   rosterAuthoritative = false,
   remindersOn,
   onRemindersChange,
@@ -493,7 +500,13 @@ export function CampSchedule({
     return () => window.clearTimeout(timer);
   }, [localScrollNonce]);
 
+  // Gated on `active` as well as document visibility: the schedule stays
+  // mounted behind display:none so the camper's day and track survive a trip
+  // to the map, and a ticking clock there would re-render every card for
+  // nothing. Re-entering restarts the clock and resyncs immediately, so no
+  // countdown is ever stale on arrival.
   useEffect(() => {
+    if (!active) return;
     let id = 0;
     const start = () => {
       setNowTick(Date.now());
@@ -511,7 +524,7 @@ export function CampSchedule({
       stop();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [active]);
 
   function selectTeam(id: number | "") {
     cancelPendingScroll();
@@ -972,15 +985,13 @@ export function CampSchedule({
         </div>
       ) : null}
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`${day.id}-${track}`}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.2 }}
-          className="mt-5 space-y-6"
-        >
+      {/* Was AnimatePresence `mode="wait"`. Changing day or track had to wait
+          for the outgoing list's exit before the new one could mount, and
+          framer drives that with requestAnimationFrame — so wherever rAF is
+          throttled the exit never finished and tapping a day did nothing at
+          all. A keyed CSS keyframe replays on each change and mounts
+          immediately. */}
+      <div key={`${day.id}-${track}`} className="schedule-day mt-5 space-y-6">
           {!isSplit ? (
             <Section
               title="Full day — Everyone together"
@@ -1097,8 +1108,7 @@ export function CampSchedule({
               />
             </>
           )}
-        </motion.div>
-      </AnimatePresence>
+      </div>
     </section>
   );
 }

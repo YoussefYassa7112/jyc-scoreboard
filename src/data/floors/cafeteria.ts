@@ -3,12 +3,16 @@ import type { FloorPlan } from "./types";
 /**
  * CENTRAL cafeteria — same building as the basement, one floor up.
  * Stairs sit in the same east-wing spot so the two plans line up.
+ *
+ * Parented to Camp site 1 for the same reason as the basement: CENTRAL stands
+ * there, and the heading, tab hint and back button all read from that.
  */
 export const cafeteriaFloor: FloorPlan = {
   id: "cafeteria",
   label: "Cafeteria",
-  siteTitle: "Main lodge",
-  banner: "MAIN LODGE — CAFETERIA",
+  siteTitle: "Camp site 1 · CENTRAL",
+  banner: "CAMP SITE 1 · CENTRAL — CAFETERIA",
+  parentFloorId: "north-shore",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",
   rooms: [
@@ -71,7 +75,10 @@ export const cafeteriaFloor: FloorPlan = {
       w: 80,
       h: 140,
       linksTo: [
-        { floorId: "outdoor", roomId: "central", label: "Go outside" },
+        // Was outdoor/central, from when the overview WAS the grounds map. The
+        // overview is pins only now and has no `central`, so this link went
+        // nowhere. Outside CENTRAL's entrance is Camp site 1.
+        { floorId: "north-shore", roomId: "central", label: "Go outside" },
       ],
     },
   ],

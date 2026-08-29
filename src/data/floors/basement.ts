@@ -2,13 +2,19 @@ import type { FloorPlan } from "./types";
 
 /**
  * CENTRAL basement (sous-sol) floor plan.
+ *
+ * CENTRAL stands on Camp site 1, so this is parented there rather than to the
+ * overview — that is what puts "Camp site 1" in the heading, under the tab, and
+ * on the back button, so nobody has to guess which site to walk to.
+ *
  * ViewBox 0 0 1060 560 — add other floors beside this file.
  */
 export const basementFloor: FloorPlan = {
   id: "basement",
   label: "Basement",
-  siteTitle: "Main lodge",
-  banner: "MAIN LODGE — BASEMENT",
+  siteTitle: "Camp site 1 · CENTRAL",
+  banner: "CAMP SITE 1 · CENTRAL — BASEMENT",
+  parentFloorId: "north-shore",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",
   rooms: [

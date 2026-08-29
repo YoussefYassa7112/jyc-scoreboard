@@ -8,6 +8,12 @@ import { getPointHistory, invalidateStandingsCache } from "@/lib/standings";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Staff-only: point notes are free text written by counselors about campers,
+  // and this route was readable by anyone who guessed the URL. Only the admin
+  // dashboard ever calls it.
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const history = await getPointHistory(250);
     return NextResponse.json({

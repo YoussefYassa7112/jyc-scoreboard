@@ -23,34 +23,37 @@ type StandingsPayload = {
  */
 const STANDINGS_TTL_MS = 800;
 let standingsCache: { at: number; data: StandingsPayload } | null = null;
-let revisionCache: { at: number; rev: string } | null = null;
 
 export function invalidateStandingsCache() {
   standingsCache = null;
-  revisionCache = null;
+}
+
+/**
+ * Fingerprint of exactly what the client would receive.
+ *
+ * This used to be `maxEventId:teamCount:maxTeamId:cabinSum` from its own query,
+ * which was both an extra round trip and wrong: renaming a team or changing its
+ * colour moves none of those numbers, so the ETag never changed and campers
+ * kept a 304 forever. Two teams swapping cabins also kept the same cabinSum.
+ * Hashing the payload instead is correct by construction, and it is cheaper —
+ * it reuses the 800ms standings cache rather than issuing a second query.
+ */
+function revisionOf(data: StandingsPayload): string {
+  let hash = 5381;
+  const canonical = data.standings
+    .map(
+      (r) =>
+        `${r.id}:${r.name}:${r.color}:${r.score}:${r.campGroup ?? ""}:${r.cabinId ?? ""}`,
+    )
+    .join("|");
+  for (let i = 0; i < canonical.length; i++) {
+    hash = ((hash << 5) + hash + canonical.charCodeAt(i)) | 0;
+  }
+  return `${data.standings.length}-${(hash >>> 0).toString(36)}`;
 }
 
 export async function getStandingsRevision(): Promise<string> {
-  if (revisionCache && Date.now() - revisionCache.at < STANDINGS_TTL_MS) {
-    return revisionCache.rev;
-  }
-  await ensureCabinColumn();
-  const db = getDb();
-  const [row] = await db
-    .select({
-      maxEventId: sql<number>`coalesce(max(${pointEvents.id}), 0)`.mapWith(
-        Number,
-      ),
-      teamCount: sql<number>`count(distinct ${teams.id})`.mapWith(Number),
-      maxTeamId: sql<number>`coalesce(max(${teams.id}), 0)`.mapWith(Number),
-      cabinSum: sql<number>`coalesce(sum(${teams.cabinId}), 0)`.mapWith(Number),
-    })
-    .from(teams)
-    .leftJoin(pointEvents, eq(pointEvents.teamId, teams.id));
-
-  const rev = `${row?.maxEventId ?? 0}:${row?.teamCount ?? 0}:${row?.maxTeamId ?? 0}:${row?.cabinSum ?? 0}`;
-  revisionCache = { at: Date.now(), rev };
-  return rev;
+  return revisionOf(await getStandingsCached());
 }
 
 export async function getStandingsCached(): Promise<StandingsPayload> {

@@ -1,8 +1,11 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — north shore, reached from the "North shore" pin on the camp
+ * Detail map — Camp site 1, reached from the "Camp site 1" pin on the camp
  * overview and from its own tab.
+ *
+ * The id stays `north-shore`: it is what locations.ts and the overview pin key
+ * off, and the shore is still where this is.
  *
  * This is the original camp-grounds plan. Arbre en Arbre and the camp fire are
  * gone because they are their own areas now, reached from their own pins, and
@@ -14,9 +17,9 @@ import type { FloorPlan } from "./types";
  */
 export const northShoreFloor: FloorPlan = {
   id: "north-shore",
-  label: "North shore",
-  siteTitle: "P'tit Bonheur",
-  banner: "NORTH SHORE",
+  label: "Camp site 1",
+  siteTitle: "Le P'tit Bonheur",
+  banner: "CAMP SITE 1",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 720 },
   outline: "M30,30 H1030 V690 H30 Z",
