@@ -50,3 +50,41 @@ export const listItemIn: Variants = {
   show: { opacity: 1, y: 0, transition: springSoft },
   exit: { opacity: 0, y: -8, transition: fadeSoft },
 };
+
+/** Shell resize when Present toggles — layout only, no scale blur. */
+export const presentLayoutTransition: Transition = {
+  layout: { duration: 0.42, ease: easeSoft },
+};
+
+/** Standings swap between toy-box list and projector grid. */
+export const presentStandingsVariants: Variants = {
+  hidden: (dir: number) => ({
+    opacity: 0,
+    y: dir > 0 ? 16 : -12,
+    scale: dir > 0 ? 0.968 : 0.976,
+  }),
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.36, ease: easeSoft },
+  },
+  exit: (dir: number) => ({
+    opacity: 0,
+    y: dir > 0 ? -8 : 10,
+    scale: dir > 0 ? 0.982 : 0.972,
+    transition: { duration: 0.26, ease: easeSoft },
+  }),
+};
+
+export const presentHeaderVariants: Variants = {
+  hidden: { opacity: 0, y: -10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: easeSoft } },
+  exit: { opacity: 0, y: 6, transition: { duration: 0.22, ease: easeSoft } },
+};
+
+export const presentChromeVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: easeSoft } },
+  exit: { opacity: 0, y: -6, transition: { duration: 0.22, ease: easeSoft } },
+};

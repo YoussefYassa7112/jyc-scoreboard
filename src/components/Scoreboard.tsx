@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import {
   announceDueReminders,
   useEventReminders,
@@ -9,7 +14,13 @@ import {
   type DueReminder,
 } from "@/lib/event-reminders";
 import { showLocalNotification } from "@/lib/notify";
-import { easeSoft } from "@/lib/motion";
+import {
+  easeSoft,
+  presentChromeVariants,
+  presentHeaderVariants,
+  presentLayoutTransition,
+  presentStandingsVariants,
+} from "@/lib/motion";
 import {
   readMyTeamSnapshot,
   readStandingsCache,
@@ -86,6 +97,7 @@ function formatAsOf(iso: string) {
 export function Scoreboard() {
   const { theme } = useTheme();
   const { on: presentationOn } = usePresentationMode();
+  const reduceMotion = useReducedMotion();
   const online = useOnline();
   const [data, setData] = useState<StandingsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +116,17 @@ export function Scoreboard() {
   // caught up to yet, so a fast second tap still gets its slide direction right.
   const pendingTab = useRef<BoardTab>("standings");
   const presenting = presentationOn && panelTab === "standings";
+  const prevPresentingRef = useRef(presenting);
+  const [presentAnimDir, setPresentAnimDir] = useState(1);
+  useEffect(() => {
+    if (prevPresentingRef.current !== presenting) {
+      setPresentAnimDir(presenting ? 1 : -1);
+      prevPresentingRef.current = presenting;
+    }
+  }, [presenting]);
+  const presentMotion = reduceMotion
+    ? { duration: 0 }
+    : presentLayoutTransition;
   const [tabDirection, setTabDirection] = useState(1);
   const [mapFocus, setMapFocus] = useState<{
     floorId: string;
@@ -431,8 +454,10 @@ export function Scoreboard() {
         : "Cached standings";
 
   return (
-    <main
-      className={`relative overflow-x-hidden ${
+    <motion.main
+      layout
+      transition={presentMotion}
+      className={`present-shell relative overflow-x-hidden ${
         presenting
           ? "flex min-h-dvh flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.65rem,env(safe-area-inset-top))] sm:px-5 md:h-dvh md:overflow-hidden md:px-6 md:py-3"
           : "min-h-dvh px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 md:px-10 md:py-10"
@@ -440,7 +465,10 @@ export function Scoreboard() {
     >
       <SkyDecor />
 
-      <div
+      <LayoutGroup id="scoreboard-present">
+      <motion.div
+        layout
+        transition={presentMotion}
         className={`relative z-10 mx-auto flex w-full flex-col ${
           presenting
             ? "min-h-0 max-w-7xl flex-1 gap-3 md:gap-2"
@@ -449,113 +477,143 @@ export function Scoreboard() {
       >
         {/* Presenting has to fit one screen, so the dock rides in the header
             row instead of costing its own band above it. */}
-        {presenting ? null : <ControlDock />}
+        <AnimatePresence mode="wait" initial={false}>
+          {presenting ? (
+            <motion.div
+              key="present-chrome"
+              layout
+              transition={presentMotion}
+              variants={presentHeaderVariants}
+              initial={reduceMotion ? false : "hidden"}
+              animate="show"
+              exit="exit"
+              className="flex shrink-0 flex-col gap-2 md:flex-row md:items-start md:gap-3"
+            >
+              <div className="flex min-w-0 flex-1 flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
+                <div className="min-w-0 shrink-0">
+                  <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs md:hidden">
+                    Welcome to the JYC
+                  </p>
+                  <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
+                    Camp Scoreboard
+                  </h1>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
+                    <span
+                      className={`live-dot inline-block h-2 w-2 rounded-full ${
+                        online && !staleCache ? "bg-red-500" : "bg-muted-soft"
+                      }`}
+                    />
+                    <span>{liveLabel}</span>
+                    {data?.asOf ? (
+                      <span className="font-semibold text-muted-soft">
+                        · {formatAsOf(data.asOf)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {LIVE_CAMP_SIM ? (
+                    <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-star">
+                      Simulation preview
+                    </p>
+                  ) : null}
+                </div>
+                <ReachForTheSkyMarquee
+                  compact
+                  className="mt-0 min-w-0 w-full max-w-none min-[880px]:flex-1"
+                />
+              </div>
+              <motion.div
+                layoutId="scoreboard-dock"
+                transition={presentMotion}
+                className="order-first flex shrink-0 justify-end md:order-none"
+              >
+                <ControlDock />
+              </motion.div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="normal-chrome"
+              layout
+              transition={presentMotion}
+              variants={presentHeaderVariants}
+              initial={reduceMotion ? false : "hidden"}
+              animate="show"
+              exit="exit"
+              className="flex flex-col gap-5 md:gap-7"
+            >
+              <motion.div
+                layoutId="scoreboard-dock"
+                transition={presentMotion}
+                className="shrink-0 self-end"
+              >
+                <ControlDock />
+              </motion.div>
 
-        {presenting ? (
-          <header className="flex shrink-0 flex-col gap-2 md:flex-row md:items-start md:gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[880px]:flex-row min-[880px]:items-end min-[880px]:gap-5">
-              <div className="min-w-0 shrink-0">
-                <p className="display-font text-[10px] font-semibold uppercase tracking-[0.2em] text-muted sm:text-xs md:hidden">
+              <header className="text-center">
+                <motion.div
+                  className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <motion.span
+                    animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
+                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    {isDark ? "🪐" : "🤠"}
+                  </motion.span>
+                  <motion.span
+                    animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    ⭐
+                  </motion.span>
+                  <motion.span
+                    animate={{ rotate: [8, -8, 8], y: [0, -6, 0] }}
+                    transition={{
+                      duration: 2.8,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay: 0.3,
+                    }}
+                  >
+                    🚀
+                  </motion.span>
+                </motion.div>
+
+                <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
                   Welcome to the JYC
                 </p>
-                <h1 className="display-font text-2xl font-bold leading-tight text-ink sm:text-3xl">
+                <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
                   Camp Scoreboard
                 </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-muted sm:text-sm">
+                {LIVE_CAMP_SIM ? (
+                  <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
+                    Simulation preview — not the public camp site
+                  </p>
+                ) : null}
+
+                <ReachForTheSkyMarquee />
+
+                <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
                   <span
-                    className={`live-dot inline-block h-2 w-2 rounded-full ${
+                    className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
                       online && !staleCache ? "bg-red-500" : "bg-muted-soft"
                     }`}
                   />
                   <span>{liveLabel}</span>
                   {data?.asOf ? (
                     <span className="font-semibold text-muted-soft">
-                      · {formatAsOf(data.asOf)}
+                      · as of {formatAsOf(data.asOf)}
                     </span>
                   ) : null}
                 </div>
-                {LIVE_CAMP_SIM ? (
-                  <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-star">
-                    Simulation preview
-                  </p>
-                ) : null}
-              </div>
-              <ReachForTheSkyMarquee
-                compact
-                className="mt-0 min-w-0 w-full max-w-none min-[880px]:flex-1"
-              />
-            </div>
-            {/* Phone keeps the dock on its own row; from md up it tucks into the
-                header row so the whole board still fits one screen. */}
-            <div className="order-first flex shrink-0 justify-end md:order-none">
-              <ControlDock />
-            </div>
-          </header>
-        ) : (
-          <header className="text-center">
-            <motion.div
-              className="mx-auto mb-2 flex items-center justify-center gap-3 text-2xl sm:text-3xl"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <motion.span
-                animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
-                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              >
-                {isDark ? "🪐" : "🤠"}
-              </motion.span>
-              <motion.span
-                animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                ⭐
-              </motion.span>
-              <motion.span
-                animate={{ rotate: [8, -8, 8], y: [0, -6, 0] }}
-                transition={{
-                  duration: 2.8,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 0.3,
-                }}
-              >
-                🚀
-              </motion.span>
+
+                <div className="mt-4 flex justify-center">
+                  <CampPhotosButton online={online} />
+                </div>
+              </header>
             </motion.div>
-
-            <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
-              Welcome to the JYC
-            </p>
-            <h1 className="display-font mt-2 px-8 text-[2rem] font-bold leading-tight text-ink drop-shadow-sm sm:px-0 sm:text-5xl md:text-6xl">
-              Camp Scoreboard
-            </h1>
-            {LIVE_CAMP_SIM ? (
-              <p className="mt-2 text-xs font-extrabold uppercase tracking-[0.18em] text-star">
-                Simulation preview — not the public camp site
-              </p>
-            ) : null}
-
-            <ReachForTheSkyMarquee />
-
-            <div className="mt-3 flex items-center justify-center gap-2 text-sm font-bold text-muted sm:text-base">
-              <span
-                className={`live-dot inline-block h-2.5 w-2.5 rounded-full ${
-                  online && !staleCache ? "bg-red-500" : "bg-muted-soft"
-                }`}
-              />
-              <span>{liveLabel}</span>
-              {data?.asOf ? (
-                <span className="font-semibold text-muted-soft">
-                  · as of {formatAsOf(data.asOf)}
-                </span>
-              ) : null}
-            </div>
-
-            <div className="mt-4 flex justify-center">
-              <CampPhotosButton online={online} />
-            </div>
-          </header>
-        )}
+          )}
+        </AnimatePresence>
 
         <OfflineBanner
           online={online}
@@ -617,75 +675,93 @@ export function Scoreboard() {
                 : "gap-5 md:gap-7"
             }`}
           >
-        {panelTab === "standings" && presenting ? (
-          <>
-            {loading && !data ? (
-              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
-                Opening the toy box…
-              </p>
-            ) : null}
+        {panelTab === "standings" ? (
+          <AnimatePresence mode="wait" custom={presentAnimDir} initial={false}>
+            {presenting ? (
+              <motion.div
+                key="standings-present"
+                custom={presentAnimDir}
+                variants={presentStandingsVariants}
+                initial={reduceMotion ? false : "hidden"}
+                animate="show"
+                exit="exit"
+                className="min-h-0 flex-1"
+              >
+                {loading && !data ? (
+                  <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
+                    Opening the toy box…
+                  </p>
+                ) : null}
 
-            {error && !data ? (
-              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-star">
-                {error}
-              </p>
-            ) : null}
+                {error && !data ? (
+                  <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-star">
+                    {error}
+                  </p>
+                ) : null}
 
-            {data && data.standings.length === 0 ? (
-              <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
-                No teams yet — ask a counselor to set up the scoreboard!
-              </p>
-            ) : null}
+                {data && data.standings.length === 0 ? (
+                  <p className="panel rounded-3xl py-16 text-center text-lg font-bold text-muted">
+                    No teams yet — ask a counselor to set up the scoreboard!
+                  </p>
+                ) : null}
 
-            {data && data.standings.length > 0 ? (
-              <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
-                <section className="panel toy-box relative order-2 min-h-0 min-w-0 overflow-hidden rounded-3xl p-3 md:order-1 md:h-full md:overflow-y-auto">
-                  <StandingsList standings={data.standings} presentation />
-                </section>
-                <div className="order-1 min-h-0 min-w-0 md:order-2 md:h-full">
-                  <OrbitArena standings={data.standings} variant="stage">
-                    <CampStatStrip
-                      standings={data.standings}
-                      layout="inset"
-                    />
-                  </OrbitArena>
+                {data && data.standings.length > 0 ? (
+                  <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] items-stretch gap-3 md:h-full md:flex-1 md:grid-cols-[minmax(20rem,28rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-4">
+                    <section className="panel toy-box relative order-2 min-h-0 min-w-0 overflow-hidden rounded-3xl p-3 md:order-1 md:h-full md:overflow-y-auto">
+                      <StandingsList standings={data.standings} presentation />
+                    </section>
+                    <div className="order-1 min-h-0 min-w-0 md:order-2 md:h-full">
+                      <OrbitArena standings={data.standings} variant="stage">
+                        <CampStatStrip
+                          standings={data.standings}
+                          layout="inset"
+                        />
+                      </OrbitArena>
+                    </div>
+                  </div>
+                ) : null}
+              </motion.div>
+            ) : (
+              <motion.section
+                key="standings-normal"
+                custom={presentAnimDir}
+                variants={presentStandingsVariants}
+                initial={reduceMotion ? false : "hidden"}
+                animate="show"
+                exit="exit"
+                className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6"
+              >
+                <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
+                  ✨
                 </div>
-              </div>
-            ) : null}
-          </>
-        ) : null}
+                <div className="pointer-events-none absolute -left-1 bottom-2 text-2xl opacity-35 sm:text-3xl">
+                  🌟
+                </div>
 
-        {panelTab === "standings" && !presenting ? (
-        <section className="panel toy-box relative overflow-hidden rounded-3xl p-3 sm:p-5 md:p-6">
-          <div className="pointer-events-none absolute -right-2 top-4 text-2xl opacity-45 sm:text-3xl">
-            ✨
-          </div>
-          <div className="pointer-events-none absolute -left-1 bottom-2 text-2xl opacity-35 sm:text-3xl">
-            🌟
-          </div>
+                {loading && !data ? (
+                  <p className="py-16 text-center text-lg font-bold text-muted">
+                    Opening the toy box…
+                  </p>
+                ) : null}
 
-          {loading && !data ? (
-            <p className="py-16 text-center text-lg font-bold text-muted">
-              Opening the toy box…
-            </p>
-          ) : null}
+                {error && !data ? (
+                  <p className="py-16 text-center text-lg font-bold text-star">
+                    {error}
+                  </p>
+                ) : null}
 
-          {error && !data ? (
-            <p className="py-16 text-center text-lg font-bold text-star">
-              {error}
-            </p>
-          ) : null}
+                {data && data.standings.length === 0 ? (
+                  <p className="py-16 text-center text-lg font-bold text-muted">
+                    No teams yet — ask a counselor to set up the scoreboard!
+                  </p>
+                ) : null}
 
-          {data && data.standings.length === 0 ? (
-            <p className="py-16 text-center text-lg font-bold text-muted">
-              No teams yet — ask a counselor to set up the scoreboard!
-            </p>
-          ) : null}
-
-          {data && data.standings.length > 0 ? (
-            <StandingsList standings={data.standings} />
-          ) : null}
-        </section>
+                {data && data.standings.length > 0 ? (
+                  <StandingsList standings={data.standings} />
+                ) : null}
+              </motion.section>
+            )}
+          </AnimatePresence>
         ) : null}
 
         {panelTab === "map" ? (
@@ -744,21 +820,40 @@ export function Scoreboard() {
           </motion.div>
         </AnimatePresence>
 
-        {presenting ? null : (
-          <div
-            className={panelTab === "standings" ? "mt-5 md:mt-7" : "hidden"}
-            aria-hidden={panelTab !== "standings"}
-          >
-            <OrbitArena standings={data?.standings ?? []} />
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {!presenting && panelTab === "standings" ? (
+            <motion.div
+              key="orbit-footer"
+              layout
+              variants={presentChromeVariants}
+              initial={reduceMotion ? false : "hidden"}
+              animate="show"
+              exit="exit"
+              className="mt-5 md:mt-7"
+              aria-hidden={panelTab !== "standings"}
+            >
+              <OrbitArena standings={data?.standings ?? []} />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
-        {presenting ? null : (
-          <p className="qr-breathe mx-auto w-fit max-w-[min(100%,22rem)] rounded-full bg-cloud/90 px-3.5 py-1.5 text-center text-xs font-semibold text-muted shadow-sm sm:max-w-xl sm:text-sm dark:bg-[#152038]/90 dark:text-slate-300">
-            Scan the camp QR anytime to check who&apos;s leading the adventure
-          </p>
-        )}
-      </div>
+        <AnimatePresence initial={false}>
+          {!presenting ? (
+            <motion.p
+              key="qr-footer"
+              layout
+              variants={presentChromeVariants}
+              initial={reduceMotion ? false : "hidden"}
+              animate="show"
+              exit="exit"
+              className="qr-breathe mx-auto w-fit max-w-[min(100%,22rem)] rounded-full bg-cloud/90 px-3.5 py-1.5 text-center text-xs font-semibold text-muted shadow-sm sm:max-w-xl sm:text-sm dark:bg-[#152038]/90 dark:text-slate-300"
+            >
+              Scan the camp QR anytime to check who&apos;s leading the adventure
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+      </motion.div>
+      </LayoutGroup>
 
       <AdminToasts
         toasts={toasts}
@@ -772,6 +867,6 @@ export function Scoreboard() {
           setAlerts((current) => current.filter((a) => a.id !== id))
         }
       />
-    </main>
+    </motion.main>
   );
 }

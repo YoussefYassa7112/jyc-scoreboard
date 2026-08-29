@@ -611,6 +611,18 @@ html.presentation .sky-floaters {
   opacity: 0.42;
 }
 
+.present-shell {
+  transition:
+    padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .present-shell {
+    transition: none;
+  }
+}
+
 html.dark .sky-floaters {
   opacity: 0;
 }
