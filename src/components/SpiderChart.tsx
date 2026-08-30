@@ -84,7 +84,7 @@ function separatePoints(points: Pt[], minDist: number, angles: number[]) {
  * Low-score dots stay on their spokes (not stacked at center).
  */
 export function SpiderChart({ teams, replayKey }: Props) {
-  const { theme } = useTheme();
+  const { theme, ready: themeReady } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const prevPts = useRef<Map<number, Pt>>(new Map());
@@ -153,6 +153,13 @@ export function SpiderChart({ teams, replayKey }: Props) {
   }, []);
 
   useEffect(() => {
+    // Nothing is drawn until the real theme is known. The provider reports
+    // "light" on the first render and corrects itself an instant later, which
+    // used to draw the chart twice: the intro would start in light colours and
+    // then be cut off mid-flight by a redraw in dark ones. On a phone left on
+    // the History tab that is every single load.
+    if (!themeReady) return;
+
     const wrapEl = wrapRef.current;
     const svgEl = svgRef.current;
     if (!wrapEl || !svgEl) return;
@@ -546,7 +553,7 @@ export function SpiderChart({ teams, replayKey }: Props) {
         .attr("opacity", 1)
         .attr("transform", `translate(${cx},${cy}) scale(1)`);
     }
-  }, [dataKey, theme, sorted, wrapWidth, replayKey]);
+  }, [dataKey, theme, themeReady, sorted, wrapWidth, replayKey]);
 
   const focus =
     tip?.items.find((item) => item.team.id === tip.focusId) ?? tip?.items[0];

@@ -16,6 +16,13 @@ type ThemeContextValue = {
   setTheme: (mode: ThemeMode) => void;
   toggleTheme: () => void;
   isAutoNight: boolean;
+  /**
+   * False until the stored preference has been read. `theme` reports "light"
+   * during that first render whatever the device actually is, so anything that
+   * paints itself once per theme — rather than re-reading a CSS variable — has
+   * to wait for this instead of drawing twice.
+   */
+  ready: boolean;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -85,8 +92,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme, isAutoNight }),
-    [theme, setTheme, toggleTheme, isAutoNight],
+    () => ({ theme, setTheme, toggleTheme, isAutoNight, ready }),
+    [theme, setTheme, toggleTheme, isAutoNight, ready],
   );
 
   return (
