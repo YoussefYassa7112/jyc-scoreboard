@@ -117,6 +117,23 @@ export function SpiderChart({ teams }: Props) {
     };
   }, []);
 
+  // The chart sizes itself from its container, but only ever measured once, so
+  // a rotated phone or a resized window left it drawn at the old width. Zero
+  // widths are ignored so a hidden container keeps the last good size instead
+  // of collapsing, and the width is snapped to 8px steps so dragging a desktop
+  // window edge does not rebuild the whole chart on every frame.
+  const [wrapWidth, setWrapWidth] = useState(0);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const measured = entries[0]?.contentRect.width ?? 0;
+      if (measured > 0) setWrapWidth(Math.round(measured / 8) * 8);
+    });
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const wrapEl = wrapRef.current;
     const svgEl = svgRef.current;
@@ -124,7 +141,7 @@ export function SpiderChart({ teams }: Props) {
     // Capture after null-check so nested handlers keep a definite type
     const wrap: HTMLDivElement = wrapEl;
 
-    const width = Math.min(wrap.clientWidth || 480, 520);
+    const width = Math.min(wrapWidth || wrap.clientWidth || 480, 520);
     const height = Math.max(300, Math.min(380, width));
     const svg = d3.select(svgEl);
     svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
@@ -498,7 +515,7 @@ export function SpiderChart({ teams }: Props) {
         .attr("opacity", 1)
         .attr("transform", `translate(${cx},${cy}) scale(1)`);
     }
-  }, [dataKey, theme, sorted]);
+  }, [dataKey, theme, sorted, wrapWidth]);
 
   const focus =
     tip?.items.find((item) => item.team.id === tip.focusId) ?? tip?.items[0];

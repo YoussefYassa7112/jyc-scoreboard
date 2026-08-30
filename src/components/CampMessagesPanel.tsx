@@ -57,7 +57,6 @@ export function CampMessagesPanel({
 
   return (
     <motion.section
-      layout
       variants={panelIn}
       className="panel rounded-3xl p-4 sm:p-5"
     >
@@ -132,7 +131,6 @@ export function CampMessagesPanel({
               {messages.map((message) => (
                 <motion.li
                   key={message.id}
-                  layout
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: 12 }}

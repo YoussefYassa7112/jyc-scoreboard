@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   contentSwap,
   fadeSoft,
@@ -73,6 +73,23 @@ type HistoryRow = {
   createdAt: string;
 };
 
+type AdminTabId = "award" | "teams" | "notices" | "history" | "qr";
+
+/** Order matters: it decides which way a panel slides in. */
+const ADMIN_TABS: { id: AdminTabId; label: string }[] = [
+  { id: "award", label: "Award" },
+  { id: "teams", label: "Teams" },
+  { id: "notices", label: "Notices" },
+  { id: "history", label: "History" },
+  { id: "qr", label: "QR code" },
+];
+
+const ADMIN_TAB_KEY = "camp-admin-tab";
+
+function isAdminTabId(value: string | null): value is AdminTabId {
+  return ADMIN_TABS.some((tab) => tab.id === value);
+}
+
 export function AdminDashboard() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -105,6 +122,54 @@ export function AdminDashboard() {
   const [publicUrl, setPublicUrl] = useState("");
   const [fieldNotes, setFieldNotes] = useState<FieldNote[]>([]);
   const [pending, setPending] = useState<Record<string, true>>({});
+
+  // The dashboard is five jobs stacked in one column; on a phone that was a
+  // very long scroll to reach the team list or the QR. Tabs cut it to one
+  // screen each. Panels are mounted on first visit and then kept alive, so
+  // switching back never re-runs a D3 render or refetches anything — and
+  // nothing renders while hidden, which matters for the chart, since it sizes
+  // itself from its container and would measure zero inside a hidden panel.
+  const [adminTab, setAdminTab] = useState<AdminTabId>("award");
+  const [mountedTabs, setMountedTabs] = useState<AdminTabId[]>(["award"]);
+  const tabDir = useRef<"forward" | "back">("forward");
+  const tabNavRef = useRef<HTMLElement | null>(null);
+
+  // Read after mount so the server and first client paint agree.
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(ADMIN_TAB_KEY);
+    } catch {
+      /* private mode */
+    }
+    if (!isAdminTabId(stored) || stored === "award") return;
+    setAdminTab(stored);
+    setMountedTabs((current) =>
+      current.includes(stored) ? current : [...current, stored],
+    );
+  }, []);
+
+  function selectTab(id: AdminTabId) {
+    if (id === adminTab) return;
+    const from = ADMIN_TABS.findIndex((tab) => tab.id === adminTab);
+    const to = ADMIN_TABS.findIndex((tab) => tab.id === id);
+    tabDir.current = to > from ? "forward" : "back";
+    setAdminTab(id);
+    setMountedTabs((current) =>
+      current.includes(id) ? current : [...current, id],
+    );
+    try {
+      window.localStorage.setItem(ADMIN_TAB_KEY, id);
+    } catch {
+      /* private mode */
+    }
+    // Panels differ wildly in height, so a switch from deep inside the team
+    // list would otherwise land below the new panel entirely.
+    const nav = tabNavRef.current;
+    if (!nav) return;
+    const top = nav.getBoundingClientRect().top + window.scrollY - 12;
+    if (window.scrollY > top) window.scrollTo({ top, behavior: "smooth" });
+  }
 
   // Ref mirror so a second click in the same tick is rejected before state lands.
   const inFlight = useRef(new Set<string>());
@@ -695,622 +760,702 @@ export function AdminDashboard() {
             variants={contentSwap}
             className="flex flex-col gap-5"
           >
-            <LayoutGroup>
-            <section className="grid gap-5 lg:grid-cols-2">
-              <AwardPointsPanel
-                teams={teams}
-                online={online}
-                busy={isBusy("submit-points")}
-                onAward={awardDrafts}
-                onSaveForLater={saveDraftsToFieldNotes}
-                onSetupSaved={() =>
-                  flash("I'm done", "Scoring events are saved on this device.")
-                }
-              />
 
-              <FieldNotes
-                notes={fieldNotes}
-                online={online}
-                postingId={postingNoteId}
-                postingAll={postingAll}
-                className="lg:col-start-2 lg:row-start-1 lg:row-span-2"
-                onPost={postFieldNote}
-                onDiscard={(id) => {
-                  persistNotes(fieldNotes.filter((n) => n.id !== id));
-                  flash("Note discarded", "It was only on this device.");
-                }}
-                onPostAll={postAllFieldNotes}
-              />
+            <motion.nav
+              ref={tabNavRef}
+              variants={panelIn}
+              aria-label="Dashboard sections"
+              className="panel flex flex-wrap gap-1.5 rounded-3xl p-1.5"
+            >
+              {ADMIN_TABS.map((item) => {
+                const isActive = item.id === adminTab;
+                const badge = item.id === "award" ? fieldNotes.length : 0;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectTab(item.id)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`min-h-11 grow basis-[calc(33.333%-0.375rem)] cursor-pointer rounded-2xl px-2.5 py-2.5 text-sm font-extrabold sm:basis-0 ${
+                      isActive ? "bg-star text-on-star shadow-sm" : "btn-chip"
+                    }`}
+                  >
+                    {item.label}
+                    {badge > 0 ? (
+                      <span className="ml-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                        {badge}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </motion.nav>
 
-              <motion.form
-                layout
-                variants={panelIn}
-                onSubmit={createTeam}
-                className="panel rounded-3xl p-4 sm:p-5 lg:col-start-1 lg:row-start-2"
+            <div className="contents">
+              <div
+                data-panel="award"
+                data-active={adminTab === "award"}
+                data-dir={tabDir.current}
+                className="board-panel gap-5"
               >
-                <h2 className="display-font text-xl font-bold">Create team</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-soft">
-                  Add as many teams as you need — names are fully dynamic.
-                </p>
-                {!online ? (
-                  <div className="mt-3">
-                    <NeedsWifiNotice>
-                      Connect to create a team with its group and cabin.
-                    </NeedsWifiNotice>
-                  </div>
-                ) : null}
-
-                <fieldset
-                  disabled={!online}
-                  className="min-w-0 border-0 p-0 disabled:opacity-55"
-                >
-
-                <label className="mt-4 block text-sm font-bold text-muted">
-                  Team name
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="e.g. Team Rocket"
-                    required
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                  />
-                </label>
-
-                <label className="mt-3 block text-sm font-bold text-muted">
-                  Camp group
-                  <select
-                    value={newCampGroup}
-                    onChange={(e) => {
-                      const group = e.target.value as CampGroup;
-                      setNewCampGroup(group);
-                      setNewCabinId("");
-                    }}
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                    required
-                  >
-                    <option value="red">Red group</option>
-                    <option value="green">Green group</option>
-                  </select>
-                </label>
-
-                <label className="mt-3 block text-sm font-bold text-muted">
-                  Cabin
-                  <select
-                    value={newCabinId}
-                    onChange={(e) =>
-                      setNewCabinId(e.target.value ? Number(e.target.value) : "")
+                {mountedTabs.includes("award") ? (
+                  <>
+                  <section className="grid gap-5 lg:grid-cols-2">
+                  <AwardPointsPanel
+                    teams={teams}
+                    online={online}
+                    busy={isBusy("submit-points")}
+                    onAward={awardDrafts}
+                    onSaveForLater={saveDraftsToFieldNotes}
+                    onSetupSaved={() =>
+                      flash("I'm done", "Scoring events are saved on this device.")
                     }
-                    className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
-                    required={newCabinOptions.length > 0}
-                  >
-                    <option value="" disabled={newCabinOptions.length > 0}>
-                      {newCabinOptions.length > 0
-                        ? "Pick a cabin"
-                        : "No cabin left in this group"}
-                    </option>
-                    {newCabinChoices.map(({ cabin, takenBy }) => (
-                      <option
-                        key={cabin.id}
-                        value={cabin.id}
-                        disabled={Boolean(takenBy)}
-                      >
-                        Cabin {cabin.id} · {cabin.label}
-                        {takenBy ? ` · taken by ${takenBy}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {newCabinChoices.length > 0 ? (
-                  <p className="mt-1 text-xs font-semibold text-muted-soft">
-                    {newCampGroup === "green" ? "Green" : "Red"} cabins:{" "}
-                    {newCabinChoices
-                      .map(
-                        ({ cabin, takenBy }) =>
-                          `${cabin.id}${takenBy ? ` (taken)` : ""}`,
-                      )
-                      .join(" · ")}
-                    {newCabinOptions.length === 0
-                      ? ". All of them are already assigned."
-                      : ""}
-                  </p>
+                  />
+
+                  <FieldNotes
+                    notes={fieldNotes}
+                    online={online}
+                    postingId={postingNoteId}
+                    postingAll={postingAll}
+                    className="lg:col-start-2 lg:row-start-1"
+                    onPost={postFieldNote}
+                    onDiscard={(id) => {
+                      persistNotes(fieldNotes.filter((n) => n.id !== id));
+                      flash("Note discarded", "It was only on this device.");
+                    }}
+                    onPostAll={postAllFieldNotes}
+                  />
+                  </section>
+                  </>
                 ) : null}
+              </div>
 
-                <label className="mt-3 block text-sm font-bold text-muted">
-                  Color
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    <input
-                      type="color"
-                      value={newColor}
-                      onChange={(e) => setNewColor(e.target.value)}
-                      className="field h-11 w-14 cursor-pointer rounded border-2"
-                    />
-                    <div className="flex flex-wrap gap-1.5">
-                      {TEAM_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          aria-label={`Pick ${c}`}
-                          aria-pressed={newColor.toLowerCase() === c.toLowerCase()}
-                          onClick={() => setNewColor(c)}
-                          className="relative h-8 w-8 rounded-full border-2 border-white/80 shadow transition-transform duration-200 hover:scale-110 active:scale-95"
-                          style={{ backgroundColor: c }}
-                        >
-                          {newColor.toLowerCase() === c.toLowerCase() ? (
-                            <motion.span
-                              layoutId="new-color-ring"
-                              transition={springSnappy}
-                              className="pointer-events-none absolute -inset-1.5 rounded-full ring-2 ring-saddle dark:ring-white/70"
-                            />
-                          ) : null}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </label>
-
-                <button
-                  type="submit"
-                  disabled={
-                    !online ||
-                    isBusy("create-team") ||
-                    !newName.trim() ||
-                    (newCabinOptions.length > 0 && newCabinId === "")
-                  }
-                  className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
-                >
-                  <BusyLabel
-                    busy={isBusy("create-team")}
-                    busyLabel="Adding team…"
+              <div
+                data-panel="teams"
+                data-active={adminTab === "teams"}
+                data-dir={tabDir.current}
+                className="board-panel gap-5"
+              >
+                {mountedTabs.includes("teams") ? (
+                  <>
+                  <motion.form
+                    variants={panelIn}
+                    onSubmit={createTeam}
+                    className="panel rounded-3xl p-4 sm:p-5"
                   >
-                    {online ? "Add team" : "Needs WiFi"}
-                  </BusyLabel>
-                </button>
-                </fieldset>
-              </motion.form>
-            </section>
+                    <h2 className="display-font text-xl font-bold">Create team</h2>
+                    <p className="mt-1 text-sm font-semibold text-muted-soft">
+                      Add as many teams as you need — names are fully dynamic.
+                    </p>
+                    {!online ? (
+                      <div className="mt-3">
+                        <NeedsWifiNotice>
+                          Connect to create a team with its group and cabin.
+                        </NeedsWifiNotice>
+                      </div>
+                    ) : null}
 
-            <CampMessagesPanel
-              messages={messages}
-              online={online}
-              sending={isBusy("send-message")}
-              busyId={
-                messages.find((m) => isBusy(`message-${m.id}`))?.id ?? null
-              }
-              onSend={sendMessage}
-              onDelete={removeMessage}
-              onTogglePin={toggleMessagePin}
-            />
-
-            <motion.div variants={panelIn}>
-              <SpiderChart teams={sortedTeams} />
-            </motion.div>
-
-            <motion.section layout variants={panelIn} className="panel rounded-3xl p-4 sm:p-5">
-              <h2 className="display-font text-xl font-bold">Teams</h2>
-              {!online ? (
-                <div className="mt-3">
-                  <NeedsWifiNotice>
-                    Connect to edit, assign a cabin, or delete a team.
-                  </NeedsWifiNotice>
-                </div>
-              ) : null}
-              {sortedTeams.length === 0 ? (
-                <p className="mt-3 font-semibold text-muted-soft">
-                  No teams yet. Create your first team above.
-                </p>
-              ) : (
-                <motion.ul layout className="mt-4 flex flex-col gap-3">
-                  <AnimatePresence initial={false}>
-                  {sortedTeams.map((team, index) => {
-                    const teamBusy =
-                      isBusy(`team-${team.id}`) || isBusy(`delete-${team.id}`);
-                    return (
-                    <motion.li
-                      key={team.id}
-                      layout
-                      variants={listItemIn}
-                      initial="hidden"
-                      animate="show"
-                      exit="exit"
-                      transition={springSoft}
-                      className="surface-card overflow-hidden rounded-2xl border-2 p-3 sm:p-4"
+                    <fieldset
+                      disabled={!online}
+                      className="min-w-0 border-0 p-0 disabled:opacity-55"
                     >
-                      <AnimatePresence mode="popLayout" initial={false}>
-                      {editingId === team.id ? (
-                        <motion.div
-                          key="edit"
-                          layout="position"
-                          initial={{ opacity: 0, y: -8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 8 }}
-                          transition={springSoft}
-                          className="grid grid-cols-1 gap-2 min-[520px]:grid-cols-2"
-                        >
-                          <label className="text-sm font-bold text-muted min-[520px]:col-span-2">
-                            Name
-                            <input
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
-                            />
-                          </label>
-                          <label className="text-sm font-bold text-muted">
-                            Group
-                            <select
-                              value={editCampGroup}
-                              onChange={(e) => {
-                                const group = e.target.value as CampGroup;
-                                setEditCampGroup(group);
-                                const cabin = getCabin(
-                                  typeof editCabinId === "number" ? editCabinId : null,
-                                );
-                                if (!cabin || cabin.group !== group) {
-                                  setEditCabinId("");
-                                }
-                              }}
-                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
-                            >
-                              <option value="red">Red</option>
-                              <option value="green">Green</option>
-                            </select>
-                          </label>
-                          <label className="text-sm font-bold text-muted">
-                            Cabin
-                            <select
-                              value={editCabinId}
-                              onChange={(e) =>
-                                setEditCabinId(
-                                  e.target.value ? Number(e.target.value) : "",
-                                )
-                              }
-                              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
-                            >
-                              <option value="">No cabin</option>
-                              {editCabinChoices.map(({ cabin, takenBy }) => (
-                                <option
-                                  key={cabin.id}
-                                  value={cabin.id}
-                                  disabled={Boolean(takenBy)}
-                                >
-                                  Cabin {cabin.id} · {cabin.label}
-                                  {takenBy ? ` · taken by ${takenBy}` : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="text-sm font-bold text-muted">
-                            Color
-                            <input
-                              type="color"
-                              value={editColor}
-                              onChange={(e) => setEditColor(e.target.value)}
-                              className="field mt-1 block h-10 w-14 rounded border-2"
-                            />
-                          </label>
-                          <div className="grid grid-cols-2 gap-2 min-[520px]:col-span-2">
+
+                    <label className="mt-4 block text-sm font-bold text-muted">
+                      Team name
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        placeholder="e.g. Team Rocket"
+                        required
+                        className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                      />
+                    </label>
+
+                    <label className="mt-3 block text-sm font-bold text-muted">
+                      Camp group
+                      <select
+                        value={newCampGroup}
+                        onChange={(e) => {
+                          const group = e.target.value as CampGroup;
+                          setNewCampGroup(group);
+                          setNewCabinId("");
+                        }}
+                        className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                        required
+                      >
+                        <option value="red">Red group</option>
+                        <option value="green">Green group</option>
+                      </select>
+                    </label>
+
+                    <label className="mt-3 block text-sm font-bold text-muted">
+                      Cabin
+                      <select
+                        value={newCabinId}
+                        onChange={(e) =>
+                          setNewCabinId(e.target.value ? Number(e.target.value) : "")
+                        }
+                        className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+                        required={newCabinOptions.length > 0}
+                      >
+                        <option value="" disabled={newCabinOptions.length > 0}>
+                          {newCabinOptions.length > 0
+                            ? "Pick a cabin"
+                            : "No cabin left in this group"}
+                        </option>
+                        {newCabinChoices.map(({ cabin, takenBy }) => (
+                          <option
+                            key={cabin.id}
+                            value={cabin.id}
+                            disabled={Boolean(takenBy)}
+                          >
+                            Cabin {cabin.id} · {cabin.label}
+                            {takenBy ? ` · taken by ${takenBy}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {newCabinChoices.length > 0 ? (
+                      <p className="mt-1 text-xs font-semibold text-muted-soft">
+                        {newCampGroup === "green" ? "Green" : "Red"} cabins:{" "}
+                        {newCabinChoices
+                          .map(
+                            ({ cabin, takenBy }) =>
+                              `${cabin.id}${takenBy ? ` (taken)` : ""}`,
+                          )
+                          .join(" · ")}
+                        {newCabinOptions.length === 0
+                          ? ". All of them are already assigned."
+                          : ""}
+                      </p>
+                    ) : null}
+
+                    <label className="mt-3 block text-sm font-bold text-muted">
+                      Color
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <input
+                          type="color"
+                          value={newColor}
+                          onChange={(e) => setNewColor(e.target.value)}
+                          className="field h-11 w-14 cursor-pointer rounded border-2"
+                        />
+                        <div className="flex flex-wrap gap-1.5">
+                          {TEAM_COLORS.map((c) => (
                             <button
+                              key={c}
                               type="button"
-                              onClick={() => saveEdit(team.id)}
-                              disabled={!online || isBusy(`team-${team.id}`)}
-                              className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold disabled:opacity-60"
+                              aria-label={`Pick ${c}`}
+                              aria-pressed={newColor.toLowerCase() === c.toLowerCase()}
+                              onClick={() => setNewColor(c)}
+                              className="relative h-8 w-8 rounded-full border-2 border-white/80 shadow transition-transform duration-200 hover:scale-110 active:scale-95"
+                              style={{ backgroundColor: c }}
                             >
-                              <BusyLabel
-                                busy={isBusy(`team-${team.id}`)}
-                                busyLabel="Saving…"
-                              >
-                                {online ? "Save" : "Needs WiFi"}
-                              </BusyLabel>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              disabled={isBusy(`team-${team.id}`)}
-                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="view"
-                          layout="position"
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          transition={springSoft}
-                          className="flex flex-col gap-3"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span
-                              className="display-font flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
-                              style={{ backgroundColor: team.color }}
-                            >
-                              {index + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="display-font break-words text-lg font-bold text-card-ink">
-                                  {team.name}
-                                </p>
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
-                                    team.campGroup === "green"
-                                      ? "bg-[#2F8F4E]"
-                                      : team.campGroup === "red"
-                                        ? "bg-[#C45C26]"
-                                        : "bg-slate-500"
-                                  }`}
-                                >
-                                  {team.campGroup ?? "unassigned"}
-                                </span>
-                              </div>
-                              <p className="break-words text-sm font-bold text-muted-soft">
-                                {team.score} pts · {team.eventCount} events
-                                {typeof team.cabinId === "number"
-                                  ? ` · Cabin ${team.cabinId}${
-                                      getCabin(team.cabinId)
-                                        ? ` (${getCabin(team.cabinId)!.label})`
-                                        : ""
-                                    }`
-                                  : " · no cabin"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                            <select
-                              aria-label={`Camp group for ${team.name}`}
-                              value={team.campGroup ?? ""}
-                              disabled={!online || teamBusy}
-                              onChange={(e) => {
-                                const value = e.target.value as CampGroup;
-                                if (value === "red" || value === "green") {
-                                  setTeamGroup(team.id, value);
-                                }
-                              }}
-                              className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
-                            >
-                              {!team.campGroup ? (
-                                <option value="" disabled>
-                                  Set group
-                                </option>
-                              ) : null}
-                              <option value="red">Red</option>
-                              <option value="green">Green</option>
-                            </select>
-                            <select
-                              aria-label={`Cabin for ${team.name}`}
-                              value={team.cabinId ?? ""}
-                              disabled={!online || teamBusy || !team.campGroup}
-                              onChange={(e) => {
-                                if (!requireOnline()) return;
-                                const value = e.target.value;
-                                void run(`team-${team.id}`, async () => {
-                                  const res = await fetch(`/api/teams/${team.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      cabinId: value ? Number(value) : null,
-                                    }),
-                                  });
-                                  const data = (await res.json().catch(() => ({}))) as {
-                                    error?: string;
-                                  };
-                                  if (!res.ok) {
-                                    fail(data.error || "Could not update cabin");
-                                    return;
-                                  }
-                                  await refresh();
-                                  flash(
-                                    value
-                                      ? `${team.name} → Cabin ${value}`
-                                      : `${team.name} cabin cleared`,
-                                  );
-                                });
-                              }}
-                              className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
-                            >
-                              <option value="">No cabin</option>
-                              {cabinChoicesForGroup(
-                                team.campGroup ?? "red",
-                                teams,
-                                team.id,
-                              ).map(({ cabin, takenBy }) => (
-                                <option
-                                  key={cabin.id}
-                                  value={cabin.id}
-                                  disabled={Boolean(takenBy)}
-                                >
-                                  Cabin {cabin.id} · {cabin.label}
-                                  {takenBy ? ` · ${takenBy}` : ""}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => startEdit(team)}
-                              disabled={!online || teamBusy}
-                              className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => requestDeleteTeam(team.id, team.name)}
-                              disabled={!online || teamBusy}
-                              className="btn-danger rounded-xl px-3 py-2 text-sm font-extrabold disabled:opacity-60"
-                            >
-                              Delete
-                            </button>
-                            <AnimatePresence initial={false}>
-                              {teamBusy ? (
+                              {newColor.toLowerCase() === c.toLowerCase() ? (
                                 <motion.span
-                                  key="saving"
-                                  initial={{ opacity: 0, x: -6 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: -6 }}
-                                  transition={fadeSoft}
-                                  className="col-span-2 inline-flex items-center gap-2 text-sm font-bold text-muted-soft sm:col-span-1"
-                                >
-                                  <Spinner />
-                                  Saving…
-                                </motion.span>
+                                  layoutId="new-color-ring"
+                                  transition={springSnappy}
+                                  className="pointer-events-none absolute -inset-1.5 rounded-full ring-2 ring-saddle dark:ring-white/70"
+                                />
                               ) : null}
-                            </AnimatePresence>
-                          </div>
-                        </motion.div>
-                      )}
-                      </AnimatePresence>
-                    </motion.li>
-                    );
-                  })}
-                  </AnimatePresence>
-                </motion.ul>
-              )}
-            </motion.section>
-
-            <section className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-              <motion.div layout variants={panelIn} className="panel rounded-3xl p-5">
-                <h2 className="display-font text-xl font-bold">Point history</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-soft">
-                  Each award shows the team, the event or extra reason, and the cap used.
-                </p>
-                {teams.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setHistoryTeamId("all")}
-                      className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
-                        historyTeamId === "all"
-                          ? "border-star bg-star text-on-star"
-                          : "btn-chip"
-                      }`}
-                    >
-                      All teams
-                    </button>
-                    {sortedTeams.map((team) => (
-                      <button
-                        key={team.id}
-                        type="button"
-                        onClick={() => setHistoryTeamId(team.id)}
-                        className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
-                          historyTeamId === team.id
-                            ? "ring-2 ring-white/85 dark:ring-white/80"
-                            : ""
-                        }`}
-                        style={teamChipStyle(team.color, historyTeamId === team.id)}
-                      >
-                        {team.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {filteredHistory.length === 0 ? (
-                  <p className="mt-3 font-semibold text-muted-soft">
-                    {history.length === 0
-                      ? "No point events yet."
-                      : "No history for that team yet."}
-                  </p>
-                ) : (
-                  <ul className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-                    <AnimatePresence initial={false}>
-                    {filteredHistory.map((row) => {
-                      const parsed = parsePointNote(row.note);
-                      return (
-                      <motion.li
-                        key={row.id}
-                        layout
-                        initial={{ opacity: 0, x: -14, scale: 0.98 }}
-                        animate={{ opacity: 1, x: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: 14, scale: 0.98 }}
-                        transition={springSoft}
-                        className="surface-card flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-extrabold text-card-ink">
-                            <span
-                              className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: row.teamColor }}
-                            />
-                            {row.teamName}
-                          </p>
-                          <p className="mt-0.5 text-sm font-bold text-card-ink">
-                            <span className="mr-1.5 rounded-full bg-saddle/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-muted dark:bg-white/10">
-                              {parsed.kind === "extra"
-                                ? "Extra"
-                                : parsed.kind === "activity"
-                                  ? "Event"
-                                  : "Note"}
-                            </span>
-                            {parsed.title}
-                          </p>
-                          <p className="text-xs font-semibold text-muted-soft">
-                            {new Date(row.createdAt).toLocaleString()}
-                            {parsed.capLabel ? ` · cap ${parsed.capLabel}` : ""}
-                          </p>
+                            </button>
+                          ))}
                         </div>
-                        <span
-                          className={`display-font shrink-0 text-lg font-bold ${
-                            row.delta > 0
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-red-600 dark:text-red-400"
+                      </div>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={
+                        !online ||
+                        isBusy("create-team") ||
+                        !newName.trim() ||
+                        (newCabinOptions.length > 0 && newCabinId === "")
+                      }
+                      className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-base font-extrabold disabled:opacity-50"
+                    >
+                      <BusyLabel
+                        busy={isBusy("create-team")}
+                        busyLabel="Adding team…"
+                      >
+                        {online ? "Add team" : "Needs WiFi"}
+                      </BusyLabel>
+                    </button>
+                    </fieldset>
+                  </motion.form>
+
+                <motion.section variants={panelIn} className="panel rounded-3xl p-4 sm:p-5">
+                  <h2 className="display-font text-xl font-bold">Teams</h2>
+                  {!online ? (
+                    <div className="mt-3">
+                      <NeedsWifiNotice>
+                        Connect to edit, assign a cabin, or delete a team.
+                      </NeedsWifiNotice>
+                    </div>
+                  ) : null}
+                  {sortedTeams.length === 0 ? (
+                    <p className="mt-3 font-semibold text-muted-soft">
+                      No teams yet. Create your first team above.
+                    </p>
+                  ) : (
+                    <motion.ul className="mt-4 flex flex-col gap-3">
+                      <AnimatePresence initial={false}>
+                      {sortedTeams.map((team, index) => {
+                        const teamBusy =
+                          isBusy(`team-${team.id}`) || isBusy(`delete-${team.id}`);
+                        return (
+                        <motion.li
+                          key={team.id}
+                          variants={listItemIn}
+                          initial="hidden"
+                          animate="show"
+                          exit="exit"
+                          transition={springSoft}
+                          className="surface-card overflow-hidden rounded-2xl border-2 p-3 sm:p-4"
+                        >
+                          <AnimatePresence mode="popLayout" initial={false}>
+                          {editingId === team.id ? (
+                            <motion.div
+                              key="edit"
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 8 }}
+                              transition={springSoft}
+                              className="grid grid-cols-1 gap-2 min-[520px]:grid-cols-2"
+                            >
+                              <label className="text-sm font-bold text-muted min-[520px]:col-span-2">
+                                Name
+                                <input
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
+                                />
+                              </label>
+                              <label className="text-sm font-bold text-muted">
+                                Group
+                                <select
+                                  value={editCampGroup}
+                                  onChange={(e) => {
+                                    const group = e.target.value as CampGroup;
+                                    setEditCampGroup(group);
+                                    const cabin = getCabin(
+                                      typeof editCabinId === "number" ? editCabinId : null,
+                                    );
+                                    if (!cabin || cabin.group !== group) {
+                                      setEditCabinId("");
+                                    }
+                                  }}
+                                  className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
+                                >
+                                  <option value="red">Red</option>
+                                  <option value="green">Green</option>
+                                </select>
+                              </label>
+                              <label className="text-sm font-bold text-muted">
+                                Cabin
+                                <select
+                                  value={editCabinId}
+                                  onChange={(e) =>
+                                    setEditCabinId(
+                                      e.target.value ? Number(e.target.value) : "",
+                                    )
+                                  }
+                                  className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
+                                >
+                                  <option value="">No cabin</option>
+                                  {editCabinChoices.map(({ cabin, takenBy }) => (
+                                    <option
+                                      key={cabin.id}
+                                      value={cabin.id}
+                                      disabled={Boolean(takenBy)}
+                                    >
+                                      Cabin {cabin.id} · {cabin.label}
+                                      {takenBy ? ` · taken by ${takenBy}` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="text-sm font-bold text-muted">
+                                Color
+                                <input
+                                  type="color"
+                                  value={editColor}
+                                  onChange={(e) => setEditColor(e.target.value)}
+                                  className="field mt-1 block h-10 w-14 rounded border-2"
+                                />
+                              </label>
+                              <div className="grid grid-cols-2 gap-2 min-[520px]:col-span-2">
+                                <button
+                                  type="button"
+                                  onClick={() => saveEdit(team.id)}
+                                  disabled={!online || isBusy(`team-${team.id}`)}
+                                  className="btn-cta rounded-xl bg-emerald-500 px-3 py-2 text-sm font-extrabold disabled:opacity-60"
+                                >
+                                  <BusyLabel
+                                    busy={isBusy(`team-${team.id}`)}
+                                    busyLabel="Saving…"
+                                  >
+                                    {online ? "Save" : "Needs WiFi"}
+                                  </BusyLabel>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingId(null)}
+                                  disabled={isBusy(`team-${team.id}`)}
+                                  className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="view"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              transition={springSoft}
+                              className="flex flex-col gap-3"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span
+                                  className="display-font flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
+                                  style={{ backgroundColor: team.color }}
+                                >
+                                  {index + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="display-font break-words text-lg font-bold text-card-ink">
+                                      {team.name}
+                                    </p>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white ${
+                                        team.campGroup === "green"
+                                          ? "bg-[#2F8F4E]"
+                                          : team.campGroup === "red"
+                                            ? "bg-[#C45C26]"
+                                            : "bg-slate-500"
+                                      }`}
+                                    >
+                                      {team.campGroup ?? "unassigned"}
+                                    </span>
+                                  </div>
+                                  <p className="break-words text-sm font-bold text-muted-soft">
+                                    {team.score} pts · {team.eventCount} events
+                                    {typeof team.cabinId === "number"
+                                      ? ` · Cabin ${team.cabinId}${
+                                          getCabin(team.cabinId)
+                                            ? ` (${getCabin(team.cabinId)!.label})`
+                                            : ""
+                                        }`
+                                      : " · no cabin"}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                                <select
+                                  aria-label={`Camp group for ${team.name}`}
+                                  value={team.campGroup ?? ""}
+                                  disabled={!online || teamBusy}
+                                  onChange={(e) => {
+                                    const value = e.target.value as CampGroup;
+                                    if (value === "red" || value === "green") {
+                                      setTeamGroup(team.id, value);
+                                    }
+                                  }}
+                                  className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
+                                >
+                                  {!team.campGroup ? (
+                                    <option value="" disabled>
+                                      Set group
+                                    </option>
+                                  ) : null}
+                                  <option value="red">Red</option>
+                                  <option value="green">Green</option>
+                                </select>
+                                <select
+                                  aria-label={`Cabin for ${team.name}`}
+                                  value={team.cabinId ?? ""}
+                                  disabled={!online || teamBusy || !team.campGroup}
+                                  onChange={(e) => {
+                                    if (!requireOnline()) return;
+                                    const value = e.target.value;
+                                    void run(`team-${team.id}`, async () => {
+                                      const res = await fetch(`/api/teams/${team.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          cabinId: value ? Number(value) : null,
+                                        }),
+                                      });
+                                      const data = (await res.json().catch(() => ({}))) as {
+                                        error?: string;
+                                      };
+                                      if (!res.ok) {
+                                        fail(data.error || "Could not update cabin");
+                                        return;
+                                      }
+                                      await refresh();
+                                      flash(
+                                        value
+                                          ? `${team.name} → Cabin ${value}`
+                                          : `${team.name} cabin cleared`,
+                                      );
+                                    });
+                                  }}
+                                  className="field col-span-2 rounded-xl border-2 px-2 py-2 text-sm font-extrabold disabled:opacity-60 sm:col-span-1 sm:w-auto"
+                                >
+                                  <option value="">No cabin</option>
+                                  {cabinChoicesForGroup(
+                                    team.campGroup ?? "red",
+                                    teams,
+                                    team.id,
+                                  ).map(({ cabin, takenBy }) => (
+                                    <option
+                                      key={cabin.id}
+                                      value={cabin.id}
+                                      disabled={Boolean(takenBy)}
+                                    >
+                                      Cabin {cabin.id} · {cabin.label}
+                                      {takenBy ? ` · ${takenBy}` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => startEdit(team)}
+                                  disabled={!online || teamBusy}
+                                  className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-60"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => requestDeleteTeam(team.id, team.name)}
+                                  disabled={!online || teamBusy}
+                                  className="btn-danger rounded-xl px-3 py-2 text-sm font-extrabold disabled:opacity-60"
+                                >
+                                  Delete
+                                </button>
+                                <AnimatePresence initial={false}>
+                                  {teamBusy ? (
+                                    <motion.span
+                                      key="saving"
+                                      initial={{ opacity: 0, x: -6 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      exit={{ opacity: 0, x: -6 }}
+                                      transition={fadeSoft}
+                                      className="col-span-2 inline-flex items-center gap-2 text-sm font-bold text-muted-soft sm:col-span-1"
+                                    >
+                                      <Spinner />
+                                      Saving…
+                                    </motion.span>
+                                  ) : null}
+                                </AnimatePresence>
+                              </div>
+                            </motion.div>
+                          )}
+                          </AnimatePresence>
+                        </motion.li>
+                        );
+                      })}
+                      </AnimatePresence>
+                    </motion.ul>
+                  )}
+                </motion.section>
+                  </>
+                ) : null}
+              </div>
+
+              <div
+                data-panel="notices"
+                data-active={adminTab === "notices"}
+                data-dir={tabDir.current}
+                className="board-panel gap-5"
+              >
+                {mountedTabs.includes("notices") ? (
+                  <>
+                <CampMessagesPanel
+                  messages={messages}
+                  online={online}
+                  sending={isBusy("send-message")}
+                  busyId={
+                    messages.find((m) => isBusy(`message-${m.id}`))?.id ?? null
+                  }
+                  onSend={sendMessage}
+                  onDelete={removeMessage}
+                  onTogglePin={toggleMessagePin}
+                />
+                  </>
+                ) : null}
+              </div>
+
+              <div
+                data-panel="history"
+                data-active={adminTab === "history"}
+                data-dir={tabDir.current}
+                className="board-panel gap-5"
+              >
+                {mountedTabs.includes("history") ? (
+                  <>
+                <motion.div variants={panelIn}>
+                  <SpiderChart teams={sortedTeams} />
+                </motion.div>
+
+                  <motion.div variants={panelIn} className="panel rounded-3xl p-5">
+                    <h2 className="display-font text-xl font-bold">Point history</h2>
+                    <p className="mt-1 text-sm font-semibold text-muted-soft">
+                      Each award shows the team, the event or extra reason, and the cap used.
+                    </p>
+                    {teams.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryTeamId("all")}
+                          className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
+                            historyTeamId === "all"
+                              ? "border-star bg-star text-on-star"
+                              : "btn-chip"
                           }`}
                         >
-                          {row.delta > 0 ? `+${row.delta}` : row.delta}
-                        </span>
-                      </motion.li>
-                      );
-                    })}
-                    </AnimatePresence>
-                  </ul>
-                )}
-              </motion.div>
+                          All teams
+                        </button>
+                        {sortedTeams.map((team) => (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={() => setHistoryTeamId(team.id)}
+                            className={`rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold ${
+                              historyTeamId === team.id
+                                ? "ring-2 ring-white/85 dark:ring-white/80"
+                                : ""
+                            }`}
+                            style={teamChipStyle(team.color, historyTeamId === team.id)}
+                          >
+                            {team.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {filteredHistory.length === 0 ? (
+                      <p className="mt-3 font-semibold text-muted-soft">
+                        {history.length === 0
+                          ? "No point events yet."
+                          : "No history for that team yet."}
+                      </p>
+                    ) : (
+                      <ul className="mt-4 max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+                        <AnimatePresence initial={false}>
+                        {filteredHistory.map((row) => {
+                          const parsed = parsePointNote(row.note);
+                          return (
+                          <motion.li
+                            key={row.id}
+                            initial={{ opacity: 0, x: -14, scale: 0.98 }}
+                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                            exit={{ opacity: 0, x: 14, scale: 0.98 }}
+                            transition={springSoft}
+                            className="surface-card flex items-start justify-between gap-3 rounded-xl border px-3 py-2.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-extrabold text-card-ink">
+                                <span
+                                  className="mr-2 inline-block h-2.5 w-2.5 rounded-full"
+                                  style={{ backgroundColor: row.teamColor }}
+                                />
+                                {row.teamName}
+                              </p>
+                              <p className="mt-0.5 text-sm font-bold text-card-ink">
+                                <span className="mr-1.5 rounded-full bg-saddle/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-muted dark:bg-white/10">
+                                  {parsed.kind === "extra"
+                                    ? "Extra"
+                                    : parsed.kind === "activity"
+                                      ? "Event"
+                                      : "Note"}
+                                </span>
+                                {parsed.title}
+                              </p>
+                              <p className="text-xs font-semibold text-muted-soft">
+                                {new Date(row.createdAt).toLocaleString()}
+                                {parsed.capLabel ? ` · cap ${parsed.capLabel}` : ""}
+                              </p>
+                            </div>
+                            <span
+                              className={`display-font shrink-0 text-lg font-bold ${
+                                row.delta > 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {row.delta > 0 ? `+${row.delta}` : row.delta}
+                            </span>
+                          </motion.li>
+                          );
+                        })}
+                        </AnimatePresence>
+                      </ul>
+                    )}
+                  </motion.div>
+                  </>
+                ) : null}
+              </div>
 
-              <motion.div layout variants={panelIn} className="panel rounded-3xl p-5 text-center">
-                <h2 className="display-font text-xl font-bold">Camper QR code</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-soft">
-                  Print this so kids can open the live scoreboard.
-                </p>
-                <AnimatePresence mode="wait" initial={false}>
-                  {qrDataUrl ? (
-                    <motion.img
-                      key="qr"
-                      src={qrDataUrl}
-                      alt="QR code to camp scoreboard"
-                      initial={{ opacity: 0, scale: 0.92 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.96 }}
-                      transition={springSoft}
-                      className="mx-auto mt-4 w-52 rounded-2xl border-2 border-field-border bg-white p-2"
-                    />
-                  ) : (
-                    <motion.p
-                      key="qr-loading"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={fadeSoft}
-                      className="mt-8 font-semibold text-muted-soft"
+              <div
+                data-panel="qr"
+                data-active={adminTab === "qr"}
+                data-dir={tabDir.current}
+                className="board-panel gap-5"
+              >
+                {mountedTabs.includes("qr") ? (
+                  <>
+                  <motion.div variants={panelIn} className="panel rounded-3xl p-5 text-center">
+                    <h2 className="display-font text-xl font-bold">Camper QR code</h2>
+                    <p className="mt-1 text-sm font-semibold text-muted-soft">
+                      Print this so kids can open the live scoreboard.
+                    </p>
+                    <AnimatePresence mode="wait" initial={false}>
+                      {qrDataUrl ? (
+                        <motion.img
+                          key="qr"
+                          src={qrDataUrl}
+                          alt="QR code to camp scoreboard"
+                          initial={{ opacity: 0, scale: 0.92 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.96 }}
+                          transition={springSoft}
+                          className="mx-auto mt-4 w-52 rounded-2xl border-2 border-field-border bg-white p-2"
+                        />
+                      ) : (
+                        <motion.p
+                          key="qr-loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={fadeSoft}
+                          className="mt-8 font-semibold text-muted-soft"
+                        >
+                          Generating QR…
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
+                    <p className="mt-3 break-all text-xs font-bold text-muted-soft">
+                      {publicUrl}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={downloadQr}
+                      disabled={!qrDataUrl}
+                      className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-50"
                     >
-                      Generating QR…
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-                <p className="mt-3 break-all text-xs font-bold text-muted-soft">
-                  {publicUrl}
-                </p>
-                <button
-                  type="button"
-                  onClick={downloadQr}
-                  disabled={!qrDataUrl}
-                  className="btn-cta mt-4 w-full rounded-xl bg-star px-4 py-3 text-sm font-extrabold disabled:opacity-50"
-                >
-                  Download QR PNG
-                </button>
-              </motion.div>
-            </section>
-            </LayoutGroup>
+                      Download QR PNG
+                    </button>
+                  </motion.div>
+                  </>
+                ) : null}
+              </div>
+
+            </div>
           </motion.div>
         )}
         </AnimatePresence>
