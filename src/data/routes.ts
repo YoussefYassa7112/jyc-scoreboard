@@ -52,6 +52,56 @@ export const campRoutes: CampRoute[] = [
       "Cross the road — look both ways — and the cabins are just above you.",
     ],
   },
+  {
+    id: "sablon-to-campfire",
+    floorId: "outdoor",
+    fromLabel: "Sablon",
+    toLabel: "Camp fire",
+    minutes: 10,
+    // Registered from an annotated screenshot by matching its two endpoints to
+    // the Sablon and Camp fire pins: the photo turned out to be this same map
+    // rotated 90.7 degrees at 0.757 scale, which is exactly the kind of clean
+    // result that says the fit is real rather than fitted.
+    points: [
+      [690, 485],
+      [642, 487],
+      [628, 509],
+      [624, 541],
+      [592, 548],
+      [547, 555],
+      [501, 563],
+      [459, 574],
+      [425, 585],
+      [418, 590],
+      [400, 577],
+      [378, 555],
+      [358, 530],
+      [345, 506],
+      [341, 479],
+      [341, 451],
+      [339, 430],
+      [322, 411],
+      [295, 396],
+      [267, 383],
+      [243, 372],
+      [229, 360],
+      [222, 339],
+      [219, 319],
+      [220, 301],
+    ],
+    steps: [
+      "Head off the point on the road past the cabins.",
+      "Follow the road round the bottom of the bay, with the water beside you.",
+      "Keep on the road as it bends away from the shore and starts to climb.",
+      "Carry on until the track opens out — the fire pit is in the clearing.",
+    ],
+    stepsBack: [
+      "Leave the fire pit and follow the track down to the road.",
+      "Stay on the road as it drops towards the water.",
+      "Follow it round the bottom of the bay, water beside you the whole way.",
+      "The road runs out onto the point; the Sablon cabins are at the end.",
+    ],
+  },
 ];
 
 /**
