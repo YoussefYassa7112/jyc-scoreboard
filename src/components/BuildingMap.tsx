@@ -697,13 +697,15 @@ export function BuildingMap({
 
       {/* Zoom sits directly above the map rather than up in the header. On a
           phone the header, the floor tabs and the legend all stack, which left
-          these three buttons most of a screen away from the thing they zoom. */}
-      <div className="mt-3 flex items-center justify-end gap-2">
+          these three buttons most of a screen away from the thing they zoom.
+          They also split the full width there, rather than huddling in a
+          corner as a thumb-sized target on the widest part of the screen. */}
+      <div className="mt-3 flex items-stretch gap-2 sm:justify-end">
         <button
           type="button"
           aria-label="Zoom out"
           onClick={() => setZoom((z) => Math.max(0.9, +(z - 0.25).toFixed(2)))}
-          className="btn-soft min-h-11 min-w-11 cursor-pointer rounded-xl border px-0 text-lg font-extrabold"
+          className="btn-soft min-h-11 flex-1 cursor-pointer rounded-xl border px-0 text-lg font-extrabold sm:min-w-11 sm:flex-none"
         >
           −
         </button>
@@ -711,7 +713,7 @@ export function BuildingMap({
           type="button"
           aria-label="Zoom in"
           onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
-          className="btn-soft min-h-11 min-w-11 cursor-pointer rounded-xl border px-0 text-lg font-extrabold"
+          className="btn-soft min-h-11 flex-1 cursor-pointer rounded-xl border px-0 text-lg font-extrabold sm:min-w-11 sm:flex-none"
         >
           +
         </button>
@@ -722,7 +724,7 @@ export function BuildingMap({
             clearSelection();
             mapScrollRef.current?.scrollTo({ top: 0, left: 0 });
           }}
-          className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-extrabold"
+          className="btn-soft min-h-11 flex-1 cursor-pointer rounded-xl border px-3 text-xs font-extrabold sm:flex-none"
         >
           Reset
         </button>

@@ -140,6 +140,8 @@ export function AdminDashboard() {
   const [adminTab, setAdminTab] = useState<AdminTabId>("award");
   const [mountedTabs, setMountedTabs] = useState<AdminTabId[]>(["award"]);
   const tabDir = useRef<"forward" | "back">("forward");
+  // Bumped on every arrival at History so the chart draws itself again.
+  const [chartReplay, setChartReplay] = useState(0);
   const tabNavRef = useRef<HTMLElement | null>(null);
 
   // Read after mount so the server and first client paint agree.
@@ -162,6 +164,7 @@ export function AdminDashboard() {
     const from = ADMIN_TABS.findIndex((tab) => tab.id === adminTab);
     const to = ADMIN_TABS.findIndex((tab) => tab.id === id);
     tabDir.current = to > from ? "forward" : "back";
+    if (id === "history") setChartReplay((n) => n + 1);
     setAdminTab(id);
     setMountedTabs((current) =>
       current.includes(id) ? current : [...current, id],
@@ -1323,7 +1326,7 @@ export function AdminDashboard() {
                 {mountedTabs.includes("history") ? (
                   <>
                 <motion.div variants={panelIn}>
-                  <SpiderChart teams={sortedTeams} />
+                  <SpiderChart teams={sortedTeams} replayKey={chartReplay} />
                 </motion.div>
 
                   <motion.div variants={panelIn} className="panel rounded-3xl p-5">

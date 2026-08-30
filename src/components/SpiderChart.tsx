@@ -16,6 +16,13 @@ type TeamPoint = {
 
 type Props = {
   teams: TeamPoint[];
+  /**
+   * Change this to make the chart draw itself again from nothing. The dashboard
+   * keeps its panels mounted, so opening the History tab a second time would
+   * otherwise reveal a chart that has simply been sitting there behind a hidden
+   * panel — the build-up is most of what makes it worth looking at.
+   */
+  replayKey?: number;
 };
 
 type TipItem = {
@@ -76,13 +83,14 @@ function separatePoints(points: Pt[], minDist: number, angles: number[]) {
  * Animated D3 radar chart with modern hover tooltips.
  * Low-score dots stay on their spokes (not stacked at center).
  */
-export function SpiderChart({ teams }: Props) {
+export function SpiderChart({ teams, replayKey }: Props) {
   const { theme } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const prevPts = useRef<Map<number, Pt>>(new Map());
   const hasPlayedIntro = useRef(false);
   const gridKeyRef = useRef("");
+  const replayRef = useRef(replayKey);
   const tipLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tip, setTip] = useState<TipState>(null);
 
@@ -145,6 +153,17 @@ export function SpiderChart({ teams }: Props) {
     const height = Math.max(300, Math.min(380, width));
     const svg = d3.select(svgEl);
     svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+
+    // A replay has to wipe the drawing, not just re-run the draw. Left in
+    // place, the rings would stay put and the shape would tween from where it
+    // already was — the same three refs the empty case resets below.
+    if (replayRef.current !== replayKey) {
+      replayRef.current = replayKey;
+      svg.selectAll("*").remove();
+      prevPts.current = new Map();
+      hasPlayedIntro.current = false;
+      gridKeyRef.current = "";
+    }
 
     const emptyFill = theme === "dark" ? "#94a3b8" : "#5c4033";
     if (sorted.length === 0) {
@@ -515,7 +534,7 @@ export function SpiderChart({ teams }: Props) {
         .attr("opacity", 1)
         .attr("transform", `translate(${cx},${cy}) scale(1)`);
     }
-  }, [dataKey, theme, sorted, wrapWidth]);
+  }, [dataKey, theme, sorted, wrapWidth, replayKey]);
 
   const focus =
     tip?.items.find((item) => item.team.id === tip.focusId) ?? tip?.items[0];
