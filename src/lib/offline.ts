@@ -88,6 +88,11 @@ export function writeMyTeamSnapshot(snapshot: MyTeamSnapshot | null) {
 
 /** Drop a saved "my team" if that team is no longer on the live roster. */
 export function dropMissingMyTeam(standings: StandingRow[]) {
+  // An empty roster is not evidence that a team was deleted — it is what a
+  // cold start, a failed fetch or an empty response looks like. Treating it as
+  // proof wiped the camper's saved team on the spot, which is why picking a
+  // team never seemed to stick.
+  if (standings.length === 0) return;
   const snap = readMyTeamSnapshot();
   if (!snap) return;
   if (standings.some((row) => row.id === snap.teamId)) return;

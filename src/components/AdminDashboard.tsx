@@ -35,6 +35,7 @@ import { TEAM_COLORS } from "@/lib/standings";
 import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
 import { teamChipStyle } from "@/lib/utils";
 import { availableCabinsForGroup, cabinChoicesForGroup, getCabin } from "@/lib/cabins";
+import { clearAdminSignedIn } from "@/lib/admin-session";
 import { forgetTeamEverywhere } from "@/lib/offline";
 import { useOnline } from "@/lib/use-online";
 import { FieldNotes } from "./FieldNotes";
@@ -266,6 +267,7 @@ export function AdminDashboard() {
     if (!requireOnline()) return;
     void run("logout", async () => {
       await fetch("/api/auth/logout", { method: "POST" });
+      clearAdminSignedIn();
       router.replace("/admin/login");
       router.refresh();
     });

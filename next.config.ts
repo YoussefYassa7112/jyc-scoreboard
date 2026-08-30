@@ -15,6 +15,9 @@ const withSerwist = withSerwistInit({
   additionalPrecacheEntries: [
     { url: "/", revision },
     { url: "/~offline", revision },
+    // Staff need the dashboard shell to open with no connection so the field
+    // notes stay usable; without this the navigation fallback serves /~offline.
+    { url: "/admin", revision },
   ],
 });
 

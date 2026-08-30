@@ -653,7 +653,21 @@ export function CampSchedule({
     const next = daysForYou[index + 1];
     if (next) setDayId(next.id);
   }, [clock, dayId, daysForYou, openDay, progressTrack]);
-  const showGroupedNowNext = isSplit && track === "overview";
+  /**
+   * A camper who has picked a team is locked to that team's track. Before this
+   * they could sit on "Everyone" and see both colours side by side, and the
+   * "Coming up next" board showed three lanes — Everyone, Red and Green — so
+   * two thirds of what it told them belonged to somebody else's group.
+   */
+  const lockedGroup =
+    myTeam?.campGroup === "red" || myTeam?.campGroup === "green"
+      ? myTeam.campGroup
+      : null;
+  const showGroupedNowNext = isSplit && track === "overview" && !lockedGroup;
+
+  useEffect(() => {
+    if (lockedGroup && track !== lockedGroup) setTrack(lockedGroup);
+  }, [lockedGroup, track]);
 
   const liveEvents = useMemo(
     () => findLiveEvents(activeTrack, clock, daysForYou),
@@ -957,7 +971,9 @@ export function CampSchedule({
         })}
       </div>
 
-      {isSplit ? (
+      {/* Hidden once a team is picked — that camper has exactly one track, and
+          offering the other colour is offering them somebody else's day. */}
+      {isSplit && !lockedGroup ? (
         <div className="mt-3 grid grid-cols-3 gap-2">
           {(
             [

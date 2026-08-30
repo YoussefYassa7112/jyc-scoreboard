@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { fadeSoft, springSoft } from "@/lib/motion";
+import { markAdminSignedIn } from "@/lib/admin-session";
 import { useOnline } from "@/lib/use-online";
 import { ControlDock } from "./ControlDock";
 import { OfflineBanner } from "./OfflineBanner";
@@ -36,6 +37,9 @@ export function AdminLoginForm() {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error || "Login failed");
       }
+      // Remember on this device that staff signed in, so the dashboard shell
+      // still opens when there is no WiFi to ask the server.
+      markAdminSignedIn();
       router.replace("/admin");
       router.refresh();
     } catch (err) {
