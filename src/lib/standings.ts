@@ -1,5 +1,6 @@
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, ensureCabinColumn } from "@/db";
+import { getMessages, type CampMessageRow } from "@/lib/messages";
 import { pointEvents, teams } from "@/db/schema";
 
 export type StandingRow = {
@@ -14,6 +15,14 @@ export type StandingRow = {
 
 type StandingsPayload = {
   standings: StandingRow[];
+  /**
+   * Camp-wide notices ride along with the standings rather than getting their
+   * own polled endpoint. The board already asks for this payload on a timer,
+   * so this adds no requests and reuses the same cache and ETag — a second
+   * endpoint on its own interval would have doubled the invocation count for
+   * data that changes a handful of times a weekend.
+   */
+  messages: CampMessageRow[];
   asOf: string;
 };
 
@@ -40,12 +49,17 @@ export function invalidateStandingsCache() {
  */
 function revisionOf(data: StandingsPayload): string {
   let hash = 5381;
-  const canonical = data.standings
-    .map(
-      (r) =>
-        `${r.id}:${r.name}:${r.color}:${r.score}:${r.campGroup ?? ""}:${r.cabinId ?? ""}`,
-    )
-    .join("|");
+  const canonical = [
+    data.standings
+      .map(
+        (r) =>
+          `${r.id}:${r.name}:${r.color}:${r.score}:${r.campGroup ?? ""}:${r.cabinId ?? ""}`,
+      )
+      .join("|"),
+    // Notices are part of what the client renders, so a new one has to move the
+    // revision or campers would sit on a 304 and never see it.
+    data.messages.map((m) => `${m.id}:${m.pinned ? 1 : 0}:${m.body}`).join("|"),
+  ].join("#");
   for (let i = 0; i < canonical.length; i++) {
     hash = ((hash << 5) + hash + canonical.charCodeAt(i)) | 0;
   }
@@ -94,6 +108,9 @@ export async function getStandings(): Promise<StandingsPayload> {
       asc(teams.createdAt),
     );
 
+  // Fetched alongside the roster; both land inside the same 800ms cache window.
+  const messages = await getMessages();
+
   const standings: StandingRow[] = rows.map((row, index) => ({
     id: row.id,
     name: row.name,
@@ -106,6 +123,7 @@ export async function getStandings(): Promise<StandingsPayload> {
 
   return {
     standings,
+    messages,
     asOf: new Date().toISOString(),
   };
 }

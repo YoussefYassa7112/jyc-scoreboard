@@ -31,6 +31,7 @@ import {
   writeFieldNotes,
   type FieldNote,
 } from "@/lib/field-notes";
+import { type CampMessageRow } from "@/lib/messages";
 import { TEAM_COLORS } from "@/lib/standings";
 import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
 import { teamChipStyle } from "@/lib/utils";
@@ -40,6 +41,7 @@ import { forgetTeamEverywhere } from "@/lib/offline";
 import { useOnline } from "@/lib/use-online";
 import { FieldNotes } from "./FieldNotes";
 import { AwardPointsPanel } from "./AwardPointsPanel";
+import { CampMessagesPanel } from "./CampMessagesPanel";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { OfflineBanner, NeedsWifiNotice } from "./OfflineBanner";
@@ -78,6 +80,7 @@ export function AdminDashboard() {
   const [leavingToBoard, startLeaveToBoard] = useTransition();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [messages, setMessages] = useState<CampMessageRow[]>([]);
   const [toasts, setToasts] = useState<AdminToast[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingDelete, setPendingDelete] = useState<{
@@ -157,9 +160,10 @@ export function AdminDashboard() {
   );
 
   const refresh = useCallback(async () => {
-    const [teamsRes, historyRes] = await Promise.all([
+    const [teamsRes, historyRes, messagesRes] = await Promise.all([
       fetch("/api/teams", { cache: "no-store" }),
       fetch("/api/points", { cache: "no-store" }),
+      fetch("/api/messages", { cache: "no-store" }),
     ]);
     if (!teamsRes.ok || !historyRes.ok) {
       throw new Error("Failed to load admin data");
@@ -169,6 +173,14 @@ export function AdminDashboard() {
     setTeams(teamsJson.teams);
     writeAdminTeamsCache(teamsJson.teams);
     setHistory(historyJson.history);
+    // Notices are not cached for offline the way teams are — sending one needs
+    // the network anyway, so an empty list offline is honest rather than stale.
+    if (messagesRes.ok) {
+      const messagesJson = (await messagesRes.json()) as {
+        messages: CampMessageRow[];
+      };
+      setMessages(messagesJson.messages);
+    }
   }, []);
 
   useEffect(() => {
@@ -544,6 +556,59 @@ export function AdminDashboard() {
     });
   }
 
+  function sendMessage(body: string, pinned: boolean) {
+    if (!requireOnline()) return;
+    void run("send-message", async () => {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body, pinned }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not send the notice");
+        return;
+      }
+      await refresh();
+      flash("Notice sent", "Everyone on the camp board will see it.");
+    });
+  }
+
+  function removeMessage(message: CampMessageRow) {
+    if (!requireOnline()) return;
+    void run(`message-${message.id}`, async () => {
+      const res = await fetch(`/api/messages/${message.id}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not remove the notice");
+        return;
+      }
+      setMessages((current) => current.filter((m) => m.id !== message.id));
+      await refresh();
+      flash("Notice removed", "It is gone from the camp board.");
+    });
+  }
+
+  function toggleMessagePin(message: CampMessageRow) {
+    if (!requireOnline()) return;
+    void run(`message-${message.id}`, async () => {
+      const res = await fetch(`/api/messages/${message.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: !message.pinned }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        fail(data.error || "Could not update the notice");
+        return;
+      }
+      await refresh();
+      flash(message.pinned ? "Unpinned" : "Pinned to the top");
+    });
+  }
+
   function startEdit(team: TeamRow) {
     setEditingId(team.id);
     setEditName(team.name);
@@ -804,6 +869,18 @@ export function AdminDashboard() {
                 </fieldset>
               </motion.form>
             </section>
+
+            <CampMessagesPanel
+              messages={messages}
+              online={online}
+              sending={isBusy("send-message")}
+              busyId={
+                messages.find((m) => isBusy(`message-${m.id}`))?.id ?? null
+              }
+              onSend={sendMessage}
+              onDelete={removeMessage}
+              onTogglePin={toggleMessagePin}
+            />
 
             <motion.div variants={panelIn}>
               <SpiderChart teams={sortedTeams} />

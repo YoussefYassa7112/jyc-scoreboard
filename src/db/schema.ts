@@ -29,5 +29,19 @@ export const pointEvents = pgTable("point_events", {
     .defaultNow(),
 });
 
+/**
+ * Camp-wide announcements written by staff and shown to everyone.
+ * `pinned` keeps a notice at the top of the camper board until it is unpinned.
+ */
+export const campMessages = pgTable("camp_messages", {
+  id: serial("id").primaryKey(),
+  body: text("body").notNull(),
+  pinned: integer("pinned").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type Team = typeof teams.$inferSelect;
 export type PointEvent = typeof pointEvents.$inferSelect;
+export type CampMessage = typeof campMessages.$inferSelect;

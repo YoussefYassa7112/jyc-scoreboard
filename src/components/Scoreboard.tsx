@@ -30,6 +30,7 @@ import {
   type MyTeamSnapshot,
 } from "@/lib/offline";
 import { diffStandings, type BoardAlert } from "@/lib/rank-alerts";
+import type { CampMessageRow } from "@/lib/messages";
 import type { StandingRow } from "@/lib/standings";
 import { LIVE_CAMP_SIM } from "@/lib/schedule-sim";
 import { useTheme } from "@/lib/theme";
@@ -37,6 +38,7 @@ import { useOnline } from "@/lib/use-online";
 import { setPresentationMode, usePresentationMode } from "@/lib/presentation";
 import { AdminToasts, type AdminToast } from "./AdminToasts";
 import { BoardAlerts } from "./BoardAlerts";
+import { CampNotices } from "./CampNotices";
 import { CampStatStrip } from "./CampStatStrip";
 import { useIntroReady } from "./IntroSplash";
 import { BuildingMap } from "./BuildingMap";
@@ -68,6 +70,7 @@ const TABS: { id: BoardTab; label: string }[] = [
 
 type StandingsResponse = {
   standings: StandingRow[];
+  messages?: CampMessageRow[];
   asOf: string;
   rev?: string;
 };
@@ -299,6 +302,28 @@ export function Scoreboard() {
       reminder.phase === "started" ? "Happening now" : "Time to go",
       { body: `${reminder.title}. ${reminder.body}`, tag: reminder.key },
     );
+  }, []);
+
+  const pushNoticeToast = useCallback((message: CampMessageRow) => {
+    const id = `notice-${message.id}`;
+    setToasts((current) =>
+      [
+        ...current.filter((toast) => toast.id !== id),
+        { id, kind: "notice" as const, title: message.body },
+      ].slice(-4),
+    );
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 14_000);
+    try {
+      navigator.vibrate?.([120, 60, 120]);
+    } catch {
+      /* unsupported */
+    }
+    void showLocalNotification("Camp notice", {
+      body: message.body,
+      tag: id,
+    });
   }, []);
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
@@ -705,6 +730,15 @@ export function Scoreboard() {
               : "Needs WiFi for live scores. Map & Schedule still work on this device."
           }
         />
+
+        {/* Above the tabs on purpose: a notice only shown on one section is a
+            notice half the camp never sees. */}
+        {!presenting && data?.messages?.length ? (
+          <CampNotices
+            messages={data.messages}
+            onNewMessage={pushNoticeToast}
+          />
+        ) : null}
 
         <nav
           ref={navRef}

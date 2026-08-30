@@ -2,7 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 
-export type ToastKind = "success" | "error" | "reminder" | "started" | "ended";
+export type ToastKind =
+  | "success"
+  | "error"
+  | "reminder"
+  | "started"
+  | "ended"
+  | "notice";
 
 export type AdminToast = {
   id: string;
@@ -28,24 +34,29 @@ export function AdminToasts({ toasts, onDismiss }: Props) {
           const reminder = toast.kind === "reminder";
           const started = toast.kind === "started";
           const ended = toast.kind === "ended";
+          const notice = toast.kind === "notice";
           const label = success
             ? "Nice!"
-            : started
-              ? "Happening now"
-              : ended
-                ? "Just ended"
-                : reminder
-                  ? "Time to go"
-                  : "Hold up";
+            : notice
+              ? "Camp notice"
+              : started
+                ? "Happening now"
+                : ended
+                  ? "Just ended"
+                  : reminder
+                    ? "Time to go"
+                    : "Hold up";
           const emoji = success
             ? "⭐"
-            : started
-              ? "🔔"
-              : ended
-                ? "✅"
-                : reminder
-                  ? "⏰"
-                  : "🤠";
+            : notice
+              ? "📣"
+              : started
+                ? "🔔"
+                : ended
+                  ? "✅"
+                  : reminder
+                    ? "⏰"
+                    : "🤠";
           return (
             <motion.button
               key={toast.id}
@@ -56,13 +67,15 @@ export function AdminToasts({ toasts, onDismiss }: Props) {
                 opacity: 1,
                 y: 0,
                 scale: 1,
-                rotate: success ? 1.2 : started ? 0.4 : ended ? -0.4 : reminder ? 0.6 : -1.2,
+                rotate: success ? 1.2 : notice ? 0.8 : started ? 0.4 : ended ? -0.4 : reminder ? 0.6 : -1.2,
               }}
               exit={{ opacity: 0, y: -12, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 420, damping: 24 }}
               className={`pointer-events-auto w-full rounded-2xl border-2 px-4 py-3 text-left shadow-[0_16px_40px_rgba(42,31,20,0.22)] ${
                 success
                   ? "border-emerald-400/50 bg-[#ecfdf3] text-emerald-800 dark:bg-[#123024] dark:text-emerald-200"
+                  : notice
+                    ? "border-star/60 bg-[#fff4d6] text-[#5c4033] dark:bg-[#2a2414] dark:text-[#f0e2cc]"
                   : started
                     ? "border-red-500/60 bg-red-50 text-red-700 dark:bg-[#3f1010] dark:text-red-200"
                     : ended
