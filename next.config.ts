@@ -34,9 +34,12 @@ const withSerwist = withSerwistInit({
     // Staff need the dashboard shell to open with no connection so the field
     // notes stay usable; without this the navigation fallback serves /~offline.
     { url: "/admin", revision },
-    // Reachable offline too: the gate sends staff here when this device has no
-    // record of a sign-in, and a redirect to an uncached page is a dead end.
-    { url: "/admin/login", revision },
+    // Deliberately NOT precaching /admin/login. It is a server component that
+    // redirects signed-in staff to /admin, and the service worker installs in a
+    // signed-in browser with cookies attached — so precaching it stores the
+    // /admin page under the /admin/login key. Offline that turns any bounce to
+    // the login page into an endless /admin <-> /admin/login flicker. The gate
+    // no longer navigates there without a connection, which is the real fix.
     ...publicEntries("map", revision),
     ...publicEntries("icons", revision),
   ],

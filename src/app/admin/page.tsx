@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import {
@@ -27,9 +28,9 @@ import {
  */
 export default function AdminPage() {
   const router = useRouter();
-  const [state, setState] = useState<"checking" | "allowed" | "denied">(
-    "checking",
-  );
+  const [state, setState] = useState<
+    "checking" | "allowed" | "denied" | "needsWifi"
+  >("checking");
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +39,9 @@ export default function AdminPage() {
       // No connection: the server cannot be asked, so go on what this device
       // last knew. Nothing sensitive is reachable without the cookie anyway.
       if (!navigator.onLine) {
-        if (!cancelled) setState(wasAdminSignedIn() ? "allowed" : "denied");
+        if (!cancelled) {
+          setState(wasAdminSignedIn() ? "allowed" : "needsWifi");
+        }
         return;
       }
       try {
@@ -69,7 +72,9 @@ export default function AdminPage() {
       } catch {
         // Online-ish but the check failed (flaky camp WiFi). Fall back to what
         // we last knew rather than throwing staff out mid-session.
-        if (!cancelled) setState(wasAdminSignedIn() ? "allowed" : "denied");
+        if (!cancelled) {
+          setState(wasAdminSignedIn() ? "allowed" : "needsWifi");
+        }
       }
     })();
 
@@ -78,6 +83,11 @@ export default function AdminPage() {
     };
   }, []);
 
+  // Only ever navigate away when the server actually answered. Offline this
+  // used to bounce to /admin/login, and if anything served that path from
+  // cache the two pages handed each other back and forth — a flickering tab
+  // firing request after request, never opening. Now a device with no record
+  // of a sign-in just says so, in place, and nothing navigates.
   useEffect(() => {
     if (state === "denied") router.replace("/admin/login");
   }, [state, router]);
@@ -93,6 +103,32 @@ export default function AdminPage() {
   }
 
   if (state === "denied") return null;
+
+  if (state === "needsWifi") {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+        <div className="panel w-full max-w-md rounded-3xl p-6 text-center sm:p-8">
+          <p className="inline-flex items-center rounded-xl bg-star px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-on-star">
+            Needs WiFi
+          </p>
+          <h1 className="display-font mt-3 text-3xl font-bold text-ink">
+            Sign in once to use this offline
+          </h1>
+          <p className="mt-3 text-sm font-semibold text-muted">
+            This device has no record of a staff sign-in, and signing in needs a
+            connection. Connect to WiFi, sign in once, and the dashboard will
+            open without one from then on.
+          </p>
+          <Link
+            href="/"
+            className="btn-cta mt-6 inline-flex rounded-xl bg-star px-4 py-3 text-sm font-extrabold"
+          >
+            Back to the scoreboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return <AdminDashboard />;
 }
