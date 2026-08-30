@@ -73,6 +73,14 @@ type HistoryRow = {
   createdAt: string;
 };
 
+/**
+ * Not a failure worth a toast — it is the expected answer with no WiFi.
+ * Declared at module scope so `instanceof` holds: a class defined inside the
+ * component would be a new identity on every render, and the check would run
+ * against a different class than the one `refresh` was created with.
+ */
+class OfflineError extends Error {}
+
 type AdminTabId = "award" | "teams" | "notices" | "history" | "qr";
 
 /** Order matters: it decides which way a panel slides in. */
@@ -225,11 +233,25 @@ export function AdminDashboard() {
   );
 
   const refresh = useCallback(async () => {
+    // Camp WiFi fails in two different ways and they need different handling.
+    // A phone that knows it is offline should not open a socket at all: the
+    // service worker answers /api/* network-first, so the request only ends in
+    // the same cache lookup we can do ourselves, several seconds later.
+    if (!navigator.onLine) throw new OfflineError();
+    // The nastier case is a connection that is up but going nowhere — a camp
+    // access point with no uplink. There the request neither succeeds nor
+    // fails, and the network-first strategy waits ten seconds before giving up
+    // on each call. Cut it short so staff reach the cached dashboard quickly.
+    // A plain controller rather than AbortSignal.timeout, which is newer than
+    // some of the phones that will be carried around this camp.
+    const attempt = new AbortController();
+    const deadline = window.setTimeout(() => attempt.abort(), 6000);
+    const signal = attempt.signal;
     const [teamsRes, historyRes, messagesRes] = await Promise.all([
-      fetch("/api/teams", { cache: "no-store" }),
-      fetch("/api/points", { cache: "no-store" }),
-      fetch("/api/messages", { cache: "no-store" }),
-    ]);
+      fetch("/api/teams", { cache: "no-store", signal }),
+      fetch("/api/points", { cache: "no-store", signal }),
+      fetch("/api/messages", { cache: "no-store", signal }),
+    ]).finally(() => window.clearTimeout(deadline));
     if (!teamsRes.ok || !historyRes.ok) {
       throw new Error("Failed to load admin data");
     }
@@ -269,11 +291,12 @@ export function AdminDashboard() {
           const cached = readAdminTeamsCache();
           if (cached.length) {
             setTeams(cached);
-            setLoading(false);
-          } else {
+          } else if (!(err instanceof OfflineError)) {
             fail(err instanceof Error ? err.message : "Load failed");
-            setLoading(false);
           }
+          // Either way the shell has to render. Staying on "Loading…" hides the
+          // field notes, which are the part meant to work with no connection.
+          setLoading(false);
         }
       }
     })();
@@ -744,19 +767,19 @@ export function AdminDashboard() {
           detail="Needs WiFi to add teams, change cabins, or post live points. You can still jot field notes on this phone, then post them when you're back."
         />
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* Deliberately not an AnimatePresence `mode="wait"` swap.
+            That gate holds the dashboard back until the "Loading…" exit
+            animation finishes, and framer drives exits with rAF — which a
+            browser does not run for a page being restored or resumed in the
+            background. Offline that is exactly when this renders, so the exit
+            never completed and the dashboard never mounted: a permanent
+            "Loading…" on a page whose whole point is working without WiFi. */}
         {loading ? (
-          <motion.p
-            key="loading"
-            variants={panelIn}
-            exit={{ opacity: 0, y: -10, transition: fadeSoft }}
-            className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft"
-          >
+          <p className="panel rounded-3xl px-5 py-10 text-center font-bold text-muted-soft">
             Loading…
-          </motion.p>
+          </p>
         ) : (
           <motion.div
-            key="content"
             variants={contentSwap}
             className="flex flex-col gap-5"
           >
@@ -1458,7 +1481,6 @@ export function AdminDashboard() {
             </div>
           </motion.div>
         )}
-        </AnimatePresence>
       </motion.div>
 
       <AdminToasts

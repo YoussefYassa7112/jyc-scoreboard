@@ -431,6 +431,9 @@ export function Scoreboard() {
     const controller = new AbortController();
 
     async function load() {
+      // True when this attempt was cut short by the deadline below rather than
+      // by the effect tearing down, which the catch has to tell apart.
+      let timedOut = false;
       if (!navigator.onLine) {
         const cached = readStandingsCache();
         if (!cancelled) {
@@ -452,9 +455,28 @@ export function Scoreboard() {
       try {
         const headers: HeadersInit = {};
         if (lastEtag.current) headers["If-None-Match"] = lastEtag.current;
+        // navigator.onLine only catches the clean case. A camp access point
+        // that is associated but has no uplink still reports online, and the
+        // service worker waits ten seconds before falling back to cache — ten
+        // seconds of spinner on a board that already has yesterday's standings
+        // in localStorage. Give up sooner and show what we have.
+        //
+        // The deadline gets its own controller: the effect's controller is
+        // shared by every poll, so aborting that one would leave it aborted
+        // and kill all later refreshes rather than just this attempt.
+        const attempt = new AbortController();
+        const relay = () => attempt.abort();
+        controller.signal.addEventListener("abort", relay, { once: true });
+        const timeout = window.setTimeout(() => {
+          timedOut = true;
+          attempt.abort();
+        }, 6000);
         const res = await fetch("/api/standings", {
           headers,
-          signal: controller.signal,
+          signal: attempt.signal,
+        }).finally(() => {
+          window.clearTimeout(timeout);
+          controller.signal.removeEventListener("abort", relay);
         });
         if (cancelled) return;
         if (res.status === 304 || res.status === 204) {
@@ -492,7 +514,12 @@ export function Scoreboard() {
         }
       } catch (error) {
         if (cancelled) return;
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        // An abort from the effect tearing down means nobody is listening any
+        // more. An abort from the deadline means the network is dead and the
+        // cache below is exactly what the camper should be looking at.
+        const aborted =
+          error instanceof DOMException && error.name === "AbortError";
+        if (aborted && !timedOut) return;
         const cached = readStandingsCache();
         if (cached) {
           setData({ standings: cached.standings, asOf: cached.asOf });

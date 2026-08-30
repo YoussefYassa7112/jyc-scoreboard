@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { clearAdminSignedIn, wasAdminSignedIn } from "@/lib/admin-session";
+import {
+  clearAdminSignedIn,
+  markAdminSignedIn,
+  wasAdminSignedIn,
+} from "@/lib/admin-session";
 
 /**
  * Gated on the client rather than on the server.
@@ -38,10 +42,23 @@ export default function AdminPage() {
         return;
       }
       try {
-        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        // A camp access point with no uplink neither answers nor fails, and
+        // this check sits in front of the whole dashboard. Six seconds, then
+        // fall through to what this device already knows.
+        const attempt = new AbortController();
+        const deadline = window.setTimeout(() => attempt.abort(), 6000);
+        const res = await fetch("/api/auth/me", {
+          cache: "no-store",
+          signal: attempt.signal,
+        }).finally(() => window.clearTimeout(deadline));
         const data = (await res.json()) as { authenticated?: boolean };
         if (cancelled) return;
         if (data.authenticated) {
+          // Re-arm the offline marker on every confirmed visit. It was only
+          // ever written at sign-in, so a device with a live cookie but no
+          // marker — storage cleared, or signed in before this existed — would
+          // be turned away the first time it opened the dashboard offline.
+          markAdminSignedIn();
           setState("allowed");
         } else {
           // The cookie is gone or expired — drop the marker so a later offline
