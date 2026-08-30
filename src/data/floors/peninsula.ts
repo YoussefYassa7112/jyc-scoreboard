@@ -1,7 +1,7 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — Jeune-Air 2, reached from the "Jeune-Air 2" pin on the camp
+ * Detail map — Sablon, reached from the "Sablon" pin on the camp
  * overview and from its own tab.
  *
  * The id stays `peninsula`: it is what locations.ts and the overview pin key
@@ -9,15 +9,15 @@ import type { FloorPlan } from "./types";
  *
  * Water sits west, the point runs east. Only the two annotated spots are
  * named buildings: the baignade — the swimming water, labelled Lake here —
- * and Dorm 3 · Le P'tit Bonheur, which sits out toward the east end. The
+ * and the Sablon cabin · Le P'tit Bonheur, which sits out toward the east end. The
  * shoreline details (pier, beach, boats) are read off the survey photo; the
  * rest of the point is woods.
  */
 export const peninsulaFloor: FloorPlan = {
   id: "peninsula",
-  label: "Jeune-Air 2",
+  label: "Sablon",
   siteTitle: "Le P'tit Bonheur",
-  banner: "JEUNE-AIR 2",
+  banner: "SABLON",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 700 },
   outline: "M30,30 H1030 V670 H30 Z",
@@ -27,7 +27,7 @@ export const peninsulaFloor: FloorPlan = {
       name: "Lake — Baignade",
       labelLines: ["Lake"],
       blurb:
-        "The baignade — swimming water off the west shore of Jeune-Air 2.",
+        "The baignade — swimming water off the west shore of Sablon.",
       kind: "water",
       x: 50,
       y: 50,
@@ -69,9 +69,9 @@ export const peninsulaFloor: FloorPlan = {
     },
     {
       id: "dorm-3",
-      name: "Dorm 3 · Le P'tit Bonheur",
-      labelLines: ["Dorm 3", "Le P'tit Bonheur"],
-      blurb: "Jeune-Air 2 cabin — Le P'tit Bonheur, out toward the east end.",
+      name: "Sablon",
+      labelLines: ["Sablon"],
+      blurb: "Sablon cabin — Le P'tit Bonheur, out toward the east end.",
       kind: "building",
       x: 620,
       y: 260,
@@ -91,7 +91,7 @@ export const peninsulaFloor: FloorPlan = {
       label: "Path along the point",
     },
     {
-      // The point is mostly woods now that the buildings are down to Dorm 3.
+      // The point is mostly woods now that the buildings are down to the Sablon cabin.
       // Every spot is checked against the room rects so nothing sits on a room.
       type: "trees",
       spots: [
@@ -109,7 +109,7 @@ export const peninsulaFloor: FloorPlan = {
         { x: 740, y: 205 },
         { x: 860, y: 200 },
         { x: 960, y: 215 },
-        // the belt between the shore and Dorm 3
+        // the belt between the shore and the Sablon cabin
         { x: 455, y: 290 },
         { x: 500, y: 350 },
         { x: 460, y: 420 },
@@ -118,7 +118,7 @@ export const peninsulaFloor: FloorPlan = {
         { x: 550, y: 560 },
         { x: 590, y: 300 },
         { x: 580, y: 420 },
-        // east of Dorm 3, toward the tip
+        // east of the Sablon cabin, toward the tip
         { x: 1000, y: 300 },
         { x: 1005, y: 390 },
         // south side, above the path

@@ -97,6 +97,10 @@ export type CampRoute = {
   minutes: number;
   /** Written directions, for anyone who would rather read than squint. */
   steps: string[];
+  /** The same walk described the other way round. Landmarks pass in the
+   *  opposite order and "left" becomes "right", so this cannot be generated
+   *  by reversing the list. */
+  stepsBack: string[];
 };
 
 export type FloorBackgroundImage = {

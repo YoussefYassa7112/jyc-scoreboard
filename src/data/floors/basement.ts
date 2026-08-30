@@ -3,8 +3,8 @@ import type { FloorPlan } from "./types";
 /**
  * CENTRAL basement (sous-sol) floor plan.
  *
- * CENTRAL stands on Jeune-Air 1, so this is parented there rather than to the
- * overview — that is what puts "Jeune-Air 1" in the heading, under the tab, and
+ * CENTRAL stands on Jeune-Air, so this is parented there rather than to the
+ * overview — that is what puts "Jeune-Air" in the heading, under the tab, and
  * on the back button, so nobody has to guess which site to walk to.
  *
  * ViewBox 0 0 1060 560 — add other floors beside this file.
@@ -12,8 +12,8 @@ import type { FloorPlan } from "./types";
 export const basementFloor: FloorPlan = {
   id: "basement",
   label: "Basement",
-  siteTitle: "Jeune-Air 1 · CENTRAL",
-  banner: "JEUNE-AIR 1 · CENTRAL — BASEMENT",
+  siteTitle: "Jeune-Air · CENTRAL",
+  banner: "JEUNE-AIR · CENTRAL — BASEMENT",
   parentFloorId: "north-shore",
   viewBox: { w: 1060, h: 560 },
   outline: "M40,40 H860 V220 H1040 V420 H860 V500 H40 Z",

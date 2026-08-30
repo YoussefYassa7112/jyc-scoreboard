@@ -1,7 +1,7 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — Jeune-Air 1, reached from the "Jeune-Air 1" pin on the camp
+ * Detail map — Jeune-Air, reached from the "Jeune-Air" pin on the camp
  * overview and from its own tab.
  *
  * The id stays `north-shore`: it is what locations.ts and the overview pin key
@@ -12,14 +12,14 @@ import type { FloorPlan } from "./types";
  * B4 is replaced by the two dorms that actually sit on this shore.
  *
  * Layout: lake north, road south, CENTRAL on the east with the open field
- * beside it, the two dorms across the bottom, and the volleyball court in
- * front of Dorm 1.
+ * beside it, the two cabins across the bottom, and the volleyball court in
+ * front of the west cabin.
  */
 export const northShoreFloor: FloorPlan = {
   id: "north-shore",
-  label: "Jeune-Air 1",
+  label: "Jeune-Air",
   siteTitle: "Le P'tit Bonheur",
-  banner: "JEUNE-AIR 1",
+  banner: "JEUNE-AIR",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 720 },
   outline: "M30,30 H1030 V690 H30 Z",
@@ -67,7 +67,7 @@ export const northShoreFloor: FloorPlan = {
       id: "volleyball",
       name: "Volleyball area",
       labelLines: ["Volleyball"],
-      blurb: "Volleyball court in front of Dorm 1.",
+      blurb: "Volleyball court in front of the west cabin.",
       kind: "activity",
       x: 150,
       y: 365,
@@ -76,8 +76,8 @@ export const northShoreFloor: FloorPlan = {
     },
     {
       id: "dorm-1",
-      name: "Dorm 1 · Girls",
-      labelLines: ["Dorm 1", "Girls"],
+      name: "Jeune-Air 2 · Girls",
+      labelLines: ["Jeune-Air 2", "Girls"],
       blurb: "Girls sleep here — west end of the shore, behind the volleyball court.",
       kind: "building",
       x: 170,
@@ -87,8 +87,8 @@ export const northShoreFloor: FloorPlan = {
     },
     {
       id: "dorm-2",
-      name: "Dorm 2 · Boys & committee",
-      labelLines: ["Dorm 2", "Boys + committee"],
+      name: "Jeune-Air 1 · Boys & committee",
+      labelLines: ["Jeune-Air 1", "Boys + committee"],
       blurb:
         "Boys and the committee sleep here — east end of the shore, below CENTRAL.",
       kind: "building",
@@ -132,8 +132,6 @@ export const northShoreFloor: FloorPlan = {
         { x: 150, y: 265 },
         { x: 235, y: 300 },
         { x: 320, y: 300 },
-        { x: 318, y: 420 },
-        { x: 360, y: 560 },
         { x: 430, y: 600 },
         { x: 500, y: 555 },
         { x: 570, y: 600 },

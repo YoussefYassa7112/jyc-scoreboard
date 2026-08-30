@@ -105,6 +105,15 @@ function routeD(points: [number, number][]) {
   return d;
 }
 
+/**
+ * Zoom bounds. Multiplying rather than adding a fixed amount keeps each tap
+ * feeling like the same size change whether you are at 0.7x or 3x — a fixed
+ * step is a huge jump at the bottom and a barely visible one at the top.
+ */
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 1.35;
+
 const BASE_PIN_UNITS = 80;
 /** How tall a pin should look on screen, whatever the map is scaled to. */
 const TARGET_PIN_PX = 30;
@@ -463,7 +472,7 @@ export function BuildingMap({
   const [floorDir, setFloorDir] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [routeId, setRouteId] = useState<string | null>(null);
+  const [routeKey, setRouteKey] = useState<string | null>(null);
   const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
   const [highlightBlockId, setHighlightBlockId] = useState<string | null>(null);
 
@@ -552,8 +561,40 @@ export function BuildingMap({
     observer.observe(el);
     return () => observer.disconnect();
   }, [floor.viewBox.w]);
-  const floorRoutes = routesForFloor(floor.id);
-  const activeRoute = floorRoutes.find((route) => route.id === routeId) ?? null;
+  // Every route is walkable both ways, and a camper standing at the fire pit
+  // needs the same line read backwards — so each one offers two directions
+  // rather than making them work it out from an arrow pointing the wrong way.
+  const routeOptions = routesForFloor(floor.id).flatMap((route) => [
+    {
+      key: `${route.id}|out`,
+      route,
+      reversed: false,
+      from: route.fromLabel,
+      to: route.toLabel,
+    },
+    {
+      key: `${route.id}|back`,
+      route,
+      reversed: true,
+      from: route.toLabel,
+      to: route.fromLabel,
+    },
+  ]);
+  const activeOption =
+    routeOptions.find((option) => option.key === routeKey) ?? null;
+  const activeRoute = activeOption
+    ? {
+        ...activeOption.route,
+        points: activeOption.reversed
+          ? [...activeOption.route.points].reverse()
+          : activeOption.route.points,
+        steps: activeOption.reversed
+          ? activeOption.route.stepsBack
+          : activeOption.route.steps,
+        fromLabel: activeOption.from,
+        toLabel: activeOption.to,
+      }
+    : null;
 
   const aerial = Boolean(floor.backgroundImage);
   const overview = aerial && floor.rooms.every((r) => r.marker === "pin");
@@ -720,27 +761,27 @@ export function BuildingMap({
         </div>
       ) : null}
 
-      {floorRoutes.length ? (
+      {routeOptions.length ? (
         <div className="mt-3">
           <p className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
             Walking routes
           </p>
           <div className="mt-1.5 flex flex-wrap gap-2">
-            {floorRoutes.map((route) => {
-              const on = route.id === routeId;
+            {routeOptions.map((option) => {
+              const on = option.key === routeKey;
               return (
                 <button
-                  key={route.id}
+                  key={option.key}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => setRouteId(on ? null : route.id)}
+                  onClick={() => setRouteKey(on ? null : option.key)}
                   className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-xs font-extrabold ${
                     on ? "border-star bg-star text-on-star" : "btn-chip"
                   }`}
                 >
-                  {route.fromLabel} → {route.toLabel}
+                  {option.from} → {option.to}
                   <span className="ml-1.5 font-bold opacity-75">
-                    {route.minutes} min
+                    {on ? "tap to hide" : `${option.route.minutes} min`}
                   </span>
                 </button>
               );
@@ -760,6 +801,10 @@ export function BuildingMap({
               Yellow bar = cross the street
             </span>
           </div>
+
+          <p className="mt-2 text-[11px] font-bold text-muted-soft">
+            Tap the same route again to hide it.
+          </p>
 
           {campTransportNotes.map((note) => (
             <p
@@ -782,7 +827,7 @@ export function BuildingMap({
         <button
           type="button"
           aria-label="Zoom out"
-          onClick={() => setZoom((z) => Math.max(0.9, +(z - 0.25).toFixed(2)))}
+          onClick={() => setZoom((z) => Math.max(ZOOM_MIN, +(z / ZOOM_STEP).toFixed(2)))}
           className="btn-soft min-h-11 flex-1 cursor-pointer rounded-xl border px-0 text-lg font-extrabold sm:min-w-11 sm:flex-none"
         >
           −
@@ -790,7 +835,7 @@ export function BuildingMap({
         <button
           type="button"
           aria-label="Zoom in"
-          onClick={() => setZoom((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
+          onClick={() => setZoom((z) => Math.min(ZOOM_MAX, +(z * ZOOM_STEP).toFixed(2)))}
           className="btn-soft min-h-11 flex-1 cursor-pointer rounded-xl border px-0 text-lg font-extrabold sm:min-w-11 sm:flex-none"
         >
           +
@@ -1447,7 +1492,7 @@ export function BuildingMap({
 
           <p className="mt-3 text-[11px] font-bold text-muted-soft">
             Traced from the aerial photo — follow the trail you can see, not the
-            line to the pixel.
+            line to the pixel. Tap the route button again to hide it.
           </p>
         </div>
       ) : null}
