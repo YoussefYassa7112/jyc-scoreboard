@@ -20,9 +20,9 @@ const PIN = 96;
  * the spots they cover:
  *
  *   Arbre en Arbre (219,116)
- *   Camp site 1    dorm 1 (478,105) · cafeteria (508,149) · dorm 2 (485,193)
+ *   Jeune-Air 1    dorm 1 (478,105) · cafeteria (508,149) · dorm 2 (485,193)
  *   Camp fire      (220,301)
- *   Camp site 2    baignade (645,449) · dorm 3 (716,509)
+ *   Jeune-Air 2    baignade (645,449) · dorm 3 (716,509)
  */
 export const outdoorFloor: FloorPlan = {
   id: "outdoor",
@@ -48,8 +48,8 @@ export const outdoorFloor: FloorPlan = {
     },
     {
       id: "north-shore-area",
-      name: "Camp site 1",
-      labelLines: ["Camp site 1"],
+      name: "Jeune-Air 1",
+      labelLines: ["Jeune-Air 1"],
       blurb:
         "Dorm 1, Dorm 2, and the cafeteria — topics, baby foot, vespers & liturgy.",
       kind: "building",
@@ -75,8 +75,8 @@ export const outdoorFloor: FloorPlan = {
     },
     {
       id: "peninsula-area",
-      name: "Camp site 2",
-      labelLines: ["Camp site 2"],
+      name: "Jeune-Air 2",
+      labelLines: ["Jeune-Air 2"],
       blurb: "Baignade (swimming) and Dorm 3 · Le P'tit Bonheur.",
       kind: "building",
       marker: "pin",

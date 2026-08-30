@@ -1,7 +1,7 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — Camp site 1, reached from the "Camp site 1" pin on the camp
+ * Detail map — Jeune-Air 1, reached from the "Jeune-Air 1" pin on the camp
  * overview and from its own tab.
  *
  * The id stays `north-shore`: it is what locations.ts and the overview pin key
@@ -17,9 +17,9 @@ import type { FloorPlan } from "./types";
  */
 export const northShoreFloor: FloorPlan = {
   id: "north-shore",
-  label: "Camp site 1",
+  label: "Jeune-Air 1",
   siteTitle: "Le P'tit Bonheur",
-  banner: "CAMP SITE 1",
+  banner: "JEUNE-AIR 1",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 720 },
   outline: "M30,30 H1030 V690 H30 Z",
@@ -69,27 +69,28 @@ export const northShoreFloor: FloorPlan = {
       labelLines: ["Volleyball"],
       blurb: "Volleyball court in front of Dorm 1.",
       kind: "activity",
-      x: 100,
+      x: 150,
       y: 365,
       w: 190,
       h: 115,
     },
     {
       id: "dorm-1",
-      name: "Dorm 1",
-      labelLines: ["Dorm 1"],
-      blurb: "Cabin at the west end of the shore, behind the volleyball court.",
+      name: "Dorm 1 · Girls",
+      labelLines: ["Dorm 1", "Girls"],
+      blurb: "Girls sleep here — west end of the shore, behind the volleyball court.",
       kind: "building",
-      x: 80,
+      x: 170,
       y: 505,
       w: 230,
       h: 105,
     },
     {
       id: "dorm-2",
-      name: "Dorm 2",
-      labelLines: ["Dorm 2"],
-      blurb: "Cabin at the east end of the shore, below CENTRAL.",
+      name: "Dorm 2 · Boys & committee",
+      labelLines: ["Dorm 2", "Boys + committee"],
+      blurb:
+        "Boys and the committee sleep here — east end of the shore, below CENTRAL.",
       kind: "building",
       x: 700,
       y: 505,

@@ -1,7 +1,7 @@
 import type { FloorPlan } from "./types";
 
 /**
- * Detail map — Camp site 2, reached from the "Camp site 2" pin on the camp
+ * Detail map — Jeune-Air 2, reached from the "Jeune-Air 2" pin on the camp
  * overview and from its own tab.
  *
  * The id stays `peninsula`: it is what locations.ts and the overview pin key
@@ -15,9 +15,9 @@ import type { FloorPlan } from "./types";
  */
 export const peninsulaFloor: FloorPlan = {
   id: "peninsula",
-  label: "Camp site 2",
+  label: "Jeune-Air 2",
   siteTitle: "Le P'tit Bonheur",
-  banner: "CAMP SITE 2",
+  banner: "JEUNE-AIR 2",
   parentFloorId: "outdoor",
   viewBox: { w: 1060, h: 700 },
   outline: "M30,30 H1030 V670 H30 Z",
@@ -27,7 +27,7 @@ export const peninsulaFloor: FloorPlan = {
       name: "Lake — Baignade",
       labelLines: ["Lake"],
       blurb:
-        "The baignade — swimming water off the west shore of camp site 2.",
+        "The baignade — swimming water off the west shore of Jeune-Air 2.",
       kind: "water",
       x: 50,
       y: 50,
@@ -71,7 +71,7 @@ export const peninsulaFloor: FloorPlan = {
       id: "dorm-3",
       name: "Dorm 3 · Le P'tit Bonheur",
       labelLines: ["Dorm 3", "Le P'tit Bonheur"],
-      blurb: "Camp site 2 cabin — Le P'tit Bonheur, out toward the east end.",
+      blurb: "Jeune-Air 2 cabin — Le P'tit Bonheur, out toward the east end.",
       kind: "building",
       x: 620,
       y: 260,

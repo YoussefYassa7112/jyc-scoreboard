@@ -23,6 +23,7 @@ import {
   type MapRoom,
   type RoomKind,
 } from "@/data/floors";
+import { campTransportNotes, routesForFloor } from "@/data/routes";
 import { getScheduleDays } from "@/lib/schedule-demo";
 import { blocksAtRoom } from "@/lib/schedule-time";
 import { scrollToTarget } from "@/lib/scroll";
@@ -84,6 +85,26 @@ function pinRadius(room: MapRoom) {
 }
 
 /** Pin height in viewBox units at scale 1 (head radius + shaft). */
+/**
+ * Rounds a polyline by curving through the midpoint of each pair of segments.
+ * The points are traced off an aerial photo by eye, and hard corners make that
+ * guesswork look like precision it does not have.
+ */
+function routeD(points: [number, number][]) {
+  if (points.length < 3) {
+    return points.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  }
+  let d = `M${points[0][0]} ${points[0][1]}`;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const [x, y] = points[i];
+    const [nx, ny] = points[i + 1];
+    d += ` Q${x} ${y} ${(x + nx) / 2} ${(y + ny) / 2}`;
+  }
+  const last = points[points.length - 1];
+  d += ` L${last[0]} ${last[1]}`;
+  return d;
+}
+
 const BASE_PIN_UNITS = 80;
 /** How tall a pin should look on screen, whatever the map is scaled to. */
 const TARGET_PIN_PX = 30;
@@ -442,6 +463,7 @@ export function BuildingMap({
   const [floorDir, setFloorDir] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [routeId, setRouteId] = useState<string | null>(null);
   const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
   const [highlightBlockId, setHighlightBlockId] = useState<string | null>(null);
 
@@ -530,6 +552,9 @@ export function BuildingMap({
     observer.observe(el);
     return () => observer.disconnect();
   }, [floor.viewBox.w]);
+  const floorRoutes = routesForFloor(floor.id);
+  const activeRoute = floorRoutes.find((route) => route.id === routeId) ?? null;
+
   const aerial = Boolean(floor.backgroundImage);
   const overview = aerial && floor.rooms.every((r) => r.marker === "pin");
   const selected = useMemo(
@@ -621,7 +646,7 @@ export function BuildingMap({
               className="btn-soft min-h-11 cursor-pointer rounded-xl border px-3 text-xs font-extrabold"
             >
               {/* Was hard-coded "← Overview", which became wrong the moment the
-                  indoor plans were parented to Camp site 1 instead. */}
+                  indoor plans were parented to Jeune-Air 1 instead. */}
               ← {getFloor(floor.parentFloorId).label}
             </button>
           </div>
@@ -691,6 +716,59 @@ export function BuildingMap({
               />
               {kindLabel[kind]}
             </span>
+          ))}
+        </div>
+      ) : null}
+
+      {floorRoutes.length ? (
+        <div className="mt-3">
+          <p className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
+            Walking routes
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {floorRoutes.map((route) => {
+              const on = route.id === routeId;
+              return (
+                <button
+                  key={route.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setRouteId(on ? null : route.id)}
+                  className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-xs font-extrabold ${
+                    on ? "border-star bg-star text-on-star" : "btn-chip"
+                  }`}
+                >
+                  {route.fromLabel} → {route.toLabel}
+                  <span className="ml-1.5 font-bold opacity-75">
+                    {route.minutes} min
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* What the colours on the line mean. The yellow one is the only
+              part of this map with a safety consequence, so it gets said in
+              words as well as drawn. */}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-saddle/15 px-2.5 py-1 text-[11px] font-bold text-muted">
+              <span className="h-1.5 w-5 rounded-full bg-[#38bdf8]" />
+              Walking route
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-saddle/15 px-2.5 py-1 text-[11px] font-bold text-muted">
+              <span className="h-2.5 w-5 rounded-sm bg-[#facc15] ring-1 ring-saddle/60" />
+              Yellow bar = cross the street
+            </span>
+          </div>
+
+          {campTransportNotes.map((note) => (
+            <p
+              key={note.id}
+              className="mt-2 flex items-start gap-2 text-[11px] font-bold text-muted"
+            >
+              <span aria-hidden>{note.icon}</span>
+              <span>{note.text}</span>
+            </p>
           ))}
         </div>
       ) : null}
@@ -822,6 +900,76 @@ export function BuildingMap({
           >
             {floor.banner}
           </text>
+
+          {activeRoute ? (
+            <g className="pointer-events-none">
+              {/* Three passes: a dark casing so the line survives whatever the
+                  photo is doing underneath, the line itself, then marching
+                  dashes that show which way round the walk goes. */}
+              <path
+                d={routeD(activeRoute.points)}
+                fill="none"
+                stroke={dark ? "#0b1224" : "#1a120c"}
+                strokeOpacity={0.55}
+                strokeWidth={10}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={routeD(activeRoute.points)}
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth={5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={routeD(activeRoute.points)}
+                className="map-route-dash"
+                fill="none"
+                stroke="#f0f9ff"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="9 15"
+              />
+
+              {activeRoute.crossings?.map((crossing) => (
+                <g
+                  key={`${crossing.x}-${crossing.y}`}
+                  transform={`translate(${crossing.x} ${crossing.y}) rotate(${crossing.rotate ?? 0})`}
+                >
+                  <rect
+                    x={-17}
+                    y={-5}
+                    width={34}
+                    height={10}
+                    rx={3}
+                    fill="#facc15"
+                    stroke="#1a120c"
+                    strokeWidth={1.8}
+                  />
+                </g>
+              ))}
+
+              <circle
+                cx={activeRoute.points[0][0]}
+                cy={activeRoute.points[0][1]}
+                r={6.5}
+                fill="#38bdf8"
+                stroke="#fff8ee"
+                strokeWidth={2.5}
+              />
+              <circle
+                cx={activeRoute.points[activeRoute.points.length - 1][0]}
+                cy={activeRoute.points[activeRoute.points.length - 1][1]}
+                r={6.5}
+                fill="#22c55e"
+                stroke="#fff8ee"
+                strokeWidth={2.5}
+              />
+            </g>
+          ) : null}
 
           {!aerial ? (
             <path
@@ -1263,6 +1411,46 @@ export function BuildingMap({
         </div>
       </motion.div>
       </div>
+
+      {activeRoute ? (
+        <div className="surface-card mt-4 rounded-2xl border-2 p-4">
+          <p className="display-font text-sm font-extrabold text-card-ink">
+            {activeRoute.fromLabel} → {activeRoute.toLabel}
+            <span className="ml-2 text-xs font-bold text-muted-soft">
+              about {activeRoute.minutes} min on foot
+            </span>
+          </p>
+
+          {activeRoute.crossings?.length ? (
+            <p className="mt-2.5 flex items-start gap-2 rounded-xl border-2 border-amber-400 bg-amber-300/25 px-3 py-2 text-xs font-extrabold text-card-ink">
+              <span aria-hidden>⚠️</span>
+              <span>
+                {activeRoute.crossings.map((c) => c.label).join(" · ")} — the
+                yellow bar on the map is where the path meets the road.
+              </span>
+            </p>
+          ) : null}
+
+          <ol className="mt-3 space-y-1.5">
+            {activeRoute.steps.map((step, i) => (
+              <li
+                key={step}
+                className="flex gap-2.5 text-sm font-semibold text-card-ink"
+              >
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-star text-[11px] font-extrabold text-on-star">
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+
+          <p className="mt-3 text-[11px] font-bold text-muted-soft">
+            Traced from the aerial photo — follow the trail you can see, not the
+            line to the pixel.
+          </p>
+        </div>
+      ) : null}
 
       <AnimatePresence initial={false}>
         {selected ? (

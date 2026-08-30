@@ -70,6 +70,35 @@ export type FloorDecoration =
   | { type: "road"; x: number; y: number; w: number; h: number; label: string }
   | { type: "dock"; x: number; y: number; w: number; h: number };
 
+/**
+ * A place along a route where walkers step onto a road. Drawn as a bar lying
+ * across the road, because "cross here" is the one instruction on a camp map
+ * that has to be impossible to miss.
+ */
+export type RouteCrossing = {
+  x: number;
+  y: number;
+  /** Bar angle in degrees; 0 lies flat, so match it to the road it crosses. */
+  rotate?: number;
+  label: string;
+};
+
+/** A walking route between two places, drawn over a floor's background. */
+export type CampRoute = {
+  id: string;
+  /** Floor whose viewBox the points are expressed in. */
+  floorId: string;
+  fromLabel: string;
+  toLabel: string;
+  /** Polyline through the floor's coordinate space. */
+  points: [number, number][];
+  crossings?: RouteCrossing[];
+  /** Rough walking time, minutes. */
+  minutes: number;
+  /** Written directions, for anyone who would rather read than squint. */
+  steps: string[];
+};
+
 export type FloorBackgroundImage = {
   href: string;
   opacity?: number;

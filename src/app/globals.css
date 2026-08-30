@@ -1420,3 +1420,16 @@ html.dark .sky-floaters {
     transform: translateY(-6px) rotate(-8deg);
   }
 }
+
+/* Marching dashes along a walking route, so the line reads as a direction of
+   travel rather than a static scribble. One short path, so the main-thread
+   cost of animating stroke-dashoffset is not worth avoiding. */
+.map-route-dash {
+  animation: map-route-march 1.4s linear infinite;
+}
+
+@keyframes map-route-march {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
