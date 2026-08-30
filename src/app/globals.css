@@ -1428,6 +1428,76 @@ html.dark .sky-floaters {
   animation: map-route-march 1.4s linear infinite;
 }
 
+/* The route draws itself from the end you are standing at, and retracts the
+   same way when dismissed — which is what tells you which way round the walk
+   goes before you have read a single word.
+
+   Keyframes rather than transitions: an animation runs on mount, so the group
+   can be keyed and replayed without the two-render dance a transition needs to
+   notice a changed value. Both strokes carry pathLength="1", so one dash the
+   length of the whole path slides on and off regardless of the curve.
+
+   The easing stays close to even. A front-loaded curve is nearly finished by
+   the halfway point, which does not read as a line being traced so much as one
+   appearing and then settling. */
+.map-route-in .map-route-stroke {
+  animation: map-route-draw 900ms ease-in-out both;
+}
+
+.map-route-out .map-route-stroke {
+  animation: map-route-undraw 520ms ease-in-out both;
+}
+
+/* The far end, the crossing and the dashes wait for the line to reach them. */
+.map-route-in .map-route-late {
+  animation: map-route-appear 240ms ease-out 720ms both;
+}
+
+.map-route-in .map-route-early {
+  animation: map-route-appear 200ms ease-out both;
+}
+
+.map-route-out .map-route-late,
+.map-route-out .map-route-early {
+  animation: map-route-vanish 160ms ease-in both;
+}
+
+@keyframes map-route-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes map-route-undraw {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes map-route-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes map-route-vanish {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes map-route-march {
   to {
     stroke-dashoffset: -24;

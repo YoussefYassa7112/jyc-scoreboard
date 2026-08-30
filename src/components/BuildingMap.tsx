@@ -473,6 +473,12 @@ export function BuildingMap({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [routeKey, setRouteKey] = useState<string | null>(null);
+  // The line has to outlive the selection so it can retract on the way out.
+  // `routeKey` is what the buttons and the directions card follow; `drawnKey`
+  // is what the map is still drawing, which lags it by one animation.
+  const [drawnKey, setDrawnKey] = useState<string | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const undrawTimer = useRef<number | null>(null);
   const [spotlightKey, setSpotlightKey] = useState<number | null>(null);
   const [highlightBlockId, setHighlightBlockId] = useState<string | null>(null);
 
@@ -582,6 +588,29 @@ export function BuildingMap({
   ]);
   const activeOption =
     routeOptions.find((option) => option.key === routeKey) ?? null;
+  const drawnOption =
+    routeOptions.find((option) => option.key === drawnKey) ?? null;
+
+  function pickRoute(key: string | null) {
+    if (undrawTimer.current) window.clearTimeout(undrawTimer.current);
+    setRouteKey(key);
+    if (key) {
+      setDrawnKey(key);
+      setDrawing(true);
+      return;
+    }
+    // Keep the path mounted at its full length, flip to the retracting
+    // animation, and drop it once that has had time to finish.
+    setDrawing(false);
+    undrawTimer.current = window.setTimeout(() => setDrawnKey(null), 560);
+  }
+
+  useEffect(
+    () => () => {
+      if (undrawTimer.current) window.clearTimeout(undrawTimer.current);
+    },
+    [],
+  );
   const activeRoute = activeOption
     ? {
         ...activeOption.route,
@@ -774,7 +803,7 @@ export function BuildingMap({
                   key={option.key}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => setRouteKey(on ? null : option.key)}
+                  onClick={() => pickRoute(on ? null : option.key)}
                   className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-xs font-extrabold ${
                     on ? "border-star bg-star text-on-star" : "btn-chip"
                   }`}
@@ -946,75 +975,107 @@ export function BuildingMap({
             {floor.banner}
           </text>
 
-          {activeRoute ? (
-            <g className="pointer-events-none">
-              {/* Three passes: a dark casing so the line survives whatever the
-                  photo is doing underneath, the line itself, then marching
-                  dashes that show which way round the walk goes. */}
-              <path
-                d={routeD(activeRoute.points)}
-                fill="none"
-                stroke={dark ? "#0b1224" : "#1a120c"}
-                strokeOpacity={0.55}
-                strokeWidth={10}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d={routeD(activeRoute.points)}
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth={5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d={routeD(activeRoute.points)}
-                className="map-route-dash"
-                fill="none"
-                stroke="#f0f9ff"
-                strokeWidth={2.2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray="9 15"
-              />
+          {drawnOption ? (() => {
+            const points = drawnOption.reversed
+              ? [...drawnOption.route.points].reverse()
+              : drawnOption.route.points;
+            const d = routeD(points);
+            const [sx, sy] = points[0];
+            const [ex, ey] = points[points.length - 1];
+            return (
+              // Keyed so switching route or direction remounts the group and
+              // the draw animation replays from the new starting end.
+              <g
+                key={drawnOption.key}
+                className={`pointer-events-none ${
+                  drawing ? "map-route-in" : "map-route-out"
+                }`}
+              >
+                {/* Three passes: a dark casing so the line survives whatever
+                    the photo is doing underneath, the line itself, then
+                    marching dashes that show which way round the walk goes.
+                    pathLength normalises both strokes to 1, so one dash the
+                    length of the whole path can be slid on and off without
+                    anyone having to measure the curve. */}
+                <path
+                  className="map-route-stroke"
+                  d={d}
+                  pathLength={1}
+                  strokeDasharray={1}
+                  fill="none"
+                  stroke={dark ? "#0b1224" : "#1a120c"}
+                  strokeOpacity={0.55}
+                  strokeWidth={10}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  className="map-route-stroke"
+                  d={d}
+                  pathLength={1}
+                  strokeDasharray={1}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth={5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
 
-              {activeRoute.crossings?.map((crossing) => (
-                <g
-                  key={`${crossing.x}-${crossing.y}`}
-                  transform={`translate(${crossing.x} ${crossing.y}) rotate(${crossing.rotate ?? 0})`}
-                >
-                  <rect
-                    x={-17}
-                    y={-5}
-                    width={34}
-                    height={10}
-                    rx={3}
-                    fill="#facc15"
-                    stroke="#1a120c"
-                    strokeWidth={1.8}
+                {/* Held back until the line has arrived — dashes marching along
+                    a path that is still growing reads as two things moving. */}
+                <g className="map-route-late">
+                  <path
+                    className="map-route-dash"
+                    d={d}
+                    fill="none"
+                    stroke="#f0f9ff"
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="9 15"
+                  />
+
+                  {drawnOption.route.crossings?.map((crossing) => (
+                    <g
+                      key={`${crossing.x}-${crossing.y}`}
+                      transform={`translate(${crossing.x} ${crossing.y}) rotate(${crossing.rotate ?? 0})`}
+                    >
+                      <rect
+                        x={-17}
+                        y={-5}
+                        width={34}
+                        height={10}
+                        rx={3}
+                        fill="#facc15"
+                        stroke="#1a120c"
+                        strokeWidth={1.8}
+                      />
+                    </g>
+                  ))}
+
+                  <circle
+                    cx={ex}
+                    cy={ey}
+                    r={6.5}
+                    fill="#22c55e"
+                    stroke="#fff8ee"
+                    strokeWidth={2.5}
                   />
                 </g>
-              ))}
 
-              <circle
-                cx={activeRoute.points[0][0]}
-                cy={activeRoute.points[0][1]}
-                r={6.5}
-                fill="#38bdf8"
-                stroke="#fff8ee"
-                strokeWidth={2.5}
-              />
-              <circle
-                cx={activeRoute.points[activeRoute.points.length - 1][0]}
-                cy={activeRoute.points[activeRoute.points.length - 1][1]}
-                r={6.5}
-                fill="#22c55e"
-                stroke="#fff8ee"
-                strokeWidth={2.5}
-              />
-            </g>
-          ) : null}
+                {/* The end you are standing at, so it lands with the line. */}
+                <circle
+                  className="map-route-early"
+                  cx={sx}
+                  cy={sy}
+                  r={6.5}
+                  fill="#38bdf8"
+                  stroke="#fff8ee"
+                  strokeWidth={2.5}
+                />
+              </g>
+            );
+          })() : null}
 
           {!aerial ? (
             <path
