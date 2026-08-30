@@ -1366,3 +1366,57 @@ html.dark .sky-floaters {
     transform: translate3d(0, 0, 0);
   }
 }
+
+/* Header emoji idle bob.
+   Keyframes rather than framer: these are compositor-driven, so they survive
+   the throttling a phone applies to rAF-based animation in Low Power Mode, and
+   they sit outside the reducedMotion gate the rest of the board honours. The
+   amplitude is a few pixels on three decorative emoji. */
+.emoji-bob-spin,
+.emoji-bob-pop,
+.emoji-bob-tilt {
+  display: inline-block;
+  will-change: transform;
+}
+
+.emoji-bob-spin {
+  animation: emoji-bob-spin 2.8s ease-in-out infinite;
+}
+
+.emoji-bob-pop {
+  animation: emoji-bob-pop 2.2s ease-in-out infinite;
+}
+
+.emoji-bob-tilt {
+  animation: emoji-bob-tilt 2.8s ease-in-out 0.3s infinite;
+}
+
+@keyframes emoji-bob-spin {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-12deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(12deg);
+  }
+}
+
+@keyframes emoji-bob-pop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.12);
+  }
+}
+
+@keyframes emoji-bob-tilt {
+  0%,
+  100% {
+    transform: translateY(0) rotate(8deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-8deg);
+  }
+}

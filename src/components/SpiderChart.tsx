@@ -91,6 +91,8 @@ export function SpiderChart({ teams, replayKey }: Props) {
   const hasPlayedIntro = useRef(false);
   const gridKeyRef = useRef("");
   const replayRef = useRef(replayKey);
+  /** Container width the drawing on screen was built from. */
+  const drawnFor = useRef(0);
   const tipLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tip, setTip] = useState<TipState>(null);
 
@@ -136,7 +138,15 @@ export function SpiderChart({ teams, replayKey }: Props) {
     if (!wrap || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
       const measured = entries[0]?.contentRect.width ?? 0;
-      if (measured > 0) setWrapWidth(Math.round(measured / 8) * 8);
+      if (measured <= 0) return;
+      const next = Math.round(measured / 8) * 8;
+      // The observer fires once as soon as it starts watching, reporting the
+      // width the first draw had already measured for itself. Storing that as
+      // new state re-ran the draw a frame later, and the second pass takes the
+      // no-intro path — so the build-up was cut off almost as soon as it
+      // started. Only a width the current drawing was not built for is news.
+      if (next === drawnFor.current) return;
+      setWrapWidth(next);
     });
     observer.observe(wrap);
     return () => observer.disconnect();
@@ -149,7 +159,9 @@ export function SpiderChart({ teams, replayKey }: Props) {
     // Capture after null-check so nested handlers keep a definite type
     const wrap: HTMLDivElement = wrapEl;
 
-    const width = Math.min(wrapWidth || wrap.clientWidth || 480, 520);
+    const container = wrapWidth || wrap.clientWidth || 480;
+    drawnFor.current = Math.round(container / 8) * 8;
+    const width = Math.min(container, 520);
     const height = Math.max(300, Math.min(380, width));
     const svg = d3.select(svgEl);
     svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);

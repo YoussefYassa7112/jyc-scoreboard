@@ -688,29 +688,20 @@ export function Scoreboard() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  <motion.span
-                    animate={{ rotate: [-12, 12, -12], y: [0, -6, 0] }}
-                    transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    {isDark ? "🪐" : "🤠"}
-                  </motion.span>
-                  <motion.span
-                    animate={{ y: [0, -10, 0], scale: [1, 1.12, 1] }}
-                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    ⭐
-                  </motion.span>
-                  <motion.span
-                    animate={{ rotate: [8, -8, 8], y: [0, -6, 0] }}
-                    transition={{
-                      duration: 2.8,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      delay: 0.3,
-                    }}
-                  >
-                    🚀
-                  </motion.span>
+                  {/* Bobbed with framer until these went still on phones.
+                      Two things stop an idle rAF loop that CSS keyframes ride
+                      straight through: the reducedMotion="user" gate on the
+                      board below, and iOS Low Power Mode, which both throttles
+                      timers and reports reduced motion on its own — so a
+                      camper on a flat battery, which by day three is most of
+                      them, got a dead header they never asked to turn off.
+                      These run on the compositor now and simply keep going.
+                      It is a few pixels of bob on three emoji with nothing
+                      moving underneath; the large travel that setting exists
+                      to stop is elsewhere on this page and still respects it. */}
+                  <span className="emoji-bob-spin">{isDark ? "🪐" : "🤠"}</span>
+                  <span className="emoji-bob-pop">⭐</span>
+                  <span className="emoji-bob-tilt">🚀</span>
                 </motion.div>
 
                 <p className="display-font px-10 text-xs font-semibold uppercase tracking-[0.18em] text-muted sm:px-0 sm:text-base sm:tracking-[0.28em]">
