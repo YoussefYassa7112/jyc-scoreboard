@@ -162,12 +162,14 @@ function orbitChrome(dark: boolean): OrbitChrome {
   };
 }
 
-export type OrbitBandInfo = {
+export type OrbitBandInfo<T = unknown> = {
   /** 0 = the leader's ring, 1..10 = each 10% further off the pace. */
   band: number;
   count: number;
   label: string;
   meaning: string;
+  /** Who is on this ring, so the legend can show their colours. */
+  members: T[];
 };
 
 function bandIndex(score: number, topScore: number) {
@@ -185,18 +187,24 @@ function bandIndex(score: number, topScore: number) {
  * deriving the same buckets is two functions that will eventually disagree,
  * and a legend that misnames a ring is worse than no legend.
  */
-export function orbitBands(teams: { score: number }[]) {
+export function orbitBands<T extends { score: number }>(teams: T[]) {
   const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
-  const counts = new Map<number, number>();
+  const grouped = new Map<number, T[]>();
   for (const team of teams) {
     const band = bandIndex(team.score, topScore);
-    counts.set(band, (counts.get(band) ?? 0) + 1);
+    const list = grouped.get(band);
+    if (list) list.push(team);
+    else grouped.set(band, [team]);
   }
-  const bands: OrbitBandInfo[] = [...counts.keys()]
+  const counts = new Map(
+    [...grouped].map(([band, list]) => [band, list.length] as const),
+  );
+  const bands: OrbitBandInfo<T>[] = [...grouped.keys()]
     .sort((a, b) => a - b)
     .map((band) => ({
       band,
-      count: counts.get(band) ?? 0,
+      count: grouped.get(band)?.length ?? 0,
+      members: grouped.get(band) ?? [],
       label:
         band === 0
           ? topScore > 0
@@ -771,41 +779,7 @@ export const OrbitArena = memo(function OrbitArena({
           }
         />
       </div>
-      {/* Rings mean nothing on their own — a camper can see which one they are
-          on, but not that it is a tenth of the leader's score. Only the bands
-          in play are listed, matching what is actually drawn. Left off the
-          stage variant, where the height is already spoken for. */}
-      {!stage && legend.length ? (
-        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
-          <p className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
-            Orbits · closer in is closer to the lead
-          </p>
-          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
-            {legend.map((info, idx) => (
-              <li
-                key={info.band}
-                className="flex items-center gap-2 text-[11px] font-bold"
-              >
-                <span
-                  aria-hidden
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full border-2 ${
-                    idx === 0 ? "border-star" : "border-muted-soft"
-                  }`}
-                />
-                <span className="shrink-0 tabular-nums text-card-ink">
-                  {info.label}
-                </span>
-                <span className="min-w-0 truncate text-muted-soft">
-                  {info.meaning}
-                </span>
-                <span className="ml-auto shrink-0 tabular-nums text-muted">
-                  {info.count} {info.count === 1 ? "team" : "teams"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <OrbitLegend bands={legend} stage={stage} />
 
       {children ? (
         <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
@@ -815,6 +789,97 @@ export const OrbitArena = memo(function OrbitArena({
     </section>
   );
 });
+
+/**
+ * What the rings mean, under the rings.
+ *
+ * A camper can see which ring they are on; nothing on the arena says that the
+ * ring is a tenth of the leader's score, or that closer in is better. Each row
+ * carries the team colours on that orbit too, so finding yourself is a matter
+ * of spotting your colour rather than reading every planet label.
+ */
+function OrbitLegend({
+  bands,
+  stage,
+}: {
+  bands: OrbitBandInfo<StandingRow>[];
+  stage: boolean;
+}) {
+  if (!bands.length) return null;
+  const maxDots = stage ? 14 : 9;
+
+  return (
+    <div
+      className={`shrink-0 border-t border-saddle/10 ${stage ? "mt-2 pt-2" : "mt-3 pt-3"}`}
+    >
+      <p
+        className={`display-font font-extrabold uppercase tracking-[0.16em] text-muted-soft ${
+          stage ? "text-[11px]" : "text-[11px]"
+        }`}
+      >
+        Orbits · each ring is 10% further behind the leader
+      </p>
+      <ul
+        className={`mt-1.5 grid gap-1.5 ${
+          stage ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
+        }`}
+      >
+        {bands.map((info, idx) => (
+          <li
+            key={info.band}
+            className="surface-card flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden
+              className={`h-4 w-4 shrink-0 ${
+                idx === 0 ? "text-star" : "text-muted-soft"
+              }`}
+            >
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={idx === 0 ? 2 : 1.4}
+                opacity={idx === 0 ? 1 : 0.75}
+              />
+              <circle cx="8" cy="8" r="2" fill="currentColor" />
+            </svg>
+
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-extrabold tabular-nums text-card-ink">
+                {info.label}
+              </span>
+              <span className="block text-[11px] font-bold leading-tight text-muted-soft">
+                {info.meaning}
+              </span>
+            </span>
+
+            <span className="flex shrink-0 items-center gap-1">
+              <span className="flex -space-x-1">
+                {info.members.slice(0, maxDots).map((team) => (
+                  <span
+                    key={team.id}
+                    title={team.name}
+                    className="h-2.5 w-2.5 rounded-full border border-white/70"
+                    style={{ backgroundColor: team.color }}
+                  />
+                ))}
+              </span>
+              {info.count > maxDots ? (
+                <span className="text-[10px] font-extrabold tabular-nums text-muted-soft">
+                  +{info.count - maxDots}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function ensureDefs(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,

@@ -35,9 +35,12 @@ function groupAccent(group: StandingRow["campGroup"]) {
 function chaseLines(team: StandingRow, standings: StandingRow[], index: number) {
   const { ahead, behind, leader } = teamMeta(team, standings, index);
   if (index === 0) {
-    return behind
-      ? [`Leading by ${team.score - behind.score} pts over ${behind.name}`]
-      : ["In the lead"];
+    if (!behind) return ["In the lead"];
+    const lead = team.score - behind.score;
+    // Ranks are shared, so the top of the list can be a tie rather than a lead.
+    return lead === 0
+      ? [`Tied for the lead with ${behind.name}`]
+      : [`Leading by ${lead} pts over ${behind.name}`];
   }
   const lines: string[] = [];
   if (ahead) {
@@ -294,7 +297,9 @@ function chaseSummary(
 ) {
   const { ahead, behind } = teamMeta(team, standings, index);
   if (index === 0) {
-    return behind ? `Leading by ${team.score - behind.score}` : "In the lead";
+    if (!behind) return "In the lead";
+    const lead = team.score - behind.score;
+    return lead === 0 ? "Tied for the lead" : `Leading by ${lead}`;
   }
   if (!ahead) return "";
   const gap = ahead.score - team.score;

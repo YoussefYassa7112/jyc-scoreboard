@@ -47,9 +47,21 @@ export function invalidateStandingsCache() {
  * Hashing the payload instead is correct by construction, and it is cheaper —
  * it reuses the 800ms standings cache rather than issuing a second query.
  */
+/**
+ * Bump when the meaning of the payload changes without the data changing.
+ *
+ * The revision hashes ids, scores, names and notices — everything the client
+ * renders straight through. Rank is derived from those, so switching to shared
+ * ranking produced a byte-identical hash: every phone holding a cached copy
+ * would have kept the old numbers behind a 304 until somebody scored. Anything
+ * that changes how the payload is built has to move this.
+ */
+const PAYLOAD_VERSION = 2;
+
 function revisionOf(data: StandingsPayload): string {
   let hash = 5381;
   const canonical = [
+    `v${PAYLOAD_VERSION}`,
     data.standings
       .map(
         (r) =>
@@ -111,15 +123,29 @@ export async function getStandings(): Promise<StandingsPayload> {
   // Fetched alongside the roster; both land inside the same 800ms cache window.
   const messages = await getMessages();
 
-  const standings: StandingRow[] = rows.map((row, index) => ({
-    id: row.id,
-    name: row.name,
-    color: row.color,
-    score: row.score,
-    rank: index + 1,
-    campGroup: row.campGroup ?? null,
-    cabinId: row.cabinId ?? null,
-  }));
+  // Standard competition ranking: teams on the same score share a rank, and the
+  // next rank skips the ones they used up — 1, 2, 2, 4.
+  //
+  // Position in the list used to be the rank outright, which meant two teams on
+  // the same points were separated alphabetically. That is not a result anyone
+  // can be told with a straight face, and the board already said "Tied with
+  // ..." on rows it had numbered differently.
+  let lastScore: number | null = null;
+  let lastRank = 0;
+  const standings: StandingRow[] = rows.map((row, index) => {
+    const rank = lastScore !== null && row.score === lastScore ? lastRank : index + 1;
+    lastScore = row.score;
+    lastRank = rank;
+    return {
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      score: row.score,
+      rank,
+      campGroup: row.campGroup ?? null,
+      cabinId: row.cabinId ?? null,
+    };
+  });
 
   return {
     standings,
