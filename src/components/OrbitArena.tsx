@@ -162,6 +162,61 @@ function orbitChrome(dark: boolean): OrbitChrome {
   };
 }
 
+export type OrbitBandInfo = {
+  /** 0 = the leader's ring, 1..10 = each 10% further off the pace. */
+  band: number;
+  count: number;
+  label: string;
+  meaning: string;
+};
+
+function bandIndex(score: number, topScore: number) {
+  if (topScore <= 0 || score >= topScore) return 0;
+  return Math.min(
+    BAND_COUNT,
+    BAND_COUNT - Math.floor((score / topScore) * BAND_COUNT),
+  );
+}
+
+/**
+ * The bands actually occupied, in order, with what each one means.
+ *
+ * Shared by the rings and the legend beneath them on purpose: two functions
+ * deriving the same buckets is two functions that will eventually disagree,
+ * and a legend that misnames a ring is worse than no legend.
+ */
+export function orbitBands(teams: { score: number }[]) {
+  const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
+  const counts = new Map<number, number>();
+  for (const team of teams) {
+    const band = bandIndex(team.score, topScore);
+    counts.set(band, (counts.get(band) ?? 0) + 1);
+  }
+  const bands: OrbitBandInfo[] = [...counts.keys()]
+    .sort((a, b) => a - b)
+    .map((band) => ({
+      band,
+      count: counts.get(band) ?? 0,
+      label:
+        band === 0
+          ? topScore > 0
+            ? `${topScore} pts`
+            : "all level"
+          : band === BAND_COUNT
+            ? `under ${Math.round(topScore / BAND_COUNT)} pts`
+            : `${Math.round(topScore * (1 - band / BAND_COUNT))}+ pts`,
+      meaning:
+        band === 0
+          ? topScore > 0
+            ? "out in front"
+            : "nobody has scored yet"
+          : band === BAND_COUNT
+            ? "more than 90% behind the lead"
+            : `within ${band * 10}% of the lead`,
+    }));
+  return { topScore, bands, counts };
+}
+
 type OrbitNode = StandingRow & {
   level: number;
   orbit: number;
@@ -271,23 +326,8 @@ export const OrbitArena = memo(function OrbitArena({
     // to a speck. Bands cap it at eleven whatever the turnout, and they answer
     // a better question anyway: not "who has exactly what" but "how far off the
     // pace am I". The leader keeps the innermost ring to itself.
-    const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
-    const bandOf = (score: number) => {
-      if (topScore <= 0 || score >= topScore) return 0;
-      return Math.min(
-        BAND_COUNT,
-        BAND_COUNT - Math.floor((score / topScore) * BAND_COUNT),
-      );
-    };
-
-    const countByBand = new Map<number, number>();
-    for (const team of teams) {
-      const band = bandOf(team.score);
-      countByBand.set(band, (countByBand.get(band) ?? 0) + 1);
-    }
-    // Empty bands are skipped: a ring nobody is on costs radius and says
-    // nothing the label on the next one does not.
-    const bands = [...countByBand.keys()].sort((a, b) => a - b);
+    const { topScore, bands, counts: countByBand } = orbitBands(teams);
+    const bandOf = (score: number) => bandIndex(score, topScore);
     const orbitCount = Math.max(bands.length, 1);
     const gap = variant === "stage" ? 42 : LEVEL_GAP;
     const pad = variant === "stage" ? 80 : PAD;
@@ -297,12 +337,11 @@ export const OrbitArena = memo(function OrbitArena({
     // by its crowd never lands inside the one before it.
     const orbitByBand = new Map<number, number>();
     let walk = CORE_R + 16;
-    bands.forEach((band, idx) => {
+    bands.forEach((info, idx) => {
       const bodyR = idx === 0 ? LEADER_R : PLANET_R;
-      const needed = ((countByBand.get(band) ?? 1) * (bodyR * 2 + 10)) /
-        (2 * Math.PI);
+      const needed = (info.count * (bodyR * 2 + 10)) / (2 * Math.PI);
       walk = Math.max(walk + gap, needed);
-      orbitByBand.set(band, walk);
+      orbitByBand.set(info.band, walk);
     });
     const maxOrbit = bands.length ? walk : CORE_R + 16 + gap;
     const size = Math.max(240, maxOrbit * 2 + pad * 2);
@@ -373,24 +412,15 @@ export const OrbitArena = memo(function OrbitArena({
     paintStars(scene.stars, maxOrbit + 20, starFill);
     paintCore(scene.core, coreOuter, campInk, campHalo);
 
-    const levelByBand = new Map(bands.map((band, idx) => [band, idx + 1]));
+    const levelByBand = new Map(bands.map((info, idx) => [info.band, idx + 1]));
 
-    const ringData = bands.map((band, idx) => ({
-      band,
+    const ringData = bands.map((info, idx) => ({
+      band: info.band,
       level: idx + 1,
-      r: orbitByBand.get(band) ?? CORE_R + 16 + gap,
-      // Points, not percentages: "160+ pts" is something a camper can act on,
-      // where "80%" needs the leader's score to mean anything.
-      label:
-        band === 0
-          ? topScore > 0
-            ? `${topScore} pts`
-            : "all level"
-          : band === BAND_COUNT
-            ? // The outermost band has no floor, so a "0+ pts" label would say
-              // nothing; name its ceiling instead.
-              `under ${Math.round(topScore / BAND_COUNT)} pts`
-            : `${Math.round(topScore * (1 - band / BAND_COUNT))}+ pts`,
+      r: orbitByBand.get(info.band) ?? CORE_R + 16 + gap,
+      // Points, not percentages: "5204+ pts" is something a camper can act on,
+      // where "40%" needs the leader's score to interpret.
+      label: info.label,
     }));
 
     const ring = scene.rings
@@ -710,6 +740,10 @@ export const OrbitArena = memo(function OrbitArena({
     };
   }, []);
 
+  // Same helper the rings are built from, so a label can never name a ring
+  // that is not there.
+  const legend = useMemo(() => orbitBands(standings).bands, [standings]);
+
   const stage = variant === "stage";
 
   return (
@@ -737,6 +771,42 @@ export const OrbitArena = memo(function OrbitArena({
           }
         />
       </div>
+      {/* Rings mean nothing on their own — a camper can see which one they are
+          on, but not that it is a tenth of the leader's score. Only the bands
+          in play are listed, matching what is actually drawn. Left off the
+          stage variant, where the height is already spoken for. */}
+      {!stage && legend.length ? (
+        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
+          <p className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
+            Orbits · closer in is closer to the lead
+          </p>
+          <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {legend.map((info, idx) => (
+              <li
+                key={info.band}
+                className="flex items-center gap-2 text-[11px] font-bold"
+              >
+                <span
+                  aria-hidden
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full border-2 ${
+                    idx === 0 ? "border-star" : "border-muted-soft"
+                  }`}
+                />
+                <span className="shrink-0 tabular-nums text-card-ink">
+                  {info.label}
+                </span>
+                <span className="min-w-0 truncate text-muted-soft">
+                  {info.meaning}
+                </span>
+                <span className="ml-auto shrink-0 tabular-nums text-muted">
+                  {info.count} {info.count === 1 ? "team" : "teams"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {children ? (
         <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
           {children}
