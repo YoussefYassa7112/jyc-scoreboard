@@ -98,19 +98,8 @@ export async function POST(request: Request) {
     }
 
     const db = getDb();
-    if (cabinId != null) {
-      const taken = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(eq(teams.cabinId, cabinId))
-        .limit(1);
-      if (taken.length) {
-        return NextResponse.json(
-          { error: "That cabin is already assigned" },
-          { status: 400 },
-        );
-      }
-    }
+    // Cabins are shared. Several teams sleep in the same one, so the only rule
+    // left is that the cabin belongs to the team's group, checked above.
 
     const existing = await db.select({ id: teams.id }).from(teams);
     const color =

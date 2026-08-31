@@ -35,7 +35,7 @@ import { type CampMessageRow } from "@/lib/messages";
 import { TEAM_COLORS } from "@/lib/standings";
 import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
 import { teamChipStyle } from "@/lib/utils";
-import { availableCabinsForGroup, cabinChoicesForGroup, getCabin } from "@/lib/cabins";
+import { cabinChoicesForGroup, cabinsForGroup, getCabin } from "@/lib/cabins";
 import { clearAdminSignedIn } from "@/lib/admin-session";
 import { forgetTeamEverywhere } from "@/lib/offline";
 import { useOnline } from "@/lib/use-online";
@@ -332,9 +332,10 @@ export function AdminDashboard() {
     () => cabinChoicesForGroup(newCampGroup, teams),
     [newCampGroup, teams],
   );
+  // Every cabin in the group is always on offer now that teams share them.
   const newCabinOptions = useMemo(
-    () => availableCabinsForGroup(newCampGroup, teams),
-    [newCampGroup, teams],
+    () => cabinsForGroup(newCampGroup),
+    [newCampGroup],
   );
   const editCabinChoices = useMemo(
     () =>
@@ -930,14 +931,12 @@ export function AdminDashboard() {
                             ? "Pick a cabin"
                             : "No cabin left in this group"}
                         </option>
-                        {newCabinChoices.map(({ cabin, takenBy }) => (
-                          <option
-                            key={cabin.id}
-                            value={cabin.id}
-                            disabled={Boolean(takenBy)}
-                          >
+                        {newCabinChoices.map(({ cabin, teamsIn }) => (
+                          <option key={cabin.id} value={cabin.id}>
                             Cabin {cabin.id} · {cabin.label}
-                            {takenBy ? ` · taken by ${takenBy}` : ""}
+                            {teamsIn.length
+                              ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
+                              : ""}
                           </option>
                         ))}
                       </select>
@@ -947,13 +946,10 @@ export function AdminDashboard() {
                         {newCampGroup === "green" ? "Green" : "Red"} cabins:{" "}
                         {newCabinChoices
                           .map(
-                            ({ cabin, takenBy }) =>
-                              `${cabin.id}${takenBy ? ` (taken)` : ""}`,
+                            ({ cabin, teamsIn }) =>
+                              `${cabin.id}${teamsIn.length ? ` (${teamsIn.length})` : ""}`,
                           )
                           .join(" · ")}
-                        {newCabinOptions.length === 0
-                          ? ". All of them are already assigned."
-                          : ""}
                       </p>
                     ) : null}
 
@@ -1089,14 +1085,12 @@ export function AdminDashboard() {
                                   className="field mt-1 w-full rounded-xl border-2 px-3 py-2 font-semibold"
                                 >
                                   <option value="">No cabin</option>
-                                  {editCabinChoices.map(({ cabin, takenBy }) => (
-                                    <option
-                                      key={cabin.id}
-                                      value={cabin.id}
-                                      disabled={Boolean(takenBy)}
-                                    >
+                                  {editCabinChoices.map(({ cabin, teamsIn }) => (
+                                    <option key={cabin.id} value={cabin.id}>
                                       Cabin {cabin.id} · {cabin.label}
-                                      {takenBy ? ` · taken by ${takenBy}` : ""}
+                                      {teamsIn.length
+                                        ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
+                                        : ""}
                                     </option>
                                   ))}
                                 </select>
@@ -1237,14 +1231,12 @@ export function AdminDashboard() {
                                     team.campGroup ?? "red",
                                     teams,
                                     team.id,
-                                  ).map(({ cabin, takenBy }) => (
-                                    <option
-                                      key={cabin.id}
-                                      value={cabin.id}
-                                      disabled={Boolean(takenBy)}
-                                    >
+                                  ).map(({ cabin, teamsIn }) => (
+                                    <option key={cabin.id} value={cabin.id}>
                                       Cabin {cabin.id} · {cabin.label}
-                                      {takenBy ? ` · ${takenBy}` : ""}
+                                      {teamsIn.length
+                                        ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
+                                        : ""}
                                     </option>
                                   ))}
                                 </select>

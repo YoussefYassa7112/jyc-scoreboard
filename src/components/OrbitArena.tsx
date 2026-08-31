@@ -16,6 +16,8 @@ const PLANET_R = 14;
 const LEADER_R = 18;
 const CORE_R = 26;
 const LEVEL_GAP = 36;
+/** Orbits below the leader, one per 10% of the leading score. */
+const BAND_COUNT = 10;
 const PAD = 48;
 /** Lower = slower radius lerp when ranks/scores change. */
 const ORBIT_EASE = 1.15;
@@ -262,13 +264,47 @@ export const OrbitArena = memo(function OrbitArena({
       (a, b) => b.score - a.score || a.name.localeCompare(b.name),
     );
 
-    const uniqueScores = Array.from(new Set(teams.map((t) => t.score))).sort(
-      (a, b) => b - a,
-    );
-    const orbitCount = Math.max(uniqueScores.length, 1);
+    // Orbits are bands of the leader's score, not one ring per distinct score.
+    //
+    // A ring each meant thirty teams on thirty different scores drew thirty
+    // rings, and the whole arena had to shrink to fit them — every planet down
+    // to a speck. Bands cap it at eleven whatever the turnout, and they answer
+    // a better question anyway: not "who has exactly what" but "how far off the
+    // pace am I". The leader keeps the innermost ring to itself.
+    const topScore = teams.reduce((max, t) => Math.max(max, t.score), 0);
+    const bandOf = (score: number) => {
+      if (topScore <= 0 || score >= topScore) return 0;
+      return Math.min(
+        BAND_COUNT,
+        BAND_COUNT - Math.floor((score / topScore) * BAND_COUNT),
+      );
+    };
+
+    const countByBand = new Map<number, number>();
+    for (const team of teams) {
+      const band = bandOf(team.score);
+      countByBand.set(band, (countByBand.get(band) ?? 0) + 1);
+    }
+    // Empty bands are skipped: a ring nobody is on costs radius and says
+    // nothing the label on the next one does not.
+    const bands = [...countByBand.keys()].sort((a, b) => a - b);
+    const orbitCount = Math.max(bands.length, 1);
     const gap = variant === "stage" ? 42 : LEVEL_GAP;
     const pad = variant === "stage" ? 80 : PAD;
-    const maxOrbit = CORE_R + 16 + orbitCount * gap;
+
+    // A band holding a lot of teams needs the circumference to seat them, or
+    // they overlap into a smear. Radii are walked outwards so a ring pushed out
+    // by its crowd never lands inside the one before it.
+    const orbitByBand = new Map<number, number>();
+    let walk = CORE_R + 16;
+    bands.forEach((band, idx) => {
+      const bodyR = idx === 0 ? LEADER_R : PLANET_R;
+      const needed = ((countByBand.get(band) ?? 1) * (bodyR * 2 + 10)) /
+        (2 * Math.PI);
+      walk = Math.max(walk + gap, needed);
+      orbitByBand.set(band, walk);
+    });
+    const maxOrbit = bands.length ? walk : CORE_R + 16 + gap;
     const size = Math.max(240, maxOrbit * 2 + pad * 2);
     sizeRef.current.target = size;
 
@@ -337,19 +373,29 @@ export const OrbitArena = memo(function OrbitArena({
     paintStars(scene.stars, maxOrbit + 20, starFill);
     paintCore(scene.core, coreOuter, campInk, campHalo);
 
-    const orbitForLevel = (level: number) => CORE_R + 16 + level * gap;
-    const levelByScore = new Map(
-      uniqueScores.map((score, idx) => [score, idx + 1]),
-    );
+    const levelByBand = new Map(bands.map((band, idx) => [band, idx + 1]));
 
-    const ringData = uniqueScores.map((score, idx) => {
-      const level = idx + 1;
-      return { score, level, r: orbitForLevel(level) };
-    });
+    const ringData = bands.map((band, idx) => ({
+      band,
+      level: idx + 1,
+      r: orbitByBand.get(band) ?? CORE_R + 16 + gap,
+      // Points, not percentages: "160+ pts" is something a camper can act on,
+      // where "80%" needs the leader's score to mean anything.
+      label:
+        band === 0
+          ? topScore > 0
+            ? `${topScore} pts`
+            : "all level"
+          : band === BAND_COUNT
+            ? // The outermost band has no floor, so a "0+ pts" label would say
+              // nothing; name its ceiling instead.
+              `under ${Math.round(topScore / BAND_COUNT)} pts`
+            : `${Math.round(topScore * (1 - band / BAND_COUNT))}+ pts`,
+    }));
 
     const ring = scene.rings
       .selectAll<SVGGElement, (typeof ringData)[number]>("g.ring")
-      .data(ringData, (d) => String(d.level));
+      .data(ringData, (d) => String(d.band));
 
     const ringEnter = ring.enter().append("g").attr("class", "ring");
     ringEnter.append("circle").attr("class", "halo").attr("fill", ringFill);
@@ -416,7 +462,7 @@ export const OrbitArena = memo(function OrbitArena({
       .attr("r", (d) => d.r);
     ringMerge
       .select("text.pts")
-      .text((d) => `${d.score} pts`)
+      .text((d) => d.label)
       .attr("fill", qFill);
     ringMerge
       .select("text.pts")
@@ -426,20 +472,17 @@ export const OrbitArena = memo(function OrbitArena({
       .attr("y", (d) => -d.r + 3);
     ring.exit().transition().duration(900).style("opacity", 0).remove();
 
-    const slotByScore = new Map<number, number>();
-    const countByScore = new Map<number, number>();
-    for (const team of teams) {
-      countByScore.set(team.score, (countByScore.get(team.score) ?? 0) + 1);
-    }
+    const slotByBand = new Map<number, number>();
 
     const prevById = new Map(nodesRef.current.map((node) => [node.id, node]));
     const nodes: OrbitNode[] = teams.map((team) => {
-      const level = levelByScore.get(team.score) ?? 1;
-      const slot = slotByScore.get(team.score) ?? 0;
-      slotByScore.set(team.score, slot + 1);
-      const onOrbit = countByScore.get(team.score) ?? 1;
+      const band = bandOf(team.score);
+      const level = levelByBand.get(band) ?? 1;
+      const slot = slotByBand.get(band) ?? 0;
+      slotByBand.set(band, slot + 1);
+      const onOrbit = countByBand.get(band) ?? 1;
       const phase = (level - 1) * 0.35;
-      const targetOrbit = orbitForLevel(level);
+      const targetOrbit = orbitByBand.get(band) ?? CORE_R + 16 + gap;
       const targetSpeed = 0.26 + (orbitCount - level + 1) * 0.048;
       const targetBodyR = level === 1 ? LEADER_R : PLANET_R;
       const prev = prevById.get(team.id);

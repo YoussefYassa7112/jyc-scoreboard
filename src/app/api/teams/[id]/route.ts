@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ensureCabinColumn, getDb } from "@/db";
 import { pointEvents, teams, type CampGroup } from "@/db/schema";
 import { isAdminAuthenticated } from "@/lib/auth";
@@ -81,19 +81,8 @@ export async function PATCH(request: Request, { params }: Params) {
       updates.cabinId = null;
     }
 
-    if (updates.cabinId != null) {
-      const taken = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(and(eq(teams.cabinId, updates.cabinId), ne(teams.id, id)))
-        .limit(1);
-      if (taken.length) {
-        return NextResponse.json(
-          { error: "That cabin is already assigned" },
-          { status: 400 },
-        );
-      }
-    }
+    // Cabins are shared between teams; only the group has to match, which the
+    // check above already enforces.
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
