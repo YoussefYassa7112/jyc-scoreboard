@@ -3,6 +3,7 @@
 import {
   memo,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -789,9 +790,9 @@ export const OrbitArena = memo(function OrbitArena({
       <OrbitLegend bands={legend} stage={stage} />
 
       {children ? (
-        <div className="mt-3 shrink-0 border-t border-saddle/10 pt-3">
+        <Collapsible name="orbit-totals" label="Camp totals">
           {children}
-        </div>
+        </Collapsible>
       ) : null}
     </section>
   );
@@ -805,37 +806,45 @@ export const OrbitArena = memo(function OrbitArena({
  * carries the team colours on that orbit too, so finding yourself is a matter
  * of spotting your colour rather than reading every planet label.
  */
-function OrbitLegend({
-  bands,
-  stage,
+/**
+ * A disclosure row that costs nothing while shut.
+ *
+ * Both the things that sit under the arena — what the rings mean, and the camp
+ * totals — are read once and then in the way. Closed, this contributes no
+ * height at all, so the graph keeps every pixel it had.
+ */
+function Collapsible({
+  name,
+  label,
+  meta,
+  children,
 }: {
-  bands: OrbitBandInfo<StandingRow>[];
-  stage: boolean;
+  /** Stable handle for styling and tests; the DOM id is generated. */
+  name: string;
+  label: string;
+  meta?: string;
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  if (!bands.length) return null;
-  // Few enough dots that the text beside them still gets a sensible column on
-  // a phone; the overflow count carries the rest.
-  const maxDots = stage ? 12 : 5;
+  // The board arena stays mounted behind Present mode, so both instances render
+  // this at once. A hard-coded id would be duplicated in the document and
+  // aria-controls would point at whichever one happened to be first.
+  const panelId = `${name}-${useId()}`;
 
   return (
-    <div
-      className={`shrink-0 border-t border-saddle/10 ${stage ? "mt-2 pt-2" : "mt-3 pt-2.5"}`}
-    >
-      {/* Closed by default so the arena keeps its full height — the legend is
-          something you consult once, not something you read every time. */}
+    <div className="mt-2 shrink-0 border-t border-saddle/10 pt-2">
       <button
         type="button"
         data-open={open}
         aria-expanded={open}
-        aria-controls="orbit-legend-panel"
+        aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-1 py-1 text-left"
       >
         <svg
           viewBox="0 0 16 16"
           aria-hidden
-          className="orbit-legend-chevron h-3.5 w-3.5 shrink-0 text-star"
+          className="collapse-chevron h-3.5 w-3.5 shrink-0 text-star"
         >
           <path
             d="M4 6.5 L8 10.5 L12 6.5"
@@ -847,87 +856,111 @@ function OrbitLegend({
           />
         </svg>
         <span className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
-          What the rings mean
+          {label}
         </span>
-        <span className="ml-auto text-[11px] font-bold text-muted-soft">
-          {bands.length} {bands.length === 1 ? "orbit" : "orbits"}
-        </span>
+        {meta ? (
+          <span className="ml-auto text-[11px] font-bold text-muted-soft">
+            {meta}
+          </span>
+        ) : null}
       </button>
 
       {/* Grid rows 0fr -> 1fr animates the height without anyone measuring it,
           and the row stays mounted, so this is a plain transition rather than
           something that has to survive being mounted mid-animation. */}
       <div
-        id="orbit-legend-panel"
-        className="orbit-legend-collapse"
+        id={panelId}
+        data-collapse={name}
+        className="collapse-rows"
         data-open={open}
         aria-hidden={!open}
       >
-        <div>
-          <p className="px-1 pb-1.5 pt-1 text-[11px] font-bold text-muted-soft">
-            Closer in is closer to the lead. Each ring is another 10% behind.
-          </p>
-          <ul
-            className={`grid gap-1.5 ${
-              stage ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
-            }`}
-          >
-            {bands.map((info, idx) => (
-              <li
-                key={info.band}
-                className="surface-card flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  aria-hidden
-                  className={`h-4 w-4 shrink-0 ${
-                    idx === 0 ? "text-star" : "text-muted-soft"
-                  }`}
-                >
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={idx === 0 ? 2 : 1.4}
-                    opacity={idx === 0 ? 1 : 0.75}
-                  />
-                  <circle cx="8" cy="8" r="2" fill="currentColor" />
-                </svg>
-
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-extrabold tabular-nums text-card-ink">
-                    {info.label}
-                  </span>
-                  <span className="line-clamp-2 block text-[11px] font-bold leading-tight text-muted-soft">
-                    {info.meaning}
-                  </span>
-                </span>
-
-                <span className="flex shrink-0 items-center gap-1">
-                  <span className="flex -space-x-1">
-                    {info.members.slice(0, maxDots).map((team) => (
-                      <span
-                        key={team.id}
-                        title={team.name}
-                        className="h-2.5 w-2.5 rounded-full border border-white/70"
-                        style={{ backgroundColor: team.color }}
-                      />
-                    ))}
-                  </span>
-                  {info.count > maxDots ? (
-                    <span className="text-[10px] font-extrabold tabular-nums text-muted-soft">
-                      +{info.count - maxDots}
-                    </span>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <div>{children}</div>
       </div>
     </div>
+  );
+}
+
+function OrbitLegend({
+  bands,
+  stage,
+}: {
+  bands: OrbitBandInfo<StandingRow>[];
+  stage: boolean;
+}) {
+  if (!bands.length) return null;
+  // Few enough dots that the text beside them still gets a sensible column on
+  // a phone; the overflow count carries the rest.
+  const maxDots = stage ? 12 : 5;
+
+  return (
+    <Collapsible
+      name="orbit-legend"
+      label="What the rings mean"
+      meta={`${bands.length} ${bands.length === 1 ? "orbit" : "orbits"}`}
+    >
+      <p className="px-1 pb-1.5 pt-1 text-[11px] font-bold text-muted-soft">
+        Closer in is closer to the lead. Each ring is another 10% behind.
+      </p>
+      <ul
+        className={`grid gap-1.5 ${
+          stage ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
+        }`}
+      >
+        {bands.map((info, idx) => (
+          <li
+            key={info.band}
+            className="surface-card flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden
+              className={`h-4 w-4 shrink-0 ${
+                idx === 0 ? "text-star" : "text-muted-soft"
+              }`}
+            >
+              <circle
+                cx="8"
+                cy="8"
+                r="6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={idx === 0 ? 2 : 1.4}
+                opacity={idx === 0 ? 1 : 0.75}
+              />
+              <circle cx="8" cy="8" r="2" fill="currentColor" />
+            </svg>
+
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-extrabold tabular-nums text-card-ink">
+                {info.label}
+              </span>
+              <span className="line-clamp-2 block text-[11px] font-bold leading-tight text-muted-soft">
+                {info.meaning}
+              </span>
+            </span>
+
+            <span className="flex shrink-0 items-center gap-1">
+              <span className="flex -space-x-1">
+                {info.members.slice(0, maxDots).map((team) => (
+                  <span
+                    key={team.id}
+                    title={team.name}
+                    className="h-2.5 w-2.5 rounded-full border border-white/70"
+                    style={{ backgroundColor: team.color }}
+                  />
+                ))}
+              </span>
+              {info.count > maxDots ? (
+                <span className="text-[10px] font-extrabold tabular-nums text-muted-soft">
+                  +{info.count - maxDots}
+                </span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Collapsible>
   );
 }
 
