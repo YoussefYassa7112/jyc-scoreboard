@@ -1,6 +1,13 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import * as d3 from "d3";
 import { useTheme } from "@/lib/theme";
 import type { StandingRow } from "@/lib/standings";
@@ -805,78 +812,121 @@ function OrbitLegend({
   bands: OrbitBandInfo<StandingRow>[];
   stage: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   if (!bands.length) return null;
-  const maxDots = stage ? 14 : 9;
+  // Few enough dots that the text beside them still gets a sensible column on
+  // a phone; the overflow count carries the rest.
+  const maxDots = stage ? 12 : 5;
 
   return (
     <div
-      className={`shrink-0 border-t border-saddle/10 ${stage ? "mt-2 pt-2" : "mt-3 pt-3"}`}
+      className={`shrink-0 border-t border-saddle/10 ${stage ? "mt-2 pt-2" : "mt-3 pt-2.5"}`}
     >
-      <p
-        className={`display-font font-extrabold uppercase tracking-[0.16em] text-muted-soft ${
-          stage ? "text-[11px]" : "text-[11px]"
-        }`}
+      {/* Closed by default so the arena keeps its full height — the legend is
+          something you consult once, not something you read every time. */}
+      <button
+        type="button"
+        data-open={open}
+        aria-expanded={open}
+        aria-controls="orbit-legend-panel"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-1 py-1 text-left"
       >
-        Orbits · each ring is 10% further behind the leader
-      </p>
-      <ul
-        className={`mt-1.5 grid gap-1.5 ${
-          stage ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
-        }`}
+        <svg
+          viewBox="0 0 16 16"
+          aria-hidden
+          className="orbit-legend-chevron h-3.5 w-3.5 shrink-0 text-star"
+        >
+          <path
+            d="M4 6.5 L8 10.5 L12 6.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="display-font text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted-soft">
+          What the rings mean
+        </span>
+        <span className="ml-auto text-[11px] font-bold text-muted-soft">
+          {bands.length} {bands.length === 1 ? "orbit" : "orbits"}
+        </span>
+      </button>
+
+      {/* Grid rows 0fr -> 1fr animates the height without anyone measuring it,
+          and the row stays mounted, so this is a plain transition rather than
+          something that has to survive being mounted mid-animation. */}
+      <div
+        id="orbit-legend-panel"
+        className="orbit-legend-collapse"
+        data-open={open}
+        aria-hidden={!open}
       >
-        {bands.map((info, idx) => (
-          <li
-            key={info.band}
-            className="surface-card flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
+        <div>
+          <p className="px-1 pb-1.5 pt-1 text-[11px] font-bold text-muted-soft">
+            Closer in is closer to the lead. Each ring is another 10% behind.
+          </p>
+          <ul
+            className={`grid gap-1.5 ${
+              stage ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"
+            }`}
           >
-            <svg
-              viewBox="0 0 16 16"
-              aria-hidden
-              className={`h-4 w-4 shrink-0 ${
-                idx === 0 ? "text-star" : "text-muted-soft"
-              }`}
-            >
-              <circle
-                cx="8"
-                cy="8"
-                r="6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={idx === 0 ? 2 : 1.4}
-                opacity={idx === 0 ? 1 : 0.75}
-              />
-              <circle cx="8" cy="8" r="2" fill="currentColor" />
-            </svg>
-
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-extrabold tabular-nums text-card-ink">
-                {info.label}
-              </span>
-              <span className="block text-[11px] font-bold leading-tight text-muted-soft">
-                {info.meaning}
-              </span>
-            </span>
-
-            <span className="flex shrink-0 items-center gap-1">
-              <span className="flex -space-x-1">
-                {info.members.slice(0, maxDots).map((team) => (
-                  <span
-                    key={team.id}
-                    title={team.name}
-                    className="h-2.5 w-2.5 rounded-full border border-white/70"
-                    style={{ backgroundColor: team.color }}
+            {bands.map((info, idx) => (
+              <li
+                key={info.band}
+                className="surface-card flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  aria-hidden
+                  className={`h-4 w-4 shrink-0 ${
+                    idx === 0 ? "text-star" : "text-muted-soft"
+                  }`}
+                >
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={idx === 0 ? 2 : 1.4}
+                    opacity={idx === 0 ? 1 : 0.75}
                   />
-                ))}
-              </span>
-              {info.count > maxDots ? (
-                <span className="text-[10px] font-extrabold tabular-nums text-muted-soft">
-                  +{info.count - maxDots}
+                  <circle cx="8" cy="8" r="2" fill="currentColor" />
+                </svg>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-extrabold tabular-nums text-card-ink">
+                    {info.label}
+                  </span>
+                  <span className="line-clamp-2 block text-[11px] font-bold leading-tight text-muted-soft">
+                    {info.meaning}
+                  </span>
                 </span>
-              ) : null}
-            </span>
-          </li>
-        ))}
-      </ul>
+
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="flex -space-x-1">
+                    {info.members.slice(0, maxDots).map((team) => (
+                      <span
+                        key={team.id}
+                        title={team.name}
+                        className="h-2.5 w-2.5 rounded-full border border-white/70"
+                        style={{ backgroundColor: team.color }}
+                      />
+                    ))}
+                  </span>
+                  {info.count > maxDots ? (
+                    <span className="text-[10px] font-extrabold tabular-nums text-muted-soft">
+                      +{info.count - maxDots}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
