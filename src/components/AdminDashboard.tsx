@@ -94,6 +94,9 @@ const ADMIN_TABS: { id: AdminTabId; label: string }[] = [
 
 const ADMIN_TAB_KEY = "camp-admin-tab";
 
+/** Teams on the spider graph. Past this the axes crowd into a scribble. */
+const SPIDER_TEAMS = 10;
+
 function isAdminTabId(value: string | null): value is AdminTabId {
   return ADMIN_TABS.some((tab) => tab.id === value);
 }
@@ -1318,7 +1321,11 @@ export function AdminDashboard() {
                 {mountedTabs.includes("history") ? (
                   <>
                 <motion.div variants={panelIn}>
-                  <SpiderChart teams={sortedTeams} replayKey={chartReplay} />
+                  <SpiderChart
+                    teams={sortedTeams}
+                    replayKey={chartReplay}
+                    limit={SPIDER_TEAMS}
+                  />
                 </motion.div>
 
                   <motion.div variants={panelIn} className="panel rounded-3xl p-5">
