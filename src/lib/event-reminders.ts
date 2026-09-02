@@ -49,7 +49,32 @@ function readSent(): string[] {
   }
 }
 
+/**
+ * Keys announced in this tab, whatever localStorage thinks.
+ *
+ * The stored list is the record across sessions, but it is re-read on every
+ * check and written back — so two checks landing together, or a write refused
+ * in private mode, could both decide a reminder was still owed and fire it
+ * twice. This set cannot be raced or refused.
+ */
+const firedThisSession = new Set<string>();
+
+/**
+ * Reminders belong to a track. "overview" is what a camper sits on before
+ * picking a side, or when they pick Everyone — no track, so nothing to be
+ * reminded about, and a stream of events for teams they are not on is worse
+ * than silence.
+ */
+export function remindersApplyTo(group: ReminderGroup) {
+  return group === "red" || group === "green";
+}
+
+export function forgetSessionReminders() {
+  firedThisSession.clear();
+}
+
 function markSent(key: string) {
+  firedThisSession.add(key);
   if (typeof window === "undefined") return;
   try {
     const next = [...readSent().filter((k) => k !== key), key].slice(-SENT_LIMIT);
@@ -195,10 +220,11 @@ export function findScheduleAlerts(
   previousNow: Date | null = null,
   options: ScheduleAlertOptions = {},
 ): DueReminder[] {
+  if (!remindersApplyTo(group)) return [];
   const nowMs = now.getTime();
   const prevMs = previousNow?.getTime() ?? null;
   const timed = timedEvents(group, now, options.cabinId);
-  const sent = new Set(alreadySent);
+  const sent = new Set([...alreadySent, ...firedThisSession]);
   const due: DueReminder[] = [];
   const seen = new Set<string>();
 
@@ -212,6 +238,7 @@ export function findScheduleAlerts(
     if (!isLive(item, nowMs)) continue;
     const key = phaseKey(item.dayId, item.block.id, "started");
     if (!options.forceLive && sent.has(key)) continue;
+    if (options.forceLive) firedThisSession.delete(key);
     if (!options.forceLive && prevMs != null && prevMs >= item.start) continue;
     push(reminderFromBlock(item, "started", nowMs));
   }
@@ -269,6 +296,7 @@ export function announceDueReminders(
   now = new Date(),
   options: ScheduleAlertOptions = {},
 ) {
+  if (!remindersApplyTo(group)) return;
   const due = findScheduleAlerts(group, now, readSent(), null, {
     ...options,
     forceLive: options.forceLive ?? true,
@@ -282,6 +310,9 @@ export function announceDueReminders(
 export function clearRemindersForDay(dayId: string) {
   if (typeof window === "undefined") return;
   try {
+    for (const key of [...firedThisSession]) {
+      if (key.startsWith(`${dayId}:`)) firedThisSession.delete(key);
+    }
     const next = readSent().filter((key) => !key.startsWith(`${dayId}:`));
     window.localStorage.setItem(SENT_KEY, JSON.stringify(next));
   } catch {
@@ -312,7 +343,7 @@ export function useEventReminders(
   }, [group, cabinId]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !remindersApplyTo(group)) return;
 
     function check() {
       const now = new Date();

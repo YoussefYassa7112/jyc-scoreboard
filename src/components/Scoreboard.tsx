@@ -270,24 +270,48 @@ export function Scoreboard() {
   const reminderCabinId =
     typeof myTeam?.cabinId === "number" ? myTeam.cabinId : null;
 
+  // Toasts leave on their own, counting only the time the tab was actually in
+  // front. A plain timeout starts when the toast is raised, so one that arrives
+  // while the phone is in a pocket has spent its whole life unseen — the point
+  // of a reminder being that somebody reads it.
+  const toastTimers = useRef<number[]>([]);
+  useEffect(
+    () => () => {
+      toastTimers.current.forEach((id) => window.clearInterval(id));
+      toastTimers.current = [];
+    },
+    [],
+  );
+
+  const showToast = useCallback((toast: AdminToast, holdMs = 9_000) => {
+    // Keyed by id, so the same reminder arriving again replaces its toast
+    // instead of stacking a second copy of itself.
+    setToasts((current) =>
+      [...current.filter((t) => t.id !== toast.id), toast].slice(-4),
+    );
+    let seen = 0;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = now - last;
+      last = now;
+      if (document.hidden) return;
+      seen += Math.min(delta, 1_000);
+      if (seen < holdMs) return;
+      window.clearInterval(timer);
+      setToasts((current) => current.filter((t) => t.id !== toast.id));
+    }, 250);
+    toastTimers.current.push(timer);
+  }, []);
+
   const pushReminderToast = useCallback((reminder: DueReminder) => {
-    const id = `reminder-${reminder.key}-${Date.now()}`;
+    // No timestamp in the id. It used to carry one, so a reminder announced
+    // twice — switching team re-announces what is on now — became two toasts
+    // sitting on top of each other rather than one replacing the other.
+    const id = `reminder-${reminder.key}`;
     const kind: AdminToast["kind"] =
       reminder.phase === "started" ? "started" : "reminder";
-    setToasts((current) =>
-      [
-        ...current.filter((toast) => toast.id !== id),
-        {
-          id,
-          kind,
-          title: reminder.title,
-          detail: reminder.body,
-        },
-      ].slice(-4),
-    );
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 14_000);
+    showToast({ id, kind, title: reminder.title, detail: reminder.body });
     try {
       navigator.vibrate?.([180, 70, 180]);
     } catch {
@@ -297,19 +321,11 @@ export function Scoreboard() {
       reminder.phase === "started" ? "Happening now" : "Time to go",
       { body: `${reminder.title}. ${reminder.body}`, tag: reminder.key },
     );
-  }, []);
+  }, [showToast]);
 
   const pushNoticeToast = useCallback((message: CampMessageRow) => {
     const id = `notice-${message.id}`;
-    setToasts((current) =>
-      [
-        ...current.filter((toast) => toast.id !== id),
-        { id, kind: "notice" as const, title: message.body },
-      ].slice(-4),
-    );
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 14_000);
+    showToast({ id, kind: "notice" as const, title: message.body });
     try {
       navigator.vibrate?.([120, 60, 120]);
     } catch {
@@ -319,7 +335,7 @@ export function Scoreboard() {
       body: message.body,
       tag: id,
     });
-  }, []);
+  }, [showToast]);
 
   useEventReminders(reminderGroup, remindersOn, pushReminderToast, reminderCabinId);
 
