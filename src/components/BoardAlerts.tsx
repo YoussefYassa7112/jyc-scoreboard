@@ -8,7 +8,7 @@ import type { BoardAlert } from "@/lib/rank-alerts";
 /** Roughly how long the takeover takes to arrive and settle. */
 const APPEAR_MS = 900;
 /** How long it then stands there before letting itself out. */
-const HOLD_MS = 6000;
+const HOLD_MS = 7000;
 /** Coarse enough to cost nothing, fine enough that the wait feels right. */
 const TICK_MS = 250;
 

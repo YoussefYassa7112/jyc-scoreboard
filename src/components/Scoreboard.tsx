@@ -194,28 +194,16 @@ export function Scoreboard() {
     dropMissingMyTeam(pending.standings);
   }, []);
 
-  // Every timer this schedules is tracked so unmounting cannot leave a
-  // setState firing into a dead component.
-  const alertTimers = useRef<number[]>([]);
-  useEffect(
-    () => () => {
-      alertTimers.current.forEach((id) => window.clearTimeout(id));
-      alertTimers.current = [];
-    },
-    [],
-  );
 
+  // No expiry is scheduled here. These used to be given a lifetime the moment
+  // they were raised — twelve seconds for a new leader, eight for a rank move —
+  // which ran whether or not the alert was on screen. Raise both at once and
+  // the leader takes its turn first while the rank move quietly burns its eight
+  // seconds behind it, then flashes up with a second left. BoardAlerts times
+  // them instead, from when each becomes the one being shown.
   const pushAlerts = useCallback((incoming: BoardAlert[]) => {
     if (incoming.length === 0) return;
     setAlerts((current) => [...current, ...incoming].slice(-3));
-    for (const alert of incoming) {
-      const life = alert.kind === "leader" ? 12000 : 8000;
-      alertTimers.current.push(
-        window.setTimeout(() => {
-          setAlerts((current) => current.filter((a) => a.id !== alert.id));
-        }, life),
-      );
-    }
   }, []);
 
   useEffect(() => {
