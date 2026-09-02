@@ -203,7 +203,11 @@ export function Scoreboard() {
   // them instead, from when each becomes the one being shown.
   const pushAlerts = useCallback((incoming: BoardAlert[]) => {
     if (incoming.length === 0) return;
-    setAlerts((current) => [...current, ...incoming].slice(-3));
+    // Replaces rather than appends. A batch describes the standings as they are
+    // now, so anything still queued from a moment ago describes a board that no
+    // longer exists — "you climbed to #4" is not merely old once you are sixth,
+    // it is wrong. The newest picture wins and the stale ones go.
+    setAlerts(incoming.slice(-3));
   }, []);
 
   useEffect(() => {
@@ -243,7 +247,10 @@ export function Scoreboard() {
 
       if (holdForMessage || alreadyHolding) {
         pendingReveal.current = json;
-        if (holdForMessage && !alreadyHolding) {
+        // Note the missing `&& !alreadyHolding`. While a takeover was on screen
+        // the board parked the newer standings but threw their alerts away, so
+        // a rank change during those few seconds was never announced at all.
+        if (holdForMessage) {
           if (introReadyRef.current) pushAlerts(incoming);
           else queuedAlerts.current = incoming;
         }
