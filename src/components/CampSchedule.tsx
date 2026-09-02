@@ -808,6 +808,11 @@ export function CampSchedule({
               Start camp now
             </button>
           </div>
+          <p className="mt-2 text-[11px] font-bold text-muted-soft">
+            Build {(process.env.NEXT_PUBLIC_BUILD_SHA ?? "dev").slice(0, 7)} ·
+            if this differs between phone and laptop, the phone is still on the
+            old service worker — load it twice.
+          </p>
           <label className="mt-2 block text-xs font-bold text-muted">
             Jump to an event
             <select

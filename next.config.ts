@@ -45,6 +45,11 @@ const withSerwist = withSerwistInit({
   ],
 });
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // Surfaced in the dry-run panel. A phone keeps serving the previous bundle
+  // from the service worker until it has loaded twice, so "is this actually the
+  // new build?" needs an answer you can read off the screen.
+  env: { NEXT_PUBLIC_BUILD_SHA: revision },
+};
 
 export default withSerwist(nextConfig);
