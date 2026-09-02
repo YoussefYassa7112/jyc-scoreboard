@@ -274,35 +274,77 @@ export function Scoreboard() {
   // front. A plain timeout starts when the toast is raised, so one that arrives
   // while the phone is in a pocket has spent its whole life unseen — the point
   // of a reminder being that somebody reads it.
-  const toastTimers = useRef<number[]>([]);
-  useEffect(
-    () => () => {
-      toastTimers.current.forEach((id) => window.clearInterval(id));
-      toastTimers.current = [];
+  const toastTimers = useRef(new Map<string, number>());
+  const dismissedAt = useRef(new Map<string, number>());
+  useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      timers.forEach((id) => window.clearInterval(id));
+      timers.clear();
+    };
+  }, []);
+
+  const dropToast = useCallback((id: string) => {
+    const timer = toastTimers.current.get(id);
+    if (timer != null) {
+      window.clearInterval(timer);
+      toastTimers.current.delete(id);
+    }
+    setToasts((current) => current.filter((t) => t.id !== id));
+  }, []);
+
+  // A toast the camper has just swiped away must not come back because the same
+  // reminder was announced again a second later. Short window: a genuinely new
+  // reminder carries a different key, so nothing real is suppressed by it.
+  const dismissToast = useCallback(
+    (id: string) => {
+      dismissedAt.current.set(id, performance.now());
+      dropToast(id);
     },
-    [],
+    [dropToast],
   );
 
-  const showToast = useCallback((toast: AdminToast, holdMs = 9_000) => {
-    // Keyed by id, so the same reminder arriving again replaces its toast
-    // instead of stacking a second copy of itself.
-    setToasts((current) =>
-      [...current.filter((t) => t.id !== toast.id), toast].slice(-4),
-    );
-    let seen = 0;
-    let last = performance.now();
-    const timer = window.setInterval(() => {
-      const now = performance.now();
-      const delta = now - last;
-      last = now;
-      if (document.hidden) return;
-      seen += Math.min(delta, 1_000);
-      if (seen < holdMs) return;
-      window.clearInterval(timer);
-      setToasts((current) => current.filter((t) => t.id !== toast.id));
-    }, 250);
-    toastTimers.current.push(timer);
-  }, []);
+  const showToast = useCallback(
+    (toast: AdminToast, holdMs = 9_000) => {
+      const justDismissed = dismissedAt.current.get(toast.id);
+      if (justDismissed != null && performance.now() - justDismissed < 5_000) {
+        return;
+      }
+
+      setToasts((current) => {
+        const at = current.findIndex((t) => t.id === toast.id);
+        // Replaced where it already sits, never moved to the end. Filtering it
+        // out and re-appending reorders the stack, and React re-inserts the DOM
+        // node to match — which restarts its entry animation. That is the blink:
+        // the toast appears to vanish and come back while standing still.
+        if (at >= 0) {
+          const next = [...current];
+          next[at] = toast;
+          return next;
+        }
+        return [...current, toast].slice(-4);
+      });
+
+      // One timer per toast. Re-showing used to add a second one, and the older
+      // deadline would then pull the toast down early.
+      const existing = toastTimers.current.get(toast.id);
+      if (existing != null) window.clearInterval(existing);
+
+      let seen = 0;
+      let last = performance.now();
+      const timer = window.setInterval(() => {
+        const now = performance.now();
+        const delta = now - last;
+        last = now;
+        if (document.hidden) return;
+        seen += Math.min(delta, 1_000);
+        if (seen < holdMs) return;
+        dropToast(toast.id);
+      }, 250);
+      toastTimers.current.set(toast.id, timer);
+    },
+    [dropToast],
+  );
 
   const pushReminderToast = useCallback((reminder: DueReminder) => {
     // No timestamp in the id. It used to carry one, so a reminder announced
@@ -1029,9 +1071,7 @@ export function Scoreboard() {
 
       <AdminToasts
         toasts={toasts}
-        onDismiss={(id) =>
-          setToasts((current) => current.filter((toast) => toast.id !== id))
-        }
+        onDismiss={dismissToast}
       />
       <BoardAlerts
         alerts={alerts}
