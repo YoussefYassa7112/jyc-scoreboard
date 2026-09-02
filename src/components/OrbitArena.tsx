@@ -27,9 +27,11 @@ const LEVEL_GAP = 36;
 /** Orbits below the leader, one per 10% of the leading score. */
 const BAND_COUNT = 10;
 const PAD = 48;
-/** Lower = slower radius lerp when ranks/scores change. */
-const ORBIT_EASE = 1.15;
-const RANK_MOVE_MS = 1800;
+const TAU = Math.PI * 2;
+/** Lower = slower lerp of radius, size and the slide into formation. */
+const ORBIT_EASE = 2.4;
+/** How long the rings take to resize when the standings move. */
+const RANK_MOVE_MS = 850;
 const THEME_MS = 160;
 
 type OrbitChrome = {
@@ -238,6 +240,8 @@ type OrbitNode = StandingRow & {
   orbit: number;
   targetOrbit: number;
   angle: number;
+  /** Where this team belongs on its ring, as an offset from the ring's phase. */
+  slotOffset: number;
   speed: number;
   targetSpeed: number;
   bodyR: number;
@@ -291,6 +295,9 @@ export const OrbitArena = memo(function OrbitArena({
   const wrapRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const nodesRef = useRef<OrbitNode[]>([]);
+  /** Per-ring phase and speed, so a ring's teams travel together. */
+  const ringPhaseRef = useRef<Map<number, number>>(new Map());
+  const ringSpeedRef = useRef<Map<number, number>>(new Map());
   const planetsRef = useRef<PlanetHandle[]>([]);
   const driftRef = useRef<DriftHandle[]>([]);
   const starsRef = useRef<StarHandle[]>([]);
@@ -520,6 +527,10 @@ export const OrbitArena = memo(function OrbitArena({
 
     const slotByBand = new Map<number, number>();
 
+    const ringPhases = ringPhaseRef.current;
+    const ringSpeeds = ringSpeedRef.current;
+    ringSpeeds.clear();
+
     const prevById = new Map(nodesRef.current.map((node) => [node.id, node]));
     const nodes: OrbitNode[] = teams.map((team) => {
       const band = bandOf(team.score);
@@ -531,6 +542,17 @@ export const OrbitArena = memo(function OrbitArena({
       const targetOrbit = orbitByBand.get(band) ?? CORE_R + 16 + gap;
       const targetSpeed = 0.26 + (orbitCount - level + 1) * 0.048;
       const targetBodyR = level === 1 ? LEADER_R : PLANET_R;
+      // Every team is given its share of the ring again on every layout. It
+      // used to keep whatever angle it was created with, so a team leaving a
+      // ring left a hole behind and one arriving landed wherever it happened to
+      // be — on top of somebody, if that is where its old orbit had carried it.
+      const slotOffset = (slot / onOrbit) * TAU;
+
+      // One phase per ring, advancing at that ring's speed, so the teams on it
+      // hold formation instead of each drifting on its own clock.
+      ringSpeeds.set(level, targetSpeed);
+      if (!ringPhases.has(level)) ringPhases.set(level, phase);
+
       const prev = prevById.get(team.id);
       if (prev) {
         return {
@@ -539,6 +561,7 @@ export const OrbitArena = memo(function OrbitArena({
           orbit: prev.orbit,
           targetOrbit,
           angle: prev.angle,
+          slotOffset,
           speed: prev.speed,
           targetSpeed,
           bodyR: prev.bodyR,
@@ -550,7 +573,10 @@ export const OrbitArena = memo(function OrbitArena({
         level,
         orbit: targetOrbit * 0.35,
         targetOrbit,
-        angle: phase + (slot / onOrbit) * Math.PI * 2,
+        // A team seen for the first time starts in formation rather than
+        // gliding into it from an arbitrary angle.
+        angle: (ringPhases.get(level) ?? phase) + slotOffset,
+        slotOffset,
         speed: targetSpeed,
         targetSpeed,
         bodyR: targetBodyR * 0.4,
@@ -558,6 +584,11 @@ export const OrbitArena = memo(function OrbitArena({
       };
     });
     nodesRef.current = nodes;
+
+    // Rings nobody is on any more should not keep spinning a phase.
+    for (const level of [...ringPhases.keys()]) {
+      if (!ringSpeeds.has(level)) ringPhases.delete(level);
+    }
 
     const planet = scene.planets
       .selectAll<SVGGElement, OrbitNode>("g.planet")
@@ -729,12 +760,27 @@ export const OrbitArena = memo(function OrbitArena({
       const planets = planetsRef.current;
       if (planets.length === 0) return;
 
+      const ringPhases = ringPhaseRef.current;
+      for (const [level, speed] of ringSpeedRef.current) {
+        ringPhases.set(level, (ringPhases.get(level) ?? 0) + speed * dt);
+      }
+
       for (const handle of planets) {
         const d = handle.node;
         d.orbit += (d.targetOrbit - d.orbit) * ease;
         d.speed += (d.targetSpeed - d.speed) * ease;
         d.bodyR += (d.targetBodyR - d.bodyR) * ease;
-        d.angle += d.speed * dt;
+
+        // Travel with the ring, and close whatever distance is left to this
+        // team's share of it. Wrapping the difference into [-pi, pi] first
+        // means a team always takes the short way round rather than unwinding
+        // most of a circle to reach a neighbouring slot.
+        const want = (ringPhases.get(d.level) ?? d.angle) + d.slotOffset;
+        const drift = Math.atan2(
+          Math.sin(want - d.angle),
+          Math.cos(want - d.angle),
+        );
+        d.angle += drift * Math.min(1, ease * 1.6);
 
         const x = Math.cos(d.angle) * d.orbit;
         const y = Math.sin(d.angle) * d.orbit;

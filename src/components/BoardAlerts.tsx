@@ -1,8 +1,16 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { fadeSoft, springSoft, springSnappy } from "@/lib/motion";
 import type { BoardAlert } from "@/lib/rank-alerts";
+
+/** Roughly how long the takeover takes to arrive and settle. */
+const APPEAR_MS = 900;
+/** How long it then stands there before letting itself out. */
+const HOLD_MS = 6000;
+/** Coarse enough to cost nothing, fine enough that the wait feels right. */
+const TICK_MS = 250;
 
 const PIECES = ["🎉", "⭐", "🏆", "✨", "🚀", "👑", "🌟", "💫", "🎊", "🤠"];
 
@@ -222,6 +230,37 @@ export function BoardAlerts({
   onDismiss: (id: string) => void;
 }) {
   const shown = alerts.find((a) => a.kind === "leader") ?? alerts[0];
+  const shownId = shown?.id ?? null;
+
+  // Held in a ref because the board passes a fresh closure every render, and a
+  // timer that restarted on each one would never reach the end.
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+
+  // Let it go by itself if nobody taps, but only after it has actually been
+  // seen. The clock starts when this alert becomes the visible one — not when
+  // it was raised, so a queued alert does not spend its turn behind another —
+  // and stops while the tab is in the background, which is the one case where
+  // time passing does not mean anyone is looking.
+  useEffect(() => {
+    if (!shownId) return;
+    let seen = 0;
+    let last = performance.now();
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      const delta = now - last;
+      last = now;
+      if (document.hidden) return;
+      // Real elapsed time rather than one tick per tick: a browser clamps
+      // timers in a background tab, so counting ticks would drift. The clamp
+      // stops a long throttled gap from spending the whole budget at once.
+      seen += Math.min(delta, TICK_MS * 4);
+      if (seen < APPEAR_MS + HOLD_MS) return;
+      window.clearInterval(timer);
+      dismissRef.current(shownId);
+    }, TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [shownId]);
 
   return (
     <MotionConfig reducedMotion="user">
