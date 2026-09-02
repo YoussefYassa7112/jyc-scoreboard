@@ -30,7 +30,13 @@ import {
   resetDemoScheduleClock,
   setDemoScheduleEnabled,
 } from "@/lib/schedule-demo";
-import { LIVE_CAMP_SIM, resetLiveSimClock } from "@/lib/schedule-sim";
+import {
+  LIVE_CAMP_SIM,
+  SIM_LEAD_IN_MS,
+  resetLiveSimClock,
+  simJumpTargets,
+  skipLiveSimTo,
+} from "@/lib/schedule-sim";
 import {
   readMyTeamSnapshot,
   setMyBracelet,
@@ -577,6 +583,18 @@ export function CampSchedule({
   }
 
   const calendarKey = isoDateKey(new Date(nowTick));
+  // Every sim control does the same three things: move the origin, forget the
+  // reminders already fired against the old timeline, and make the view re-read
+  // the clock. Kept together so a new button cannot forget one of them.
+  function jumpSim(move: () => unknown, dayId = "day-1") {
+    move();
+    for (const d of campDays) clearRemindersForDay(d.id);
+    setDemoEpoch((n) => n + 1);
+    setNowTick(Date.now());
+    followLiveDay.current = true;
+    setDayId(dayId);
+  }
+
   const days = useMemo(() => {
     void demoEpoch;
     if (LIVE_CAMP_SIM && !simReady) return campDays;
@@ -771,24 +789,47 @@ export function CampSchedule({
       {LIVE_CAMP_SIM ? (
         <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">
           <p className="text-sm font-bold text-star">
-            Simulation preview — the real 3-day camp, shifted so Arrival starts
-            when you opened this page (or when you tap Restart from now). Not the
-            public site. Gaps and lengths stay the same.
+            Dry run — the real 3-day camp with every gap and length intact,
+            slid so it happens now. Not the public site.
           </p>
-          <button
-            type="button"
-            className="btn-soft mt-2 min-h-11 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
-            onClick={() => {
-              resetLiveSimClock();
-              for (const d of days) clearRemindersForDay(d.id);
-              setDemoEpoch((n) => n + 1);
-              setNowTick(Date.now());
-              followLiveDay.current = true;
-              setDayId("day-1");
-            }}
-          >
-            Restart from now
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-cta min-h-11 rounded-xl bg-star px-3 py-1.5 text-xs font-extrabold"
+              onClick={() => jumpSim(() => resetLiveSimClock())}
+            >
+              Restart · camp opens in {Math.round(SIM_LEAD_IN_MS / 60000)} min
+            </button>
+            <button
+              type="button"
+              className="btn-soft min-h-11 rounded-xl border px-3 py-1.5 text-xs font-extrabold"
+              onClick={() => jumpSim(() => resetLiveSimClock(0))}
+            >
+              Start camp now
+            </button>
+          </div>
+          <label className="mt-2 block text-xs font-bold text-muted">
+            Jump to an event
+            <select
+              value=""
+              className="field mt-1 w-full rounded-xl border-2 px-3 py-2 text-xs font-semibold"
+              onChange={(e) => {
+                const [dayId, blockId] = e.target.value.split("|");
+                if (!dayId || !blockId) return;
+                jumpSim(() => skipLiveSimTo(dayId, blockId), dayId);
+              }}
+            >
+              <option value="">Pick an event to start now…</option>
+              {simJumpTargets().map((target) => (
+                <option
+                  key={`${target.dayId}|${target.blockId}`}
+                  value={`${target.dayId}|${target.blockId}`}
+                >
+                  {target.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       ) : day.id === DEMO_DAY_ID ? (
         <div className="mt-3 rounded-2xl border-2 border-star/40 bg-chip/80 px-4 py-3">

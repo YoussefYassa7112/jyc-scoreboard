@@ -6,21 +6,65 @@ import { eventDateTimes, isoDateKey } from "@/lib/schedule-time";
  * Shifts the real 3-day camp so Arrival starts at the stored origin (now).
  * Origin lives in localStorage so closing the phone overnight keeps the clock.
  */
-export const LIVE_CAMP_SIM = false;
+export const LIVE_CAMP_SIM = true;
 
 const ORIGIN_KEY = "camp-live-sim-origin";
 
+/**
+ * Arrival lands this far ahead by default, so a fresh start shows the board as
+ * it looks *before* camp — nothing running, Arrival counting down — and you get
+ * to watch it tip over rather than opening straight into a camp already going.
+ */
+export const SIM_LEAD_IN_MS = 3 * 60 * 1000;
+
 let originMs: number | null = null;
 
-export function resetLiveSimClock() {
-  originMs = Date.now();
-  if (typeof window === "undefined") return originMs;
+function writeOrigin(ms: number) {
+  originMs = ms;
+  if (typeof window === "undefined") return ms;
   try {
-    window.localStorage.setItem(ORIGIN_KEY, String(originMs));
+    window.localStorage.setItem(ORIGIN_KEY, String(ms));
   } catch {
     /* private mode */
   }
-  return originMs;
+  return ms;
+}
+
+/** Restart the camp. Arrival begins after the lead-in; pass 0 to start now. */
+export function resetLiveSimClock(leadInMs = SIM_LEAD_IN_MS) {
+  return writeOrigin(Date.now() + leadInMs);
+}
+
+/**
+ * Move the clock so a chosen block is starting right now.
+ *
+ * Every block is shifted by one constant offset from Arrival, so putting a
+ * block at `now` is a matter of solving for the origin that does it — no
+ * per-block bookkeeping, and the rest of the camp keeps its real spacing
+ * around the point you jumped to.
+ */
+export function skipLiveSimTo(dayId: string, blockId: string) {
+  const firstDay = campDays[0];
+  const arrival =
+    firstDay?.blocks.find((block) => block.id === "d1-arrival") ?? null;
+  const anchor = firstDay && arrival ? eventDateTimes(firstDay, arrival) : null;
+  const day = campDays.find((d) => d.id === dayId);
+  const block = day?.blocks.find((b) => b.id === blockId);
+  const target = day && block ? eventDateTimes(day, block) : null;
+  if (!anchor || !target) return null;
+  const fromArrival = target.start.getTime() - anchor.start.getTime();
+  return writeOrigin(Date.now() - fromArrival);
+}
+
+/** Every block, flattened, for a "jump to" picker. */
+export function simJumpTargets() {
+  return campDays.flatMap((day) =>
+    day.blocks.map((block) => ({
+      dayId: day.id,
+      blockId: block.id,
+      label: `${day.label} · ${block.time} — ${block.title}`,
+    })),
+  );
 }
 
 function simOrigin(): Date {
@@ -29,13 +73,21 @@ function simOrigin(): Date {
     try {
       const stored = window.localStorage.getItem(ORIGIN_KEY);
       const parsed = stored ? Number(stored) : NaN;
-      originMs = Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
+      // A first visit gets the lead-in too, not just the Restart button — the
+      // point of the dry run is to watch camp begin, which means opening the
+      // board a few minutes before it does.
+      originMs =
+        Number.isFinite(parsed) && parsed > 0
+          ? parsed
+          : Date.now() + SIM_LEAD_IN_MS;
       window.localStorage.setItem(ORIGIN_KEY, String(originMs));
     } catch {
-      originMs = Date.now();
+      originMs = Date.now() + SIM_LEAD_IN_MS;
     }
   }
-  if (!Number.isFinite(originMs) || originMs <= 0) originMs = Date.now();
+  if (!Number.isFinite(originMs) || originMs <= 0) {
+    originMs = Date.now() + SIM_LEAD_IN_MS;
+  }
   return new Date(originMs);
 }
 
