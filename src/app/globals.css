@@ -1540,3 +1540,48 @@ html.dark .sky-floaters {
 [data-open="true"] > .collapse-chevron {
   transform: rotate(0deg);
 }
+
+/* Toasts.
+   Plain keyframes rather than a spring driven by requestAnimationFrame. The
+   framer version blinked on iOS and nowhere else, and every other animation in
+   this app that misbehaved was cured the same way. Compositor-only properties,
+   so there is no layout work per frame. */
+.toast-card {
+  animation: toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.toast-card[data-leaving="true"] {
+  animation: toast-out 180ms ease-in both;
+  pointer-events: none;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) scale(0.97);
+  }
+}
+
+/* Low Power Mode reports reduced motion on iOS, and a camper on a flat battery
+   still needs to see the reminder — so it appears, just without the travel. */
+@media (prefers-reduced-motion: reduce) {
+  .toast-card,
+  .toast-card[data-leaving="true"] {
+    animation-duration: 1ms;
+  }
+}
