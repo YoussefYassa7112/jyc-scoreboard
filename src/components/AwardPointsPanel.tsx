@@ -54,13 +54,10 @@ export function AwardPointsPanel({
   const [query, setQuery] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupDraft, setSetupDraft] = useState<ScoringActivity[] | null>(null);
-  const [newTitle, setNewTitle] = useState("");
-  const [newMin, setNewMin] = useState("0");
-  const [newMax, setNewMax] = useState("10");
   const [extraAmount, setExtraAmount] = useState("5");
   const [extraSign, setExtraSign] = useState<1 | -1>(1);
   const [extraReason, setExtraReason] = useState("");
-  const [setupBusy, setSetupBusy] = useState<"save" | "add" | string | null>(
+  const [setupBusy, setSetupBusy] = useState<"save" | string | null>(
     null,
   );
   const [setupDone, setSetupDone] = useState(false);
@@ -206,7 +203,7 @@ export function AwardPointsPanel({
 
   async function commitSetup(
     next: ScoringActivity[],
-    key: "save" | "add" | string,
+    key: "save" | string,
   ) {
     setSetupBusy(key);
     setSetupDone(false);
@@ -366,30 +363,6 @@ export function AwardPointsPanel({
     setExtraReason("");
   }
 
-  function addCustomEvent(e: FormEvent) {
-    e.preventDefault();
-    const row = sanitizeActivity({
-      title: newTitle,
-      minPoints: Number(newMin),
-      maxPoints: Number(newMax),
-      enabled: true,
-    });
-    if (!row) return;
-    const list = setupList;
-    const next = list.some(
-      (item) => item.title.toLowerCase() === row.title.toLowerCase(),
-    )
-      ? list.map((item) =>
-          item.title.toLowerCase() === row.title.toLowerCase()
-            ? { ...item, ...row, id: item.id }
-            : item,
-        )
-      : [...list, row];
-    setNewTitle("");
-    setNewMin("0");
-    setNewMax("10");
-    void commitSetup(next, "add");
-  }
 
   const canSubmitActivities = Boolean(teamId) && selectedRows.length > 0 && !busy;
   const extraDelta = extraSign * Math.abs(Number(extraAmount) || 0);
@@ -914,57 +887,6 @@ export function AwardPointsPanel({
                 </li>
               ))}
             </ul>
-            <form
-              onSubmit={addCustomEvent}
-              className="grid gap-2 rounded-2xl border-2 border-dashed border-saddle/25 p-3 sm:grid-cols-[1fr_4.5rem_4.5rem_auto] sm:items-end"
-            >
-              <label className="text-xs font-bold text-muted">
-                Custom event
-                <input
-                  type="text"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g. Cabin inspection"
-                  className="field mt-1 w-full rounded-xl border-2 px-3 py-2 text-sm font-semibold"
-                  required
-                />
-              </label>
-              <label className="text-xs font-bold text-muted">
-                Min
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={newMin}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) =>
-                    setNewMin(e.target.value.replace(/[^\d-]/g, ""))
-                  }
-                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold [appearance:textfield]"
-                />
-              </label>
-              <label className="text-xs font-bold text-muted">
-                Max
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={newMax}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onChange={(e) =>
-                    setNewMax(e.target.value.replace(/[^\d-]/g, ""))
-                  }
-                  className="field mt-1 w-full rounded-xl border-2 px-2 py-2 text-sm font-semibold [appearance:textfield]"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={setupBusy !== null || !newTitle.trim()}
-                className="btn-soft rounded-xl border px-3 py-2 text-sm font-extrabold disabled:opacity-50"
-              >
-                <BusyLabel busy={setupBusy === "add"} busyLabel="Adding…">
-                  Add
-                </BusyLabel>
-              </button>
-            </form>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
