@@ -85,6 +85,14 @@ export function clampScore(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+/** Trusts nothing: used on both sides of the wire. */
+export function sanitizeActivityList(input: unknown): ScoringActivity[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row) => sanitizeActivity((row ?? {}) as Partial<ScoringActivity>))
+    .filter((row): row is ScoringActivity => row !== null);
+}
+
 export function readScoringActivities(): ScoringActivity[] {
   if (typeof window === "undefined") return suggestedScoringActivities();
   try {

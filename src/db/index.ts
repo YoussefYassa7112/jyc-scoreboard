@@ -46,6 +46,27 @@ export function ensureCabinColumn() {
  * The drizzle migration in this repo is already behind the schema, so a table
  * that only appears after a manual `db:push` would break the moment this ships.
  */
+let settingsTableReady: Promise<unknown> | null = null;
+
+export function ensureSettingsTable() {
+  if (!settingsTableReady) {
+    const url = process.env.DATABASE_URL;
+    if (!url) {
+      settingsTableReady = Promise.resolve();
+      return settingsTableReady;
+    }
+    const sql = neon(url);
+    settingsTableReady = sql`
+      CREATE TABLE IF NOT EXISTS camp_settings (
+        key text PRIMARY KEY,
+        value text NOT NULL,
+        updated_at timestamp with time zone NOT NULL DEFAULT now()
+      )
+    `;
+  }
+  return settingsTableReady;
+}
+
 export function ensureMessagesTable() {
   if (!messagesTableReady) {
     const url = process.env.DATABASE_URL;

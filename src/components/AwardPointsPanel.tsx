@@ -77,6 +77,31 @@ export function AwardPointsPanel({
     }
   }, [teams, teamId]);
 
+  // The caps live on the server so every phone and laptop agrees on what an
+  // activity is worth. localStorage is kept as an offline copy, not the record:
+  // it used to be the only place they existed, which is why a change made on a
+  // laptop never reached anyone else's device.
+  const [setupError, setSetupError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!online) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/scoring", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { activities?: ScoringActivity[] | null };
+        if (cancelled || !data.activities?.length) return;
+        setActivities(data.activities);
+        writeScoringActivities(data.activities);
+      } catch {
+        /* offline or flaky — the local copy stands */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [online]);
+
   const enabled = useMemo(
     () => activities.filter((row) => row.enabled),
     [activities],
@@ -185,8 +210,35 @@ export function AwardPointsPanel({
   ) {
     setSetupBusy(key);
     setSetupDone(false);
-    await new Promise((resolve) => window.setTimeout(resolve, 450));
-    persist(applyPointDrafts(next));
+    setSetupError(null);
+    const list = applyPointDrafts(next);
+
+    // Written locally first so the screen never lies about what was typed, then
+    // sent. A failure says so rather than leaving this device quietly ahead of
+    // every other one.
+    persist(list);
+    if (online) {
+      try {
+        const res = await fetch("/api/scoring", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activities: list }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Could not save to the camp");
+        }
+      } catch (err) {
+        setSetupError(
+          err instanceof Error
+            ? `${err.message} — saved on this device only.`
+            : "Saved on this device only.",
+        );
+      }
+    } else {
+      setSetupError("No WiFi — saved on this device only, not shared yet.");
+    }
+
     setSetupBusy(null);
     setSetupDone(true);
     onSetupSaved?.();
@@ -933,13 +985,21 @@ export function AwardPointsPanel({
                 </BusyLabel>
               </button>
             </div>
-            {setupDone ? (
+            {setupError ? (
+              <p
+                className="rounded-xl border-2 border-amber-400 bg-amber-300/25 px-3 py-2 text-center text-xs font-extrabold text-card-ink"
+                role="status"
+                aria-live="polite"
+              >
+                ⚠️ {setupError}
+              </p>
+            ) : setupDone ? (
               <p
                 className="text-center text-sm font-extrabold text-emerald-700 dark:text-emerald-300"
                 role="status"
                 aria-live="polite"
               >
-                I&apos;m done
+                Saved for the whole camp
               </p>
             ) : null}
           </div>

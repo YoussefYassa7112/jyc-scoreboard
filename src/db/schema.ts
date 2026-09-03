@@ -42,6 +42,23 @@ export const campMessages = pgTable("camp_messages", {
     .defaultNow(),
 });
 
+/**
+ * Camp-wide settings that must agree across every device staff use.
+ *
+ * One row per setting, value held as text so a setting can be a list without
+ * needing its own table. Scoring caps were the first thing to need this: they
+ * lived in localStorage, so a laptop and a phone quietly disagreed about what
+ * an activity was worth.
+ */
+export const campSettings = pgTable("camp_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type Team = typeof teams.$inferSelect;
 export type PointEvent = typeof pointEvents.$inferSelect;
 export type CampMessage = typeof campMessages.$inferSelect;
+export type CampSetting = typeof campSettings.$inferSelect;

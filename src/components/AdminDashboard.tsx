@@ -838,7 +838,7 @@ export function AdminDashboard() {
                     onAward={awardDrafts}
                     onSaveForLater={saveDraftsToFieldNotes}
                     onSetupSaved={() =>
-                      flash("I'm done", "Scoring events are saved on this device.")
+                      flash("Saved", "Scoring caps now apply on every device.")
                     }
                   />
 
