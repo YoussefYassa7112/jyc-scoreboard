@@ -35,7 +35,6 @@ import {
   writeMyTeamSnapshot,
   type MyTeamSnapshot,
 } from "@/lib/offline";
-import type { StandingRow } from "@/lib/standings";
 import {
   blockStatus,
   eventCountdown,
@@ -57,15 +56,12 @@ import { RemindMeToggle } from "./RemindMeToggle";
 type TrackFilter = "overview" | "red" | "green";
 
 type Props = {
-  teams: StandingRow[];
   /**
    * False while the camper is on another tab. The panel stays mounted so the
    * chosen day and track survive a trip to the map, but a hidden schedule must
    * not keep a 1s clock re-rendering ~60 cards behind display:none.
    */
   active?: boolean;
-  /** True after a live standings fetch — missing teams were deleted, not offline. */
-  rosterAuthoritative?: boolean;
   /** 15-minutes-before reminder opt-in, owned by the board */
   remindersOn?: boolean;
   onRemindersChange?: (on: boolean) => void;
@@ -375,9 +371,7 @@ function Section({
 }
 
 export function CampSchedule({
-  teams,
   active = true,
-  rosterAuthoritative = false,
   remindersOn,
   onRemindersChange,
   onTeamSwitch,
@@ -393,7 +387,6 @@ export function CampSchedule({
   const [dayId, setDayId] = useState("day-1");
   const [allowDemo, setAllowDemo] = useState(false);
   const [track, setTrack] = useState<TrackFilter>("overview");
-  const [myTeamId, setMyTeamId] = useState<number | "">("");
   const [peekFullGroup, setPeekFullGroup] = useState(false);
   const [teamSnapshot, setTeamSnapshot] = useState<MyTeamSnapshot | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
@@ -420,7 +413,6 @@ export function CampSchedule({
   useEffect(() => {
     const snap = readMyTeamSnapshot();
     if (!snap) return;
-    setMyTeamId(snap.teamId);
     setTeamSnapshot(snap);
   }, []);
 
@@ -432,67 +424,21 @@ export function CampSchedule({
     if (days[0]?.id === DEMO_DAY_ID) setDayId(DEMO_DAY_ID);
   }, []);
 
-  // Keep localStorage snapshot in sync with the live roster (group + cabin).
-  useEffect(() => {
-    if (myTeamId === "") return;
-    const live = teams.find((t) => t.id === myTeamId);
-    if (!live) {
-      if (rosterAuthoritative) {
-        setMyTeamId("");
-        setTeamSnapshot(null);
-        writeMyTeamSnapshot(null);
-        setTrack("overview");
-        setPeekFullGroup(false);
-        teamTrackReady.current = true;
-      }
-      return;
-    }
-
-    const cabin = getCabin(live.cabinId);
-    const validCabin =
-      cabin && (!live.campGroup || cabin.group === live.campGroup)
-        ? live.cabinId
-        : null;
-    const next: MyTeamSnapshot = {
-      teamId: live.id,
-      campGroup: live.campGroup,
-      teamName: live.name,
-      cabinId: validCabin,
-    };
-    const unchanged =
-      teamSnapshot?.teamId === next.teamId &&
-      teamSnapshot.campGroup === next.campGroup &&
-      teamSnapshot.teamName === next.teamName &&
-      teamSnapshot.cabinId === next.cabinId;
-    if (!unchanged) {
-      setTeamSnapshot(next);
-      writeMyTeamSnapshot(next);
-    }
-  }, [teams, myTeamId, teamSnapshot, rosterAuthoritative]);
-
+  /**
+   * Who this camper is, as far as the schedule is concerned: a bracelet, and
+   * the track that bracelet belongs to.
+   *
+   * This used to be a row from the standings, looked up by team id and
+   * synthesized from the snapshot when the roster had not loaded. A team said
+   * nothing about the schedule that the cabin did not already say, so the
+   * identity is read straight from the saved bracelet instead — which needs no
+   * roster, and so is right on the first paint and right offline.
+   */
   const myTeam = useMemo(() => {
-    const live = teams.find((t) => t.id === myTeamId);
-    if (live) return live;
-    if (rosterAuthoritative) return null;
-    // Offline / empty roster: synthesize from last saved snapshot
-    if (
-      teamSnapshot &&
-      myTeamId !== "" &&
-      teamSnapshot.teamId === myTeamId &&
-      (teamSnapshot.campGroup === "red" || teamSnapshot.campGroup === "green")
-    ) {
-      return {
-        id: teamSnapshot.teamId,
-        name: teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`,
-        color: "#888888",
-        score: 0,
-        rank: 0,
-        campGroup: teamSnapshot.campGroup,
-        cabinId: teamSnapshot.cabinId ?? null,
-      } satisfies StandingRow;
-    }
-    return null;
-  }, [teams, myTeamId, teamSnapshot, rosterAuthoritative]);
+    const cabin = getCabin(teamSnapshot?.cabinId);
+    if (!cabin) return null;
+    return { campGroup: cabin.group, cabinId: cabin.id };
+  }, [teamSnapshot?.cabinId]);
 
   // Apply saved team's track once when teams load — never override map navigation
   useEffect(() => {
@@ -577,38 +523,39 @@ export function CampSchedule({
     };
   }, [active]);
 
-  function selectTeam(id: number | "") {
+  /**
+   * Picking a bracelet is the whole choice now.
+   *
+   * The schedule needs a cabin and the track it belongs to; the team was a step
+   * in between that told a camper nothing they did not already know from the
+   * band on their wrist. The saved snapshot carries no team id, and everything
+   * downstream — the filtering here, the reminders on the board — reads the
+   * cabin and group from it exactly as before.
+   */
+  function selectBracelet(cabinId: number | null) {
     cancelPendingScroll();
-    setMyTeamId(id);
     setHighlightId(null);
     setPeekFullGroup(false);
-    if (id === "") {
+    setBracelet(cabinId);
+    if (cabinId == null) {
       writeMyTeamSnapshot(null);
       setTeamSnapshot(null);
       setTrack("overview");
       teamTrackReady.current = true;
       return;
     }
-    const team = teams.find((t) => t.id === id);
-    const nextGroup = team?.campGroup ?? null;
-    const cabin = getCabin(team?.cabinId);
-    const keepCabin =
-      cabin && nextGroup && cabin.group === nextGroup ? cabin.id : null;
+    const cabin = getCabin(cabinId);
+    if (!cabin) return;
     const next: MyTeamSnapshot = {
-      teamId: id,
-      campGroup: nextGroup,
-      teamName: team?.name ?? teamSnapshot?.teamName,
-      cabinId: keepCabin,
+      teamId: null,
+      campGroup: cabin.group,
+      cabinId: cabin.id,
     };
     setTeamSnapshot(next);
     writeMyTeamSnapshot(next);
-    if (next.campGroup === "red" || next.campGroup === "green") {
-      setTrack(next.campGroup);
-    }
+    setTrack(cabin.group);
     teamTrackReady.current = true;
-    if (next.campGroup === "red" || next.campGroup === "green") {
-      onTeamSwitch?.(next.campGroup, keepCabin);
-    }
+    onTeamSwitch?.(cabin.group, cabin.id);
   }
 
   function cancelPendingScroll() {
@@ -640,17 +587,6 @@ export function CampSchedule({
   // Which bracelet colour is open in the picker. Follows the chosen team, so
   // reopening the schedule shows the colour that camper already belongs to.
   const [bracelet, setBracelet] = useState<number | "none" | null>(null);
-
-  const teamsByBracelet = useMemo(() => {
-    const map = new Map<number | "none", StandingRow[]>();
-    for (const team of teams) {
-      const key = typeof team.cabinId === "number" ? team.cabinId : "none";
-      const list = map.get(key);
-      if (list) list.push(team);
-      else map.set(key, [team]);
-    }
-    return map;
-  }, [teams]);
 
   const activeCabinId =
     typeof myTeam?.cabinId === "number"
@@ -874,9 +810,9 @@ export function CampSchedule({
       ) : null}
 
       <div className="mt-4">
-        <p className="text-sm font-bold text-muted">My team</p>
+        <p className="text-sm font-bold text-muted">My bracelet</p>
         <p className="mt-0.5 text-xs font-semibold text-muted-soft">
-          Tap the colour of your bracelet, then your team.
+          Tap the colour of your bracelet.
         </p>
 
         {/* Colours, not a dropdown. A native select can only render text, so
@@ -884,15 +820,13 @@ export function CampSchedule({
             matching a band on their wrist to the screen. */}
         <div className="mt-2 flex flex-wrap gap-2">
           {campCabins.map((cabin) => {
-            const inCabin = teamsByBracelet.get(cabin.id) ?? [];
-            if (inCabin.length === 0) return null;
             const open = bracelet === cabin.id;
             return (
               <button
                 key={cabin.id}
                 type="button"
                 aria-pressed={open}
-                onClick={() => setBracelet(open ? null : cabin.id)}
+                onClick={() => selectBracelet(open ? null : cabin.id)}
                 className={`inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border-2 px-3.5 py-2 text-sm font-extrabold ${
                   open ? "" : "btn-chip"
                 }`}
@@ -919,63 +853,19 @@ export function CampSchedule({
             );
           })}
 
-          {(teamsByBracelet.get("none") ?? []).length > 0 ? (
-            <button
-              type="button"
-              aria-pressed={bracelet === "none"}
-              onClick={() => setBracelet(bracelet === "none" ? null : "none")}
-              className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
-                bracelet === "none" ? "border-star bg-star text-on-star" : "btn-chip"
-              }`}
-            >
-              No bracelet yet
-            </button>
-          ) : null}
-
           <button
             type="button"
-            aria-pressed={myTeamId === ""}
-            onClick={() => {
-              setBracelet(null);
-              selectTeam("");
-            }}
+            aria-pressed={bracelet === null}
+            onClick={() => selectBracelet(null)}
             className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
-              myTeamId === "" ? "border-star bg-star text-on-star" : "btn-chip"
+              bracelet === null ? "border-star bg-star text-on-star" : "btn-chip"
             }`}
           >
             Everyone
           </button>
         </div>
 
-        {bracelet !== null ? (
-          <div className="surface-card mt-2 flex flex-wrap gap-2 rounded-2xl border-2 p-2.5">
-            {(teamsByBracelet.get(bracelet) ?? []).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={myTeamId === t.id}
-                onClick={() => selectTeam(t.id)}
-                className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
-                  myTeamId === t.id
-                    ? "border-star bg-star text-on-star"
-                    : "btn-chip"
-                }`}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-        ) : null}
 
-        {/* A team saved on this device that the roster has not caught up with. */}
-        {teamSnapshot &&
-        myTeamId !== "" &&
-        !teams.some((t) => t.id === teamSnapshot.teamId) ? (
-          <p className="mt-2 text-xs font-bold text-muted-soft">
-            Showing {teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`} —
-            saved on this device.
-          </p>
-        ) : null}
 
         {myTeam
           ? (() => {
@@ -1003,10 +893,9 @@ export function CampSchedule({
                     className="mt-2 rounded-xl px-3 py-2 text-sm font-bold"
                     style={{ backgroundColor: scrim }}
                   >
-                    {myTeam.name}
                     {cabin
-                      ? ` · ${cabin.label}`
-                      : " — ask a leader which bracelet you wear"}
+                      ? cabin.label
+                      : "Ask a leader which bracelet you wear"}
                   </p>
                 </div>
               );
@@ -1022,6 +911,7 @@ export function CampSchedule({
           grouped={showGroupedNowNext}
           onJump={jumpToBlock}
           onViewMap={handleViewMap}
+          paint={getCabin(activeCabinId)?.swatch}
         />
         <p className="mt-3 text-[11px] font-semibold text-muted-soft">
           As of {clock.toLocaleString()} · {isoDateKey(clock)}

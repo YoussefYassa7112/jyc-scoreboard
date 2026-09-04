@@ -170,12 +170,55 @@ export function blockVisibleToCabin(
   return block.cabinIds.includes(cabinId);
 }
 
+/**
+ * The camper's own slice of a rotation line.
+ *
+ * A line covers every cabin at once — "3:00 – 3:30 — Green: Obstacle Course ·
+ * Red: Pulling Tire · Light Blue: BabyFoot · Purple: Kickball" — so matching it
+ * to a cabin kept all four. This keeps the time and the one activity that is
+ * theirs, and returns null when the line is not a rotation at all.
+ */
+export function detailLineForCabin(
+  line: string,
+  cabin: CabinInfo,
+): string | null {
+  // Longest first, so "Light Blue" is not shadowed by a shorter name. Built by
+  // concatenation rather than escapes: every pattern here is plain text.
+  const names = campCabins
+    .map((c) => c.name)
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+
+  if (!new RegExp("(" + names + ") *:", "i").test(line)) return null;
+
+  const parts = line.split("·");
+  const lead = parts[0].match(
+    new RegExp("^([^]*?)(?=(?:" + names + ") *:)", "i"),
+  );
+  const prefix = lead ? lead[1] : "";
+  const mine = new RegExp(cabin.name + " *:(.*)$", "i");
+
+  for (const part of parts) {
+    const hit = part.match(mine);
+    if (hit) return (prefix + hit[1]).replace(/\s+/g, " ").trim();
+  }
+  return null;
+}
+
 export function detailsForCabin(
   block: ScheduleBlock,
   cabinId: number | null | undefined,
 ): string[] | undefined {
   if (!block.details?.length) return block.details;
   if (cabinId == null) return block.details;
+  const cabin = getCabin(cabinId);
+  if (cabin) {
+    // Rotation lines get sliced down to this cabin's own activity.
+    const sliced = block.details
+      .map((line) => detailLineForCabin(line, cabin))
+      .filter((line): line is string => line !== null);
+    if (sliced.length) return sliced;
+  }
   const mine = block.details.filter((line) => lineMentionsCabin(line, cabinId));
   return mine.length ? mine : block.details;
 }

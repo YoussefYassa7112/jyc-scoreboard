@@ -2,6 +2,7 @@
 
 import type { ScheduleBlock, ScheduleGroup } from "@/data/schedule";
 import { mappedLocations } from "@/data/locations";
+import { inkOn } from "@/lib/cabins";
 import {
   eventCountdown,
   formatCountdown,
@@ -21,6 +22,12 @@ type Props = {
   grouped: boolean;
   onJump: (dayId: string, blockId: string, group: ScheduleGroup) => void;
   onViewMap?: (block: ScheduleBlock, locationId?: string) => void;
+  /**
+   * The camper's bracelet colour. The two section headers wear it so the board
+   * reads as one schedule in one colour rather than the app's default lime
+   * sitting on top of a light blue banner.
+   */
+  paint?: string;
 };
 
 function trackTheme(track: ScheduleGroup) {
@@ -279,19 +286,26 @@ export function NowNextBoard({
   grouped,
   onJump,
   onViewMap,
+  paint,
 }: Props) {
+  const headStyle = paint
+    ? { backgroundColor: paint, color: inkOn(paint) }
+    : undefined;
   const campOver =
     upcoming.length > 0 && upcoming.every((lane) => lane.result.kind === "after");
 
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-2xl border-2 border-star/35 bg-chip/50">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-star px-3.5 py-2.5">
-          <h3 className="display-font text-lg font-bold text-on-star sm:text-xl">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 ${paint ? "" : "bg-star"}`}
+          style={headStyle}
+        >
+          <h3 className={`display-font text-lg font-bold sm:text-xl ${paint ? "" : "text-on-star"}`}>
             Happening now
           </h3>
           {live.length > 1 ? (
-            <p className="text-[11px] font-extrabold text-on-star/90">
+            <p className={`text-[11px] font-extrabold ${paint ? "opacity-90" : "text-on-star/90"}`}>
               {live.length} events at the same time
             </p>
           ) : null}
@@ -322,12 +336,15 @@ export function NowNextBoard({
       </section>
 
       <section className="overflow-hidden rounded-2xl border-2 border-star/40 bg-star/10">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-star px-3.5 py-2.5">
-          <h3 className="display-font text-lg font-bold text-on-star sm:text-xl">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 ${paint ? "" : "bg-star"}`}
+          style={headStyle}
+        >
+          <h3 className={`display-font text-lg font-bold sm:text-xl ${paint ? "" : "text-on-star"}`}>
             Coming up next
           </h3>
           {grouped ? (
-            <p className="text-[11px] font-extrabold text-on-star/90">
+            <p className={`text-[11px] font-extrabold ${paint ? "opacity-90" : "text-on-star/90"}`}>
               Everyone · Red · Green
             </p>
           ) : null}

@@ -998,8 +998,6 @@ export function Scoreboard() {
         {mountedTabs.includes("schedule") ? (
           <CampSchedule
             active={panelTab === "schedule"}
-            teams={data?.standings ?? []}
-            rosterAuthoritative={!staleCache && data != null}
             remindersOn={remindersOn}
             onRemindersChange={setRemindersOn}
             onTeamSwitch={(group, cabin) => {

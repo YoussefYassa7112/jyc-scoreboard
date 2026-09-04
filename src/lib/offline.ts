@@ -16,7 +16,11 @@ export type StandingsCache = {
 };
 
 export type MyTeamSnapshot = {
-  teamId: number;
+  /**
+   * null when the camper picked a bracelet rather than a team. The schedule
+   * only needs the cabin and its track; the team was a step in the way.
+   */
+  teamId: number | null;
   campGroup?: "red" | "green" | null;
   teamName?: string;
   cabinId?: number | null;
@@ -59,7 +63,12 @@ export function readMyTeamSnapshot(): MyTeamSnapshot | null {
     const raw = window.localStorage.getItem(TEAM_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as MyTeamSnapshot;
-    if (typeof parsed.teamId !== "number") return null;
+    // A cabin is a valid choice on its own; a team id is not required, and
+    // demanding one here threw away every bracelet-only snapshot on reload.
+    const hasTeam = typeof parsed.teamId === "number";
+    const hasCabin = typeof parsed.cabinId === "number";
+    if (!hasTeam && !hasCabin) return null;
+    if (!hasTeam) parsed.teamId = null;
     return parsed;
   } catch {
     return null;
@@ -95,6 +104,8 @@ export function dropMissingMyTeam(standings: StandingRow[]) {
   if (standings.length === 0) return;
   const snap = readMyTeamSnapshot();
   if (!snap) return;
+  // A bracelet-only choice has no team to go missing.
+  if (snap.teamId == null) return;
   if (standings.some((row) => row.id === snap.teamId)) return;
   writeMyTeamSnapshot(null);
 }
