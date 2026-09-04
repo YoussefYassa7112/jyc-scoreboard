@@ -1,4 +1,4 @@
-import { campCabins, type CabinInfo } from "@/lib/cabins";
+import { cabinLabel, campCabins } from "@/lib/cabins";
 
 export type ScheduleGroup = "all" | "red" | "green";
 export type ScheduleSection = "morning" | "midday" | "evening" | "full";
@@ -805,7 +805,7 @@ export const campDays: CampDay[] = [
  *
  * The import back from cabins.ts is type-only, so there is no runtime cycle.
  */
-const cabinLine = (c: CabinInfo) => `Cabin ${c.id} · ${c.label}`;
+const cabinLine = cabinLabel;
 
 export const redCabins = campCabins
   .filter((c) => c.group === "red")

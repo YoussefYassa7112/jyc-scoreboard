@@ -13,6 +13,8 @@ import {
 import {
   blockVisibleToCabin,
   detailsForCabin,
+  cabinLabel,
+  cabinTag,
   getCabin,
 } from "@/lib/cabins";
 import {
@@ -864,7 +866,7 @@ export function CampSchedule({
                   {" "}
                   · Cabin {activeCabinId}
                   {getCabin(activeCabinId)
-                    ? ` (${getCabin(activeCabinId)!.label})`
+                    ? ` (${cabinTag(getCabin(activeCabinId)!)})`
                     : ""}
                 </>
               ) : (
@@ -1051,7 +1053,7 @@ export function CampSchedule({
                     day={day}
                     now={new Date(nowTick)}
                     blocks={redBlocks}
-                    cabins={[`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]}
+                    cabins={[cabinLabel(getCabin(filterCabinId)!)]}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
                   />
@@ -1062,7 +1064,7 @@ export function CampSchedule({
                     day={day}
                     now={new Date(nowTick)}
                     blocks={greenBlocks}
-                    cabins={[`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]}
+                    cabins={[cabinLabel(getCabin(filterCabinId)!)]}
                     highlightBlockId={highlightId}
                     onViewMapFor={handleViewMap}
                   />
@@ -1101,7 +1103,7 @@ export function CampSchedule({
                   blocks={redBlocks}
                   cabins={
                     filterCabinId && getCabin(filterCabinId)?.group === "red"
-                      ? [`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]
+                      ? [cabinLabel(getCabin(filterCabinId)!)]
                       : redCabins
                   }
                   highlightBlockId={highlightId}
@@ -1118,7 +1120,7 @@ export function CampSchedule({
                   blocks={greenBlocks}
                   cabins={
                     filterCabinId && getCabin(filterCabinId)?.group === "green"
-                      ? [`Cabin ${filterCabinId} · ${getCabin(filterCabinId)!.label}`]
+                      ? [cabinLabel(getCabin(filterCabinId)!)]
                       : greenCabins
                   }
                   highlightBlockId={highlightId}

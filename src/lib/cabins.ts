@@ -3,27 +3,47 @@ import type { ScheduleBlock, ScheduleGroup } from "@/data/schedule";
 export type CabinInfo = {
   id: number;
   group: "red" | "green";
+  /** The colour the sheet gives the cabin — what a camper will call it. */
+  name: string;
+  /** The two leaders. */
   label: string;
 };
 
 /**
- * From the 2026 camp schedule sheet. The sheet groups cabins by language —
- * English (cabins 1-4) and French (cabins 5-8) — which is exactly how `red`
- * and `green` are already split here, confirmed by the leader names lining up
- * in order. The internal values stay red/green because that is what the teams
+ * From the 2026 camp schedule sheet: cabin colour, leaders, and the language
+ * split — English (cabins 1-4) and French (cabins 5-8), which is exactly how
+ * `red` and `green` are already split here. The internal values stay red/green because that is what the teams
  * table stores; the language is carried alongside for display, since campers
  * looking for their group will be looking for "English" or "French".
  */
 export const campCabins: CabinInfo[] = [
-  { id: 1, group: "red", label: "Mina N. + Christina F." },
-  { id: 2, group: "red", label: "Valera G. + Youssef Y." },
-  { id: 3, group: "red", label: "Karine A. + Mickel S." },
-  { id: 4, group: "red", label: "Robert M. + Imy S." },
-  { id: 5, group: "green", label: "Carol H. + Julie" },
-  { id: 6, group: "green", label: "Mark T. + Yoanna S." },
-  { id: 7, group: "green", label: "Jean N. + Carole Y." },
-  { id: 8, group: "green", label: "Maria E. + Gab N." },
+  { id: 1, group: "red", name: "Green", label: "Mina N. + Carole Y." },
+  { id: 2, group: "red", name: "Red", label: "Valera G. + Youssef Y." },
+  { id: 3, group: "red", name: "Light Blue", label: "Karine A. + Mickel S." },
+  { id: 4, group: "red", name: "Purple", label: "Robert M. + Imy S." },
+  { id: 5, group: "green", name: "Navy Blue", label: "Carol H. + Julie" },
+  { id: 6, group: "green", name: "Orange", label: "Mark T. + Yoanna S." },
+  { id: 7, group: "green", name: "Yellow", label: "Jean N. + Christina F." },
+  { id: 8, group: "green", name: "Teal", label: "Maria E. + Gab N." },
 ];
+
+/**
+ * One formatter for every place a cabin is named, so the admin picker, the
+ * schedule lists and the "your cabin" line cannot drift apart.
+ *
+ * Note two of the cabin colours are Green and Red, which are also the internal
+ * names of the two tracks. They are unrelated: cabin Green and cabin Red both
+ * belong to the English side. The track is always shown as English or French
+ * for exactly this reason.
+ */
+export function cabinLabel(cabin: CabinInfo) {
+  return `Cabin ${cabin.id} · ${cabin.name} · ${cabin.label}`;
+}
+
+/** Compact form for parentheticals: "Green · Mina N. + Carole Y." */
+export function cabinTag(cabin: CabinInfo) {
+  return `${cabin.name} · ${cabin.label}`;
+}
 
 /** What the schedule sheet calls each track. */
 export const groupLanguage: Record<"red" | "green", string> = {

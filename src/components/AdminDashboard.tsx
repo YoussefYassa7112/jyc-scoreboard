@@ -35,7 +35,13 @@ import { type CampMessageRow } from "@/lib/messages";
 import { TEAM_COLORS } from "@/lib/standings";
 import { formatAwardNote, parsePointNote, type AwardDraft } from "@/lib/scoring";
 import { teamChipStyle } from "@/lib/utils";
-import { cabinChoicesForGroup, cabinsForGroup, getCabin } from "@/lib/cabins";
+import {
+  cabinChoicesForGroup,
+  cabinLabel,
+  cabinTag,
+  cabinsForGroup,
+  getCabin,
+} from "@/lib/cabins";
 import { clearAdminSignedIn } from "@/lib/admin-session";
 import { forgetTeamEverywhere } from "@/lib/offline";
 import { useOnline } from "@/lib/use-online";
@@ -936,7 +942,7 @@ export function AdminDashboard() {
                         </option>
                         {newCabinChoices.map(({ cabin, teamsIn }) => (
                           <option key={cabin.id} value={cabin.id}>
-                            Cabin {cabin.id} · {cabin.label}
+                            {cabinLabel(cabin)}
                             {teamsIn.length
                               ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
                               : ""}
@@ -1090,7 +1096,7 @@ export function AdminDashboard() {
                                   <option value="">No cabin</option>
                                   {editCabinChoices.map(({ cabin, teamsIn }) => (
                                     <option key={cabin.id} value={cabin.id}>
-                                      Cabin {cabin.id} · {cabin.label}
+                                      {cabinLabel(cabin)}
                                       {teamsIn.length
                                         ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
                                         : ""}
@@ -1169,7 +1175,7 @@ export function AdminDashboard() {
                                     {typeof team.cabinId === "number"
                                       ? ` · Cabin ${team.cabinId}${
                                           getCabin(team.cabinId)
-                                            ? ` (${getCabin(team.cabinId)!.label})`
+                                            ? ` (${cabinTag(getCabin(team.cabinId)!)})`
                                             : ""
                                         }`
                                       : " · no cabin"}
@@ -1236,7 +1242,7 @@ export function AdminDashboard() {
                                     team.id,
                                   ).map(({ cabin, teamsIn }) => (
                                     <option key={cabin.id} value={cabin.id}>
-                                      Cabin {cabin.id} · {cabin.label}
+                                      {cabinLabel(cabin)}
                                       {teamsIn.length
                                         ? ` · ${teamsIn.length} team${teamsIn.length > 1 ? "s" : ""}`
                                         : ""}
