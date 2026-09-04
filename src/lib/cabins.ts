@@ -5,6 +5,8 @@ export type CabinInfo = {
   group: "red" | "green";
   /** The colour the sheet gives the cabin — what a camper will call it. */
   name: string;
+  /** That colour as a value, so a bracelet can be matched to the screen. */
+  swatch: string;
   /** The two leaders. */
   label: string;
 };
@@ -17,14 +19,14 @@ export type CabinInfo = {
  * looking for their group will be looking for "English" or "French".
  */
 export const campCabins: CabinInfo[] = [
-  { id: 1, group: "red", name: "Green", label: "Mina N. + Carole Y." },
-  { id: 2, group: "red", name: "Red", label: "Valera G. + Youssef Y." },
-  { id: 3, group: "red", name: "Light Blue", label: "Karine A. + Mickel S." },
-  { id: 4, group: "red", name: "Purple", label: "Robert M. + Imy S." },
-  { id: 5, group: "green", name: "Navy Blue", label: "Carol H. + Julie" },
-  { id: 6, group: "green", name: "Orange", label: "Mark T. + Yoanna S." },
-  { id: 7, group: "green", name: "Yellow", label: "Jean N. + Christina F." },
-  { id: 8, group: "green", name: "Teal", label: "Maria E. + Gab N." },
+  { id: 1, group: "red", name: "Green", swatch: "#22c55e", label: "Mina N. + Carole Y." },
+  { id: 2, group: "red", name: "Red", swatch: "#ef4444", label: "Valera G. + Youssef Y." },
+  { id: 3, group: "red", name: "Light Blue", swatch: "#7dd3fc", label: "Karine A. + Mickel S." },
+  { id: 4, group: "red", name: "Purple", swatch: "#a855f7", label: "Robert M. + Imy S." },
+  { id: 5, group: "green", name: "Navy Blue", swatch: "#1e3a8a", label: "Carol H. + Julie" },
+  { id: 6, group: "green", name: "Orange", swatch: "#f97316", label: "Mark T. + Yoanna S." },
+  { id: 7, group: "green", name: "Yellow", swatch: "#facc15", label: "Jean N. + Christina F." },
+  { id: 8, group: "green", name: "Teal", swatch: "#14b8a6", label: "Maria E. + Gab N." },
 ];
 
 /**

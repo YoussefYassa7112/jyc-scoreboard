@@ -15,6 +15,7 @@ import {
   detailsForCabin,
   cabinLabel,
   cabinTag,
+  campCabins,
   getCabin,
 } from "@/lib/cabins";
 import {
@@ -821,12 +822,34 @@ export function CampSchedule({
             className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
           >
             <option value="">Everyone — see all groups</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-                {t.campGroup ? ` (${t.campGroup})` : " (no group yet)"}
-              </option>
-            ))}
+            {/* Grouped by cabin, because a camper looking for their team is
+                looking at their wrist. The bracelet colour is the one label
+                they carry around; team names they have to remember. */}
+            {campCabins.map((cabin) => {
+              const inCabin = teams.filter((t) => t.cabinId === cabin.id);
+              if (inCabin.length === 0) return null;
+              return (
+                <optgroup key={cabin.id} label={`${cabin.name} bracelet · ${cabin.label}`}>
+                  {inCabin.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+            {teams.some((t) => t.cabinId == null) ? (
+              <optgroup label="No bracelet yet — ask a leader">
+                {teams
+                  .filter((t) => t.cabinId == null)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.campGroup ? ` (${t.campGroup})` : ""}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : null}
             {teamSnapshot &&
             myTeamId !== "" &&
             !teams.some((t) => t.id === teamSnapshot.teamId) ? (
@@ -861,19 +884,24 @@ export function CampSchedule({
                 {myTeam.campGroup === "green" ? "Green" : "Red"}
               </span>{" "}
               schedule
-              {activeCabinId ? (
-                <>
-                  {" "}
-                  · Cabin {activeCabinId}
-                  {getCabin(activeCabinId)
-                    ? ` (${cabinTag(getCabin(activeCabinId)!)})`
-                    : ""}
-                </>
-              ) : (
-                " — ask an admin to assign a cabin"
-              )}
+              {activeCabinId && getCabin(activeCabinId)
+                ? ` · Cabin ${activeCabinId} (${cabinTag(getCabin(activeCabinId)!)})`
+                : " — ask an admin to assign a cabin"}
               .
             </p>
+
+            {/* The bracelet, shown as the colour it actually is. A camper can
+                hold their wrist next to it instead of reading anything. */}
+            {activeCabinId && getCabin(activeCabinId) ? (
+              <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-black/20 px-3 py-1.5 text-sm font-extrabold">
+                <span
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 rounded-full border-2 border-white/80"
+                  style={{ backgroundColor: getCabin(activeCabinId)!.swatch }}
+                />
+                {getCabin(activeCabinId)!.name} bracelet
+              </p>
+            ) : null}
             {activeCabinId ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {peekFullGroup || track !== myTeam.campGroup ? (
