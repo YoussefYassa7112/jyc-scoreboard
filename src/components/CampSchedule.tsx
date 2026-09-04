@@ -602,12 +602,31 @@ export function CampSchedule({
     if (LIVE_CAMP_SIM && !simReady) return campDays;
     return getScheduleDays(new Date(), allowDemo);
   }, [allowDemo, calendarKey, demoEpoch, simReady]);
+  // Which bracelet colour is open in the picker. Follows the chosen team, so
+  // reopening the schedule shows the colour that camper already belongs to.
+  const [bracelet, setBracelet] = useState<number | "none" | null>(null);
+
+  const teamsByBracelet = useMemo(() => {
+    const map = new Map<number | "none", StandingRow[]>();
+    for (const team of teams) {
+      const key = typeof team.cabinId === "number" ? team.cabinId : "none";
+      const list = map.get(key);
+      if (list) list.push(team);
+      else map.set(key, [team]);
+    }
+    return map;
+  }, [teams]);
+
   const activeCabinId =
     typeof myTeam?.cabinId === "number"
       ? myTeam.cabinId
       : typeof teamSnapshot?.cabinId === "number"
         ? teamSnapshot.cabinId
         : null;
+  useEffect(() => {
+    if (activeCabinId != null) setBracelet(activeCabinId);
+  }, [activeCabinId]);
+
   const filterCabinId =
     !peekFullGroup &&
     activeCabinId != null &&
@@ -812,56 +831,96 @@ export function CampSchedule({
       ) : null}
 
       <div className="mt-4">
-        <label className="block text-sm font-bold text-muted">
-          My team
-          <select
-            value={myTeamId}
-            onChange={(e) =>
-              selectTeam(e.target.value ? Number(e.target.value) : "")
-            }
-            className="field mt-1.5 w-full rounded-xl border-2 px-3 py-3 text-base font-semibold"
+        <p className="text-sm font-bold text-muted">My team</p>
+        <p className="mt-0.5 text-xs font-semibold text-muted-soft">
+          Tap the colour of your bracelet, then your team.
+        </p>
+
+        {/* Colours, not a dropdown. A native select can only render text, so
+            the bracelet was named but never shown — which is no use to a child
+            matching a band on their wrist to the screen. */}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {campCabins.map((cabin) => {
+            const inCabin = teamsByBracelet.get(cabin.id) ?? [];
+            if (inCabin.length === 0) return null;
+            const open = bracelet === cabin.id;
+            return (
+              <button
+                key={cabin.id}
+                type="button"
+                aria-pressed={open}
+                onClick={() => setBracelet(open ? null : cabin.id)}
+                className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                  open ? "border-star bg-star text-on-star" : "btn-chip"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 rounded-full border-2 border-white/80 shadow-sm"
+                  style={{ backgroundColor: cabin.swatch }}
+                />
+                {cabin.name}
+              </button>
+            );
+          })}
+
+          {(teamsByBracelet.get("none") ?? []).length > 0 ? (
+            <button
+              type="button"
+              aria-pressed={bracelet === "none"}
+              onClick={() => setBracelet(bracelet === "none" ? null : "none")}
+              className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                bracelet === "none" ? "border-star bg-star text-on-star" : "btn-chip"
+              }`}
+            >
+              No bracelet yet
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            aria-pressed={myTeamId === ""}
+            onClick={() => {
+              setBracelet(null);
+              selectTeam("");
+            }}
+            className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+              myTeamId === "" ? "border-star bg-star text-on-star" : "btn-chip"
+            }`}
           >
-            <option value="">Everyone — see all groups</option>
-            {/* Grouped by cabin, because a camper looking for their team is
-                looking at their wrist. The bracelet colour is the one label
-                they carry around; team names they have to remember. */}
-            {campCabins.map((cabin) => {
-              const inCabin = teams.filter((t) => t.cabinId === cabin.id);
-              if (inCabin.length === 0) return null;
-              return (
-                <optgroup key={cabin.id} label={`${cabin.name} bracelet · ${cabin.label}`}>
-                  {inCabin.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-            {teams.some((t) => t.cabinId == null) ? (
-              <optgroup label="No bracelet yet — ask a leader">
-                {teams
-                  .filter((t) => t.cabinId == null)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.campGroup ? ` (${t.campGroup})` : ""}
-                    </option>
-                  ))}
-              </optgroup>
-            ) : null}
-            {teamSnapshot &&
-            myTeamId !== "" &&
-            !teams.some((t) => t.id === teamSnapshot.teamId) ? (
-              <option value={teamSnapshot.teamId}>
-                {teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`}
-                {teamSnapshot.campGroup
-                  ? ` (${teamSnapshot.campGroup}, saved offline)`
-                  : " (saved offline)"}
-              </option>
-            ) : null}
-          </select>
-        </label>
+            Everyone
+          </button>
+        </div>
+
+        {bracelet !== null ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(teamsByBracelet.get(bracelet) ?? []).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={myTeamId === t.id}
+                onClick={() => selectTeam(t.id)}
+                className={`min-h-11 cursor-pointer rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
+                  myTeamId === t.id
+                    ? "border-star bg-star text-on-star"
+                    : "btn-chip"
+                }`}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* A team saved on this device that the roster has not caught up with. */}
+        {teamSnapshot &&
+        myTeamId !== "" &&
+        !teams.some((t) => t.id === teamSnapshot.teamId) ? (
+          <p className="mt-2 text-xs font-bold text-muted-soft">
+            Showing {teamSnapshot.teamName ?? `Team ${teamSnapshot.teamId}`} —
+            saved on this device.
+          </p>
+        ) : null}
 
         {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
           <div
