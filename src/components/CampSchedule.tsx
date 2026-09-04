@@ -13,10 +13,12 @@ import {
 import {
   blockVisibleToCabin,
   detailsForCabin,
+  CAMP_PAPER,
   cabinLabel,
-  cabinTag,
   campCabins,
   getCabin,
+  inkOn,
+  scrimOn,
 } from "@/lib/cabins";
 import {
   clearRemindersForDay,
@@ -850,14 +852,26 @@ export function CampSchedule({
                 type="button"
                 aria-pressed={open}
                 onClick={() => setBracelet(open ? null : cabin.id)}
-                className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-extrabold ${
-                  open ? "border-star bg-star text-on-star" : "btn-chip"
+                className={`inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-2xl border-2 px-3.5 py-2 text-sm font-extrabold ${
+                  open ? "" : "btn-chip"
                 }`}
+                style={
+                  open
+                    ? {
+                        backgroundColor: cabin.swatch,
+                        borderColor: inkOn(cabin.swatch),
+                        color: inkOn(cabin.swatch),
+                      }
+                    : undefined
+                }
               >
                 <span
                   aria-hidden
-                  className="h-4 w-4 shrink-0 rounded-full border-2 border-white/80 shadow-sm"
-                  style={{ backgroundColor: cabin.swatch }}
+                  className="h-5 w-5 shrink-0 rounded-full border-2 shadow-sm"
+                  style={{
+                    backgroundColor: cabin.swatch,
+                    borderColor: open ? inkOn(cabin.swatch) : "rgba(255,255,255,0.85)",
+                  }}
                 />
                 {cabin.name}
               </button>
@@ -893,7 +907,7 @@ export function CampSchedule({
         </div>
 
         {bracelet !== null ? (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="surface-card mt-2 flex flex-wrap gap-2 rounded-2xl border-2 p-2.5">
             {(teamsByBracelet.get(bracelet) ?? []).map((t) => (
               <button
                 key={t.id}
@@ -922,81 +936,63 @@ export function CampSchedule({
           </p>
         ) : null}
 
-        {myTeam?.campGroup === "red" || myTeam?.campGroup === "green" ? (
-          <div
-            className={`mt-3 overflow-hidden rounded-2xl border-2 px-4 py-3.5 text-white shadow-sm sm:px-5 sm:py-4 ${
-              myTeam.campGroup === "green"
-                ? "border-[#246B3A] bg-[#2F8F4E]"
-                : "border-[#9A451C] bg-[#C45C26]"
-            }`}
-            role="status"
-          >
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-white/80">
-              Follow this schedule
-            </p>
-            <p className="display-font mt-1 text-2xl font-bold leading-tight sm:text-3xl">
-              {myTeam.campGroup === "green" ? "GREEN" : "RED"} group
-            </p>
-            <p className="mt-1 text-sm font-bold text-white/90">
-              {myTeam.name} uses the{" "}
-              <span className="underline decoration-2 underline-offset-2">
-                {myTeam.campGroup === "green" ? "Green" : "Red"}
-              </span>{" "}
-              schedule
-              {activeCabinId && getCabin(activeCabinId)
-                ? ` · Cabin ${activeCabinId} (${cabinTag(getCabin(activeCabinId)!)})`
-                : " — ask an admin to assign a cabin"}
-              .
-            </p>
-
-            {/* The bracelet, shown as the colour it actually is. A camper can
-                hold their wrist next to it instead of reading anything. */}
-            {activeCabinId && getCabin(activeCabinId) ? (
-              <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-black/20 px-3 py-1.5 text-sm font-extrabold">
-                <span
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 rounded-full border-2 border-white/80"
-                  style={{ backgroundColor: getCabin(activeCabinId)!.swatch }}
-                />
-                {getCabin(activeCabinId)!.name} bracelet
-              </p>
-            ) : null}
-            {activeCabinId ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {peekFullGroup || track !== myTeam.campGroup ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPeekFullGroup(false);
-                      setTrack(myTeam.campGroup!);
-                      setHighlightId(null);
-                    }}
-                    className="rounded-xl bg-white/20 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/40"
+        {myTeam
+          ? (() => {
+              const cabin = activeCabinId ? getCabin(activeCabinId) : null;
+              // The bracelet is the banner now. The track still decides which
+              // events are listed, it is just no longer the thing a camper is
+              // asked to identify with — "RED group" means nothing to a child
+              // wearing a light blue band.
+              const paint = cabin?.swatch ?? "#2b3a55";
+              const ink = cabin ? inkOn(paint) : CAMP_PAPER;
+              const scrim = cabin ? scrimOn(paint) : "rgba(255,248,238,0.16)";
+              return (
+                <div
+                  className="mt-3 overflow-hidden rounded-2xl border-2 px-4 py-3.5 shadow-sm sm:px-5 sm:py-4"
+                  style={{ backgroundColor: paint, borderColor: ink, color: ink }}
+                  role="status"
+                >
+                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] opacity-80">
+                    Follow this schedule
+                  </p>
+                  <p className="display-font mt-1 text-2xl font-bold leading-tight sm:text-3xl">
+                    {cabin ? `${cabin.name} bracelet` : "No bracelet yet"}
+                  </p>
+                  <p
+                    className="mt-2 rounded-xl px-3 py-2 text-sm font-bold"
+                    style={{ backgroundColor: scrim }}
                   >
-                    Back to my cabin
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPeekFullGroup(true);
-                      setHighlightId(null);
-                    }}
-                    className="rounded-xl bg-white/20 px-3 py-2 text-xs font-extrabold text-white ring-1 ring-white/40"
-                  >
-                    See full {myTeam.campGroup === "green" ? "Green" : "Red"}{" "}
-                    schedule
-                  </button>
-                )}
-              </div>
-            ) : null}
-          </div>
-        ) : myTeamId ? (
-          <p className="mt-3 rounded-2xl border-2 border-star/30 bg-chip/80 px-4 py-3 text-sm font-bold text-star">
-            This team is not assigned to Red or Green yet — ask an admin to set
-            its camp group.
-          </p>
-        ) : null}
+                    {myTeam.name}
+                    {cabin
+                      ? ` · ${cabin.label}`
+                      : " — ask a leader which bracelet you wear"}
+                  </p>
+                  {activeCabinId ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const showingAll =
+                            peekFullGroup || track !== myTeam.campGroup;
+                          setPeekFullGroup(!showingAll);
+                          if (showingAll && myTeam.campGroup) {
+                            setTrack(myTeam.campGroup);
+                          }
+                          setHighlightId(null);
+                        }}
+                        className="min-h-11 rounded-xl px-3 py-2 text-xs font-extrabold"
+                        style={{ backgroundColor: scrim, color: ink }}
+                      >
+                        {peekFullGroup || track !== myTeam.campGroup
+                          ? "Just my bracelet"
+                          : "See every event"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()
+          : null}
       </div>
 
       <div className="surface-card mt-4 rounded-2xl border-2 p-4">

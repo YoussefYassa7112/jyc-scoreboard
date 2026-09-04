@@ -53,6 +53,54 @@ export const groupLanguage: Record<"red" | "green", string> = {
   green: "French",
 };
 
+/**
+ * Readable text for a bracelet-coloured surface.
+ *
+ * The swatches run from Navy Blue to Yellow, so a single fixed foreground would
+ * be unreadable on half of them. Relative luminance picks the side with the
+ * contrast, the same way the map pins do.
+ */
+function luminance(hex: string) {
+  const h = hex.replace("#", "");
+  const channel = (i: number) => parseInt(h.slice(i, i + 2), 16) / 255;
+  const linear = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  return (
+    0.2126 * linear(channel(0)) +
+    0.7152 * linear(channel(2)) +
+    0.0722 * linear(channel(4))
+  );
+}
+
+function contrast(a: string, b: string) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+export const CAMP_INK = "#1a120c";
+export const CAMP_PAPER = "#fff8ee";
+
+/**
+ * Readable text for a bracelet-coloured surface.
+ *
+ * The swatches run from Navy Blue to Yellow, so no single foreground works on
+ * all of them. This measures both and takes whichever actually has the
+ * contrast, rather than guessing from a lightness threshold — several of these
+ * colours sit close enough to the middle that a threshold picks wrong.
+ */
+export function inkOn(hex: string) {
+  return contrast(hex, CAMP_INK) >= contrast(hex, CAMP_PAPER)
+    ? CAMP_INK
+    : CAMP_PAPER;
+}
+
+/** A scrim in the opposite tone, so small print stays readable on any swatch. */
+export function scrimOn(hex: string) {
+  return inkOn(hex) === CAMP_INK
+    ? "rgba(255,248,238,0.78)"
+    : "rgba(26,18,12,0.45)";
+}
+
 export function cabinsForGroup(group: "red" | "green"): CabinInfo[] {
   return campCabins.filter((cabin) => cabin.group === group);
 }
