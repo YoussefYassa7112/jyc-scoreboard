@@ -15,20 +15,9 @@ type Props = {
   onChange: (on: boolean) => void;
   /** Which track the reminders will follow, for the helper line. */
   trackLabel: string;
-  /**
-   * False when no bracelet is chosen. Reminders are per-bracelet, so without
-   * one there is nothing to be reminded about — say so rather than promise a
-   * popup that will never come.
-   */
-  hasBracelet?: boolean;
 };
 
-export function RemindMeToggle({
-  enabled,
-  onChange,
-  trackLabel,
-  hasBracelet = true,
-}: Props) {
+export function RemindMeToggle({ enabled, onChange, trackLabel }: Props) {
   const [hint, setHint] = useState<string | null>(null);
 
   async function toggle() {
@@ -38,10 +27,6 @@ export function RemindMeToggle({
       return;
     }
     onChange(true);
-    if (!hasBracelet) {
-      setHint("On — but pick your bracelet colour above so I know which events to remind you about.");
-      return;
-    }
     const support = notifySupport();
     if (support === "supported") {
       await requestNotifyPermission();
