@@ -130,8 +130,8 @@ export const campDays: CampDay[] = [
         group: "red",
         section: "midday",
         details: [
-          "3:00 – 3:30 — Cabin 1: Obstacle Course · Cabin 2: Pulling Tire (TTT) · Cabin 3: BabyFoot · Cabin 4: Kickball",
-          "3:30 – 4:00 — Cabin 1: Pulling Tire (TTT) · Cabin 2: Obstacle Course · Cabin 3: Kickball · Cabin 4: BabyFoot",
+          "3:00 – 3:30 — Green: Obstacle Course · Red: Pulling Tire (TTT) · Light Blue: BabyFoot · Purple: Kickball",
+          "3:30 – 4:00 — Green: Pulling Tire (TTT) · Red: Obstacle Course · Light Blue: Kickball · Purple: BabyFoot",
         ],
       },
       {
@@ -302,8 +302,8 @@ export const campDays: CampDay[] = [
         group: "green",
         section: "midday",
         details: [
-          "6:00 – 6:30 — Cabin 5: BabyFoot · Cabin 6: Kickball · Cabin 7: Obstacle Course · Cabin 8: Pulling Tire (TTT)",
-          "6:30 – 7:00 — Cabin 5: Kickball · Cabin 6: BabyFoot · Cabin 7: Pulling Tire (TTT) · Cabin 8: Obstacle Course",
+          "6:00 – 6:30 — Navy Blue: BabyFoot · Orange: Kickball · Yellow: Obstacle Course · Teal: Pulling Tire (TTT)",
+          "6:30 – 7:00 — Navy Blue: Kickball · Orange: BabyFoot · Yellow: Pulling Tire (TTT) · Teal: Obstacle Course",
         ],
       },
       {
@@ -409,7 +409,7 @@ export const campDays: CampDay[] = [
         group: "red",
         section: "midday",
         details: [
-          "Cabin 1: BabyFoot · Cabin 2: Kickball · Cabin 3: Obstacle Course · Cabin 4: Pulling Tire (TTT)",
+          "Green: BabyFoot · Red: Kickball · Light Blue: Obstacle Course · Purple: Pulling Tire (TTT)",
         ],
       },
       {
@@ -421,7 +421,7 @@ export const campDays: CampDay[] = [
         group: "red",
         section: "midday",
         details: [
-          "Cabin 1: Kickball · Cabin 2: BabyFoot · Cabin 3: Pulling Tire (TTT) · Cabin 4: Obstacle Course",
+          "Green: Kickball · Red: BabyFoot · Light Blue: Pulling Tire (TTT) · Purple: Obstacle Course",
         ],
       },
       {
@@ -594,7 +594,7 @@ export const campDays: CampDay[] = [
         group: "green",
         section: "midday",
         details: [
-          "Cabin 5: Obstacle Course · Cabin 6: Pulling Tire (TTT) · Cabin 7: BabyFoot · Cabin 8: Kickball",
+          "Navy Blue: Obstacle Course · Orange: Pulling Tire (TTT) · Yellow: BabyFoot · Teal: Kickball",
         ],
       },
       {
@@ -606,7 +606,7 @@ export const campDays: CampDay[] = [
         group: "green",
         section: "midday",
         details: [
-          "Cabin 5: Pulling Tire (TTT) · Cabin 6: Obstacle Course · Cabin 7: Kickball · Cabin 8: BabyFoot",
+          "Navy Blue: Pulling Tire (TTT) · Orange: Obstacle Course · Yellow: Kickball · Teal: BabyFoot",
         ],
       },
       {
@@ -728,8 +728,8 @@ export const campDays: CampDay[] = [
         id: "d3-liturgy",
         title: "Holy Liturgy + Group Picture (shirts on)",
         time: "8:00 – 10:00 AM",
-        location: "Chapel",
-        locationIds: ["chapel"],
+        location: "B1 — Caf",
+        locationIds: ["caf"],
         group: "all",
         section: "full",
       },

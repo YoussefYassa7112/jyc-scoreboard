@@ -181,6 +181,14 @@ export function detailsForCabin(
 }
 
 function lineMentionsCabin(line: string, cabinId: number): boolean {
+  // Rotation lines name the cabin by its colour — "Light Blue: BabyFoot" —
+  // since that is what a camper is wearing. Cabin names are letters and
+  // spaces only, so they go into the pattern as they are.
+  const cabin = getCabin(cabinId);
+  if (cabin) {
+    const byColour = new RegExp(String.raw`\b` + cabin.name + String.raw`\s*:`, "i");
+    if (byColour.test(line)) return true;
+  }
   if (new RegExp(`Cabin\\s+${cabinId}\\b`, "i").test(line)) return true;
   const ranges = line.matchAll(/Cabins?\s+(\d+)\s*[–-]\s*(\d+)/gi);
   for (const match of ranges) {
