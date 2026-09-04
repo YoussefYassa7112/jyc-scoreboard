@@ -281,11 +281,19 @@ export function NightSky() {
   }, [theme]);
 
   return (
-    // Shown and hidden entirely from CSS, off `html.dark`, the same way
-    // .sky-floaters is — so the layer is taken out of paint when it is not the
-    // active sky instead of merely being made transparent. `w-screen` is gone
-    // with it: 100vw counts the scrollbar, which made this 15px wider than the
-    // page it covers. The insets give it the right width.
-    <canvas ref={canvasRef} aria-hidden className="night-sky pointer-events-none fixed inset-0 z-0 h-lvh" />
+    <canvas
+      ref={canvasRef}
+      aria-hidden
+      className={`pointer-events-none fixed inset-0 z-0 h-lvh w-screen transition-opacity ease-in-out ${
+        theme === "dark" ? "opacity-100" : "opacity-0"
+      }`}
+      style={{
+        transitionDuration: "var(--bg-fade)",
+        // Painted behind the bitmap, so clearRect reveals it. Keeps the sky out
+        // of the frame loop entirely.
+        backgroundImage:
+          "linear-gradient(to bottom, #070b18 0%, #101b36 45%, #1a2744 75%, #13261c 100%)",
+      }}
+    />
   );
 }

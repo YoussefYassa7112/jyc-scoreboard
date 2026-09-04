@@ -671,44 +671,6 @@ html.dark .sky-floaters {
     visibility 0s linear var(--bg-fade);
 }
 
-/* The night sky needs the same treatment, and for a sharper reason: this layer
-   is a full-viewport, opaque, dark-navy gradient. Hidden by `opacity: 0` alone
-   it stayed visible to the compositor in light mode — position:fixed with an
-   opacity transition is enough to earn a permanent layer of its own — so the
-   browser kept rasterising a screen of night sky nobody had asked for, and a
-   stale tile of it read as a patch of the wrong colour over the day
-   background: the kind that clears the instant a scroll forces a repaint and
-   comes straight back on reload.
-
-   Two changes, either of which would do on its own. visibility takes the layer
-   out of paint once the fade finishes, and the gradient only exists in dark
-   mode, so there is nothing dark left to leak even if a layer survives. */
-.night-sky {
-  opacity: 0;
-  visibility: hidden;
-  background-image: none;
-  transition:
-    opacity var(--bg-fade) ease-out,
-    visibility 0s linear var(--bg-fade);
-}
-
-html.dark .night-sky {
-  opacity: 1;
-  visibility: visible;
-  /* Painted behind the bitmap, so clearRect reveals it. Keeps the sky out of
-     the frame loop entirely. */
-  background-image: linear-gradient(
-    to bottom,
-    #070b18 0%,
-    #101b36 45%,
-    #1a2744 75%,
-    #13261c 100%
-  );
-  transition:
-    opacity var(--bg-fade) ease-out,
-    visibility 0s linear 0s;
-}
-
 /* The day sky sits behind the board out of focus, so nothing back there
    competes with the cards for attention. The blur is on each element rather
    than the wrapper on purpose: a filter over the wrapper re-rasterises the
