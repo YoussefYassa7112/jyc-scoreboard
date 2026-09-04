@@ -115,6 +115,7 @@ function chromeClasses(chrome: "all" | "red" | "green") {
 function BlockCard({
   block,
   accent,
+  paint,
   highlighted,
   status = "untimed",
   endsInMs,
@@ -123,14 +124,22 @@ function BlockCard({
 }: {
   block: ScheduleBlock;
   accent: "all" | "red" | "green";
+  paint?: string;
   highlighted?: boolean;
   status?: BlockStatus;
   endsInMs?: number | null;
   onViewMap?: (locationId?: string) => void;
   mapSpots?: { id: string; label: string }[];
 }) {
-  // Color by the event's own group — Everyone stays blue even on Red/Green.
+  // Color by the event's own group — Everyone stays blue even on Red/Green, so
+  // a shared event still reads as shared. The camper's own events take their
+  // bracelet colour when there is one.
   const colors = chromeClasses(accent);
+  const own = accent !== "all" && paint;
+  const cardStyle = own
+    ? { borderColor: `${paint}8c`, borderLeftColor: paint }
+    : undefined;
+  const timeStyle = own ? { color: paint } : undefined;
   // Where an event happens when none of its locations are on a map.
   const offMapNote = offMapNoteFor(block.locationIds);
   const done = status === "done";
@@ -145,10 +154,11 @@ function BlockCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springSnappy}
+      style={done ? undefined : cardStyle}
       className={`relative overflow-hidden rounded-2xl border border-l-4 p-3.5 text-card-ink shadow-sm sm:p-4 ${
         done
           ? "schedule-done border-[#8a8178]/40 border-l-[#8a8178] bg-[#ebe4da] dark:bg-card"
-          : `bg-card ${colors.cardBorder}`
+          : `bg-card ${own ? "" : colors.cardBorder}`
       } ${
         highlighted && !done
           ? `bg-laser/15 ring-2 ring-laser ring-offset-2 ring-offset-transparent`
@@ -159,8 +169,13 @@ function BlockCard({
         <div className="min-w-0">
           {block.time ? (
             <p
+              style={done ? undefined : timeStyle}
               className={`text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
-                done ? "text-muted-soft line-through" : colors.time
+                done
+                  ? "text-muted-soft line-through"
+                  : own
+                    ? ""
+                    : colors.time
               }`}
             >
               {block.time}
@@ -203,8 +218,9 @@ function BlockCard({
       ) : null}
       {block.location ? (
         <p
+          style={done ? undefined : timeStyle}
           className={`mt-1 text-sm font-bold ${
-            done ? "text-muted-soft" : colors.time
+            done ? "text-muted-soft" : own ? "" : colors.time
           }`}
         >
           <span className="text-muted-soft">Location · </span>
@@ -279,11 +295,14 @@ function Section({
   now,
   blocks,
   cabins,
+  paint,
   highlightBlockId,
   onViewMapFor,
 }: {
   title: string;
   tint: "all" | "red" | "green";
+  /** The camper's bracelet colour, when this heading is their own track. */
+  paint?: string;
   day: CampDay;
   now: Date;
   blocks: ScheduleBlock[];
@@ -300,14 +319,27 @@ function Section({
         ? "bg-[#2F8F4E] text-on-strong"
         : "bg-[#1E6BB8] text-on-strong";
 
+  // `paint` is the camper's bracelet. When it is set the heading wears that
+  // colour instead of the track's, so the list matches the banner above it.
+  const painted = paint
+    ? { backgroundColor: paint, color: inkOn(paint) }
+    : undefined;
+
   return (
     <div className="space-y-3">
-      <div className={`rounded-2xl px-3.5 py-2.5 ${headerBg}`}>
-        <h3 className="display-font text-lg font-bold text-on-strong sm:text-xl">
+      <div
+        className={`rounded-2xl px-3.5 py-2.5 ${paint ? "" : headerBg}`}
+        style={painted}
+      >
+        <h3
+          className={`display-font text-lg font-bold sm:text-xl ${paint ? "" : "text-on-strong"}`}
+        >
           {title}
         </h3>
         {cabins?.length ? (
-          <p className="mt-1 text-xs font-semibold text-on-strong/90 sm:text-sm">
+          <p
+            className={`mt-1 text-xs font-semibold sm:text-sm ${paint ? "opacity-90" : "text-on-strong/90"}`}
+          >
             Cabins: {cabins.join(" · ")}
           </p>
         ) : null}
@@ -321,6 +353,7 @@ function Section({
               key={block.id}
               block={block}
               accent={tint}
+              paint={paint}
               status={status}
               endsInMs={count?.endsIn}
               highlighted={highlightBlockId === block.id}
@@ -716,8 +749,6 @@ export function CampSchedule({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showGroupedNowNext, activeTrack, nowTick, daysForYou]);
 
-  const chrome: "all" | "red" | "green" =
-    track === "red" || track === "green" ? track : "all";
   const morning = day.blocks.filter(
     (b) => b.section === "morning" && b.group === "all",
   );
@@ -727,12 +758,22 @@ export function CampSchedule({
   const fullDay = day.blocks.filter((b) => b.section === "full");
   const redBlocks = day.blocks.filter((b) => b.group === "red");
   const greenBlocks = day.blocks.filter((b) => b.group === "green");
-  const dayActiveClass =
-    chrome === "green"
-      ? "bg-[#2F8F4E] text-on-strong shadow-sm"
-      : chrome === "red"
-        ? "bg-[#C45C26] text-on-strong shadow-sm"
-        : "bg-[#1E6BB8] text-on-strong shadow-sm";
+  // The chosen day used to take the group's colour, which put a second,
+  // competing identity on screen next to the bracelet. It uses the board's own
+  // highlight now, the same one every other selected control uses.
+  // The camper's own track wears their bracelet; anyone browsing without a
+  // team still sees the plain group headings.
+  const myBracelet = activeCabinId ? getCabin(activeCabinId) : null;
+  const headingFor = (g: "red" | "green") =>
+    lockedGroup === g && myBracelet
+      ? `${myBracelet.name} bracelet`
+      : g === "red"
+        ? "Red group"
+        : "Green group";
+  const paintFor = (g: "red" | "green") =>
+    lockedGroup === g && myBracelet ? myBracelet.swatch : undefined;
+
+  const dayActiveClass = "bg-star text-on-star shadow-sm";
 
   function handleViewMap(block: ScheduleBlock, locationId?: string) {
     setMapNotice(null);
@@ -967,28 +1008,6 @@ export function CampSchedule({
                       ? ` · ${cabin.label}`
                       : " — ask a leader which bracelet you wear"}
                   </p>
-                  {activeCabinId ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const showingAll =
-                            peekFullGroup || track !== myTeam.campGroup;
-                          setPeekFullGroup(!showingAll);
-                          if (showingAll && myTeam.campGroup) {
-                            setTrack(myTeam.campGroup);
-                          }
-                          setHighlightId(null);
-                        }}
-                        className="min-h-11 rounded-xl px-3 py-2 text-xs font-extrabold"
-                        style={{ backgroundColor: scrim, color: ink }}
-                      >
-                        {peekFullGroup || track !== myTeam.campGroup
-                          ? "Just my bracelet"
-                          : "See every event"}
-                      </button>
-                    </div>
-                  ) : null}
                 </div>
               );
             })()
@@ -1131,7 +1150,8 @@ export function CampSchedule({
               {track === "overview" ? (
                 filterCabinId && getCabin(filterCabinId)?.group === "red" ? (
                   <Section
-                    title="Red group"
+                    title={headingFor("red")}
+                    paint={paintFor("red")}
                     tint="red"
                     day={day}
                     now={new Date(nowTick)}
@@ -1142,7 +1162,8 @@ export function CampSchedule({
                   />
                 ) : filterCabinId && getCabin(filterCabinId)?.group === "green" ? (
                   <Section
-                    title="Green group"
+                    title={headingFor("green")}
+                    paint={paintFor("green")}
                     tint="green"
                     day={day}
                     now={new Date(nowTick)}
@@ -1154,7 +1175,8 @@ export function CampSchedule({
                 ) : (
                 <div className="grid gap-5 lg:grid-cols-2">
                   <Section
-                    title="Red group"
+                    title={headingFor("red")}
+                    paint={paintFor("red")}
                     tint="red"
                     day={day}
                     now={new Date(nowTick)}
@@ -1164,7 +1186,8 @@ export function CampSchedule({
                     onViewMapFor={handleViewMap}
                   />
                   <Section
-                    title="Green group"
+                    title={headingFor("green")}
+                    paint={paintFor("green")}
                     tint="green"
                     day={day}
                     now={new Date(nowTick)}
@@ -1179,7 +1202,8 @@ export function CampSchedule({
 
               {track === "red" ? (
                 <Section
-                  title="Red group"
+                  title={headingFor("red")}
+                    paint={paintFor("red")}
                   tint="red"
                   day={day}
                   now={new Date(nowTick)}
@@ -1196,7 +1220,8 @@ export function CampSchedule({
 
               {track === "green" ? (
                 <Section
-                  title="Green group"
+                  title={headingFor("green")}
+                    paint={paintFor("green")}
                   tint="green"
                   day={day}
                   now={new Date(nowTick)}
