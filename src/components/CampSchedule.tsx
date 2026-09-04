@@ -20,6 +20,7 @@ import {
   inkOn,
   scrimOn,
 } from "@/lib/cabins";
+import { expandRotationForCabin } from "@/lib/rotations";
 import {
   clearRemindersForDay,
 } from "@/lib/event-reminders";
@@ -608,6 +609,10 @@ export function CampSchedule({
         ...d,
         blocks: d.blocks
           .filter((b) => blockVisibleToCabin(b, filterCabinId))
+          // Rotations become one event per round before anything else looks
+          // at them, so a card, a map button and a reminder all describe the
+          // same single activity in a single place.
+          .flatMap((b) => expandRotationForCabin(b, filterCabinId))
           .map((b) => ({ ...b, details: detailsForCabin(b, filterCabinId) })),
       })),
     [days, filterCabinId],

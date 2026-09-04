@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { blockVisibleToCabin } from "@/lib/cabins";
+import { expandRotationForCabin } from "@/lib/rotations";
 import {
   blocksForGroup,
   eventDateTimes,
@@ -77,7 +78,9 @@ function markSent(key: string) {
   firedThisSession.add(key);
   if (typeof window === "undefined") return;
   try {
-    const next = [...readSent().filter((k) => k !== key), key].slice(-SENT_LIMIT);
+    const next = [...readSent().filter((k) => k !== key), key].slice(
+      -SENT_LIMIT,
+    );
     window.localStorage.setItem(SENT_KEY, JSON.stringify(next));
   } catch {
     /* private mode */
@@ -147,16 +150,20 @@ function timedEvents(
 ): TimedItem[] {
   const timed: TimedItem[] = [];
   for (const day of getScheduleDays(now)) {
-    for (const block of blocksForGroup(day, group)) {
-      if (!blockVisibleToCabin(block, cabinId)) continue;
-      const times = eventDateTimes(day, block);
-      if (!times) continue;
-      timed.push({
-        dayId: day.id,
-        block,
-        start: times.start.getTime(),
-        end: times.end.getTime(),
-      });
+    for (const parent of blocksForGroup(day, group)) {
+      if (!blockVisibleToCabin(parent, cabinId)) continue;
+      // Same split the schedule shows, so "Head to B1 — Caf" is the truth for
+      // the round that is actually starting.
+      for (const block of expandRotationForCabin(parent, cabinId)) {
+        const times = eventDateTimes(day, block);
+        if (!times) continue;
+        timed.push({
+          dayId: day.id,
+          block,
+          start: times.start.getTime(),
+          end: times.end.getTime(),
+        });
+      }
     }
   }
   timed.sort((a, b) => a.start - b.start || a.end - b.end);
@@ -171,7 +178,10 @@ function reminderFromBlock(
   const detail = [item.block.time, item.block.location]
     .filter(Boolean)
     .join(" · ");
-  const body = [trackLabel(item.block.group as ReminderGroup), detail || "Check the camp schedule."]
+  const body = [
+    trackLabel(item.block.group as ReminderGroup),
+    detail || "Check the camp schedule.",
+  ]
     .filter(Boolean)
     .join(" · ");
   const minutes = Math.max(1, Math.round((item.start - nowMs) / 60_000));
@@ -182,9 +192,7 @@ function reminderFromBlock(
       phase,
       headline: "Happening now",
       title: item.block.title,
-      body: item.block.location
-        ? `Head to ${item.block.location}`
-        : body,
+      body: item.block.location ? `Head to ${item.block.location}` : body,
     };
   }
   return {
@@ -192,9 +200,7 @@ function reminderFromBlock(
     phase,
     headline: "Time to go",
     title: `${item.block.title} · ${minutes} min`,
-    body: item.block.location
-      ? `Walk over to ${item.block.location}`
-      : body,
+    body: item.block.location ? `Walk over to ${item.block.location}` : body,
     minutes,
   };
 }
@@ -262,7 +268,9 @@ export function findScheduleAlert(
   previousNow: Date | null = null,
   options: ScheduleAlertOptions = {},
 ): DueReminder | null {
-  return findScheduleAlerts(group, now, alreadySent, previousNow, options)[0] ?? null;
+  return (
+    findScheduleAlerts(group, now, alreadySent, previousNow, options)[0] ?? null
+  );
 }
 
 /**
@@ -366,7 +374,10 @@ export function useEventReminders(
     // Backgrounded tabs stop polling entirely; returning re-checks immediately,
     // so nothing due while away is missed.
     const onVis = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      ) {
         window.clearInterval(id);
         return;
       }
