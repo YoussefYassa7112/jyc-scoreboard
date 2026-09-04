@@ -95,6 +95,48 @@ export function writeMyTeamSnapshot(snapshot: MyTeamSnapshot | null) {
   });
 }
 
+/**
+ * The two halves of the snapshot are chosen on different screens: the schedule
+ * asks for a bracelet, the standings ask which team you are cheering for. Each
+ * writes through one of these so it cannot flatten the other's answer.
+ */
+export function setMyBracelet(
+  cabin: { id: number; group: "red" | "green" } | null,
+) {
+  const snap = readMyTeamSnapshot();
+  if (!cabin) {
+    // Dropping the bracelet does not disown the team, but a team implies a
+    // group, so the group stays only while the team does.
+    if (snap?.teamId == null) return writeMyTeamSnapshot(null);
+    return writeMyTeamSnapshot({ ...snap, cabinId: null });
+  }
+  writeMyTeamSnapshot({
+    teamId: snap?.teamId ?? null,
+    teamName: snap?.teamName,
+    campGroup: cabin.group,
+    cabinId: cabin.id,
+  });
+}
+
+export function setMyTeamChoice(team: { id: number; name: string } | null) {
+  const snap = readMyTeamSnapshot();
+  if (!team) {
+    if (snap?.cabinId == null) return writeMyTeamSnapshot(null);
+    return writeMyTeamSnapshot({
+      ...snap,
+      teamId: null,
+      teamName: undefined,
+    });
+  }
+  writeMyTeamSnapshot({
+    ...snap,
+    teamId: team.id,
+    teamName: team.name,
+    campGroup: snap?.campGroup ?? null,
+    cabinId: snap?.cabinId ?? null,
+  });
+}
+
 /** Drop a saved "my team" if that team is no longer on the live roster. */
 export function dropMissingMyTeam(standings: StandingRow[]) {
   // An empty roster is not evidence that a team was deleted — it is what a
@@ -107,13 +149,14 @@ export function dropMissingMyTeam(standings: StandingRow[]) {
   // A bracelet-only choice has no team to go missing.
   if (snap.teamId == null) return;
   if (standings.some((row) => row.id === snap.teamId)) return;
-  writeMyTeamSnapshot(null);
+  // Only the team went missing. The bracelet is still on the camper's wrist.
+  setMyTeamChoice(null);
 }
 
 /** Wipe every local trace of a deleted team on this device. */
 export function forgetTeamEverywhere(teamId: number) {
   const snap = readMyTeamSnapshot();
-  if (snap?.teamId === teamId) writeMyTeamSnapshot(null);
+  if (snap?.teamId === teamId) setMyTeamChoice(null);
 
   const cache = readStandingsCache();
   if (cache) {

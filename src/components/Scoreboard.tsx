@@ -48,6 +48,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { OrbitArena } from "./OrbitArena";
 import { ControlDock } from "./ControlDock";
 import { SkyDecor } from "./SkyDecor";
+import { MyTeamPicker } from "./MyTeamPicker";
 import { StandingsList } from "./StandingsList";
 import { ReachForTheSkyMarquee } from "./SurpriseFX";
 
@@ -950,7 +951,13 @@ export function Scoreboard() {
                 ) : null}
 
                 {data && data.standings.length > 0 ? (
-                  <StandingsList standings={data.standings} />
+                  <>
+                    <MyTeamPicker
+                      standings={data.standings}
+                      myTeamId={myTeam?.teamId ?? null}
+                    />
+                    <StandingsList standings={data.standings} />
+                  </>
                 ) : null}
               </motion.section>
             )}

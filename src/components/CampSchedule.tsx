@@ -32,7 +32,7 @@ import {
 import { LIVE_CAMP_SIM, resetLiveSimClock } from "@/lib/schedule-sim";
 import {
   readMyTeamSnapshot,
-  writeMyTeamSnapshot,
+  setMyBracelet,
   type MyTeamSnapshot,
 } from "@/lib/offline";
 import {
@@ -538,21 +538,18 @@ export function CampSchedule({
     setPeekFullGroup(false);
     setBracelet(cabinId);
     if (cabinId == null) {
-      writeMyTeamSnapshot(null);
-      setTeamSnapshot(null);
+      // Through the helper, because the standings own the other half of this
+      // record — clearing the bracelet must not disown the team.
+      setMyBracelet(null);
+      setTeamSnapshot(readMyTeamSnapshot());
       setTrack("overview");
       teamTrackReady.current = true;
       return;
     }
     const cabin = getCabin(cabinId);
     if (!cabin) return;
-    const next: MyTeamSnapshot = {
-      teamId: null,
-      campGroup: cabin.group,
-      cabinId: cabin.id,
-    };
-    setTeamSnapshot(next);
-    writeMyTeamSnapshot(next);
+    setMyBracelet({ id: cabin.id, group: cabin.group });
+    setTeamSnapshot(readMyTeamSnapshot());
     setTrack(cabin.group);
     teamTrackReady.current = true;
     onTeamSwitch?.(cabin.group, cabin.id);
