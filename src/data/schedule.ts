@@ -137,7 +137,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "4:00 – 4:45 PM",
+        time: "6:00 – 6:45 PM",
         location: "B1-B Salle Le Bivouac (English room)",
         locationIds: ["bivouac"],
         group: "red",
@@ -147,7 +147,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-snack-a",
         title: "Snack",
-        time: "4:00 – 4:45 PM",
+        time: "6:00 – 6:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "red",
@@ -177,7 +177,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-arbre",
         title: "Arbre en Arbre",
-        time: "6:00 – 7:00 PM",
+        time: "4:00 – 5:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "red",
@@ -256,7 +256,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-snack-a",
         title: "Snack",
-        time: "4:00 – 4:45 PM",
+        time: "6:00 – 6:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "green",
@@ -266,7 +266,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "4:00 – 4:45 PM",
+        time: "6:00 – 6:45 PM",
         location: "B1-B Salle Le Nordet (French room)",
         locationIds: ["nordet"],
         group: "green",
@@ -296,14 +296,14 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "6:00 – 7:00 PM",
+        time: "4:00 – 5:00 PM",
         location: "BabyFoot in B1 — Caf · Outside",
         locationIds: ["caf", "outside"],
         group: "green",
         section: "midday",
         details: [
-          "6:00 – 6:30 — Navy Blue: BabyFoot · Orange: Kickball · Yellow: Obstacle Course · Teal: Pulling Tire (TTT)",
-          "6:30 – 7:00 — Navy Blue: Kickball · Orange: BabyFoot · Yellow: Pulling Tire (TTT) · Teal: Obstacle Course",
+          "4:00 – 4:30 — Navy Blue: BabyFoot · Orange: Kickball · Yellow: Obstacle Course · Teal: Pulling Tire (TTT)",
+          "4:30 – 5:00 — Navy Blue: Kickball · Orange: BabyFoot · Yellow: Pulling Tire (TTT) · Teal: Obstacle Course",
         ],
       },
       {
