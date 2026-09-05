@@ -23,10 +23,10 @@ export const campCabins: CabinInfo[] = [
   { id: 2, group: "red", name: "Red", swatch: "#ef4444", label: "Valera G. + Youssef Y." },
   { id: 3, group: "red", name: "Light Blue", swatch: "#7dd3fc", label: "Karine A. + Mickel S." },
   { id: 4, group: "red", name: "Purple", swatch: "#a855f7", label: "Robert M. + Imy S." },
-  { id: 5, group: "green", name: "Navy Blue", swatch: "#1e3a8a", label: "Carol H. + Julie" },
+  { id: 5, group: "green", name: "Navy Blue", swatch: "#1e3a8a", label: "Maria E. + Gab N." },
   { id: 6, group: "green", name: "Orange", swatch: "#f97316", label: "Mark T. + Yoanna S." },
   { id: 7, group: "green", name: "Yellow", swatch: "#facc15", label: "Jean N. + Christina F." },
-  { id: 8, group: "green", name: "Teal", swatch: "#14b8a6", label: "Maria E. + Gab N." },
+  { id: 8, group: "green", name: "Teal", swatch: "#14b8a6", label: "Carol H. + Julie" },
 ];
 
 /**
