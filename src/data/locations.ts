@@ -20,13 +20,13 @@ export type CampLocation = {
 export const campLocations: CampLocation[] = [
   {
     id: "nordet",
-    label: "B1-B Salle Le Nordet",
+    label: "B1-B Salle Le Nordet (French room)",
     floorId: "basement",
     roomId: "nordet",
   },
   {
     id: "bivouac",
-    label: "B1-B Salle Le Bivouac",
+    label: "B1-B Salle Le Bivouac (English room)",
     floorId: "basement",
     roomId: "bivouac",
   },

@@ -99,9 +99,10 @@ export const basementFloor: FloorPlan = {
     },
     {
       id: "bivouac",
-      name: "Salle Le Bivouac",
-      labelLines: ["Salle", "Le Bivouac"],
-      blurb: "West activity room with an emergency exit.",
+      name: "Salle Le Bivouac (English room)",
+      labelLines: ["Salle Le Bivouac", "(English room)"],
+      blurb:
+        "West activity room with an emergency exit. Topics in English — Green, Red, Light Blue and Purple bracelets.",
       kind: "activity",
       x: 50,
       y: 310,
@@ -121,9 +122,10 @@ export const basementFloor: FloorPlan = {
     },
     {
       id: "nordet",
-      name: "Salle Le Nordet",
-      labelLines: ["Salle Le Nordet"],
-      blurb: "Lounge with sofas and fireplace — main gathering spot.",
+      name: "Salle Le Nordet (French room)",
+      labelLines: ["Salle Le Nordet", "(French room)"],
+      blurb:
+        "Lounge with sofas and fireplace — main gathering spot. Topics in French — Navy Blue, Orange, Yellow and Teal bracelets.",
       kind: "activity",
       x: 500,
       y: 320,
