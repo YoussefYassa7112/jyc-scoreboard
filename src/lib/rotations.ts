@@ -74,9 +74,12 @@ function activityForCabin(line: string, cabin: CabinInfo): string | null {
  * place — so "Happening now" names the activity, the reminder says where to
  * walk, and there is one map button instead of a choice between two.
  *
- * Round times come from dividing the parent block's own span rather than from
- * the time written into each detail line, so this stays right under the camp
- * simulation, which rewrites block times but not the text inside them.
+ * Round times are read from the clock written at the front of each detail
+ * line, then held as fractions of the parent block's own span rather than as
+ * absolute times — so the camp simulation, which rewrites block times but not
+ * the text inside them, still lands every round in the right place. When a
+ * line carries no usable time the span is divided evenly instead, which is
+ * what this did for every round before some of them stopped being adjacent.
  */
 export function expandRotationForCabin(
   block: ScheduleBlock,
@@ -86,10 +89,15 @@ export function expandRotationForCabin(
   if (!rounds) return [block];
 
   const span = blockSpan(block);
+  const written = writtenRoundFractions(block, rounds.length);
   return rounds.map((activity, index) => {
     const locationId = rotationVenue(activity);
     const where = getLocation(locationId);
-    const slice = span ? sliceSpan(span, index, rounds.length) : null;
+    const slice = span
+      ? written
+        ? sliceFraction(span, written[index])
+        : sliceSpan(span, index, rounds.length)
+      : null;
     return {
       ...block,
       id: `${block.id}-r${index + 1}`,
@@ -114,6 +122,51 @@ function blockSpan(block: ScheduleBlock): Span | null {
   const range = parseTimeRange(block.time);
   if (!range || range.endMin <= range.startMin) return null;
   return { start: range.startMin, end: range.endMin, absolute: false };
+}
+
+/**
+ * Each round's place inside the parent, as a fraction of its span.
+ *
+ * Two forty-five minute rounds inside a hundred-and-five minute block are not
+ * two fifty-two minute halves: there is a quarter of an hour between them, and
+ * dividing the span evenly quietly invents a different schedule. The times at
+ * the head of each detail line say where the rounds really sit.
+ *
+ * Returns null — meaning "divide evenly" — unless every line yields a range
+ * that sits inside the parent and runs forwards.
+ */
+function writtenRoundFractions(
+  block: ScheduleBlock,
+  count: number,
+): { from: number; to: number }[] | null {
+  const parent = parseTimeRange(block.time);
+  if (!parent || parent.endMin <= parent.startMin) return null;
+  const total = parent.endMin - parent.startMin;
+  // A round line writes "1:00 – 1:45" with no AM/PM; the parent knows which.
+  const meridiem = block.time?.match(/(AM|PM)/i)?.[0] ?? "";
+
+  const out: { from: number; to: number }[] = [];
+  for (const line of block.details ?? []) {
+    const head = line.split("—")[0];
+    if (!head || head === line) return null;
+    const text = /(AM|PM)/i.test(head) ? head : `${head.trim()} ${meridiem}`;
+    const range = parseTimeRange(text);
+    if (!range || range.endMin <= range.startMin) return null;
+    const from = (range.startMin - parent.startMin) / total;
+    const to = (range.endMin - parent.startMin) / total;
+    if (from < -0.001 || to > 1.001 || to <= from) return null;
+    out.push({ from, to });
+  }
+  return out.length === count ? out : null;
+}
+
+function sliceFraction(span: Span, f: { from: number; to: number }) {
+  const total = span.end - span.start;
+  return {
+    start: Math.round(span.start + total * f.from),
+    end: Math.round(span.start + total * f.to),
+    absolute: span.absolute,
+  };
 }
 
 function sliceSpan(span: Span, index: number, count: number) {
