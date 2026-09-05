@@ -84,7 +84,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "3:00 – 3:45 PM",
+        time: "1:00 – 1:45 PM",
         location: "B1-B Salle Le Bivouac (English room)",
         locationIds: ["bivouac"],
         group: "red",
@@ -94,7 +94,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-lunch-a",
         title: "Lunch",
-        time: "3:00 – 3:45 PM",
+        time: "1:00 – 1:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "red",
@@ -124,20 +124,20 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "1:00 – 2:00 PM",
+        time: "3:00 – 4:00 PM",
         location: "Outside · BabyFoot in B1 — Caf",
         locationIds: ["outside", "caf"],
         group: "red",
         section: "midday",
         details: [
-          "1:00 – 1:30 — Green: Obstacle Course · Red: Pulling Tire (TTT) · Light Blue: BabyFoot · Purple: Kickball",
-          "1:30 – 2:00 — Green: Pulling Tire (TTT) · Red: Obstacle Course · Light Blue: Kickball · Purple: BabyFoot",
+          "3:00 – 3:30 — Green: Obstacle Course · Red: Pulling Tire (TTT) · Light Blue: BabyFoot · Purple: Kickball",
+          "3:30 – 4:00 — Green: Pulling Tire (TTT) · Red: Obstacle Course · Light Blue: Kickball · Purple: BabyFoot",
         ],
       },
       {
         id: "d1-red-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "6:00 – 6:45 PM",
+        time: "4:00 – 4:45 PM",
         location: "B1-B Salle Le Bivouac (English room)",
         locationIds: ["bivouac"],
         group: "red",
@@ -147,7 +147,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-snack-a",
         title: "Snack",
-        time: "6:00 – 6:45 PM",
+        time: "4:00 – 4:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "red",
@@ -177,7 +177,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-arbre",
         title: "Arbre en Arbre",
-        time: "4:00 – 5:00 PM",
+        time: "6:00 – 7:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "red",
@@ -207,7 +207,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-lunch-a",
         title: "Lunch",
-        time: "3:00 – 3:45 PM",
+        time: "1:00 – 1:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "green",
@@ -217,7 +217,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "3:00 – 3:45 PM",
+        time: "1:00 – 1:45 PM",
         location: "B1-B Salle Le Nordet (French room)",
         locationIds: ["nordet"],
         group: "green",
@@ -247,7 +247,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-arbre",
         title: "Arbre en Arbre",
-        time: "1:00 – 2:00 PM",
+        time: "3:00 – 4:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "green",
@@ -256,7 +256,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-snack-a",
         title: "Snack",
-        time: "6:00 – 6:45 PM",
+        time: "4:00 – 4:45 PM",
         location: "On the go",
         locationIds: ["on-the-go"],
         group: "green",
@@ -266,7 +266,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic2-a",
         title: "Topic 2: What God created us to be",
-        time: "6:00 – 6:45 PM",
+        time: "4:00 – 4:45 PM",
         location: "B1-B Salle Le Nordet (French room)",
         locationIds: ["nordet"],
         group: "green",
@@ -296,14 +296,14 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "4:00 – 5:00 PM",
+        time: "6:00 – 7:00 PM",
         location: "BabyFoot in B1 — Caf · Outside",
         locationIds: ["caf", "outside"],
         group: "green",
         section: "midday",
         details: [
-          "4:00 – 4:30 — Navy Blue: BabyFoot · Orange: Kickball · Yellow: Obstacle Course · Teal: Pulling Tire (TTT)",
-          "4:30 – 5:00 — Navy Blue: Kickball · Orange: BabyFoot · Yellow: Pulling Tire (TTT) · Teal: Obstacle Course",
+          "6:00 – 6:30 — Navy Blue: BabyFoot · Orange: Kickball · Yellow: Obstacle Course · Teal: Pulling Tire (TTT)",
+          "6:30 – 7:00 — Navy Blue: Kickball · Orange: BabyFoot · Yellow: Pulling Tire (TTT) · Teal: Obstacle Course",
         ],
       },
       {
