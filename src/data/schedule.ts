@@ -84,7 +84,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "1:00 – 1:45 PM",
+        time: "3:00 – 3:45 PM",
         location: "B1-B Salle Le Bivouac (English room)",
         locationIds: ["bivouac"],
         group: "red",
@@ -94,7 +94,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-lunch-a",
         title: "Lunch",
-        time: "1:00 – 1:45 PM",
+        time: "3:00 – 3:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "red",
@@ -124,14 +124,14 @@ export const campDays: CampDay[] = [
       {
         id: "d1-red-rotations",
         title: "Rotating Activities (2 rounds)",
-        time: "3:00 – 4:00 PM",
+        time: "1:00 – 2:00 PM",
         location: "Outside · BabyFoot in B1 — Caf",
         locationIds: ["outside", "caf"],
         group: "red",
         section: "midday",
         details: [
-          "3:00 – 3:30 — Green: Obstacle Course · Red: Pulling Tire (TTT) · Light Blue: BabyFoot · Purple: Kickball",
-          "3:30 – 4:00 — Green: Pulling Tire (TTT) · Red: Obstacle Course · Light Blue: Kickball · Purple: BabyFoot",
+          "1:00 – 1:30 — Green: Obstacle Course · Red: Pulling Tire (TTT) · Light Blue: BabyFoot · Purple: Kickball",
+          "1:30 – 2:00 — Green: Pulling Tire (TTT) · Red: Obstacle Course · Light Blue: Kickball · Purple: BabyFoot",
         ],
       },
       {
@@ -207,7 +207,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-lunch-a",
         title: "Lunch",
-        time: "1:00 – 1:45 PM",
+        time: "3:00 – 3:45 PM",
         location: "B1 — Caf",
         locationIds: ["caf"],
         group: "green",
@@ -217,7 +217,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-topic1-a",
         title: "Topic 1: What the world is telling you to be",
-        time: "1:00 – 1:45 PM",
+        time: "3:00 – 3:45 PM",
         location: "B1-B Salle Le Nordet (French room)",
         locationIds: ["nordet"],
         group: "green",
@@ -247,7 +247,7 @@ export const campDays: CampDay[] = [
       {
         id: "d1-green-arbre",
         title: "Arbre en Arbre",
-        time: "3:00 – 4:00 PM",
+        time: "1:00 – 2:00 PM",
         location: "Arbre en Arbre course",
         locationIds: ["arbre"],
         group: "green",
